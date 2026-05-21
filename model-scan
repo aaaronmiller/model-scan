@@ -1,0 +1,988 @@
+#!/usr/bin/env python3
+"""
+model-scan v3 — TUIDS-LLM Terminal Output Specification
+Diagnostic instrument panel for LLM provider health.
+One unified list: all models, sorted by Tier + Composite Score.
+Follows TUIDS-LLM color system: TIER|MODEL|ROLE|LAT|T/S|AA|STATUS.
+
+Sources: OpenRouter, Cerebras, Groq, NVIDIA NIM, OpenCode Go, Anthropic, OpenAI, Google, DeepSeek
+Capability data: models.dev (context, pricing, reasoning, tool_calling)
+Benchmark data: Artificial Analysis AI (AA scores)
+"""
+import argparse, asyncio, json, os, re, sys, time
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENV LOADING — all global providers present
+# ─────────────────────────────────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    for p in [Path.home() / ".hermes" / ".env",
+              Path.home() / "code" / "claude-code-proxy" / ".env",
+              Path.home() / ".env"]:
+        if p.exists():
+            load_dotenv(p, override=False)
+except ImportError:
+    pass
+
+_PROVIDER_KEYS = {
+    "openrouter":  ["OPENROUTER_API_KEY", "PROVIDERS_OPENROUTER_API_KEY"],
+    "cerebras":    ["CEREBRAS_API_KEY",   "PROVIDERS_CEREBRAS_API_KEY"],
+    "groq":        ["GROQ_API_KEY",       "PROVIDERS_GROQ_API_KEY"],
+    "nvidia":      ["NVIDIA_API_KEY",     "PROVIDERS_NVIDIA_API_KEY"],
+    "opencode_go": ["OPENCODE_GO_API_KEY","PROVIDERS_OPENCODE_GO_API_KEY"],
+    "anthropic":   ["ANTHROPIC_API_KEY",  "PROVIDERS_ANTHROPIC_API_KEY"],
+    "google":      ["GOOGLE_API_KEY",     "PROVIDERS_GOOGLE_API_KEY"],
+    "openai":      ["OPENAI_API_KEY",     "PROVIDERS_OPENAI_API_KEY"],
+    "deepseek":    ["DEEPSEEK_API_KEY",   "PROVIDERS_DEEPSEEK_API_KEY"],
+}
+
+def get_provider_key(provider: str) -> str:
+    for name in _PROVIDER_KEYS.get(provider.lower(), []):
+        v = os.environ.get(name, "")
+        if v and v != "***" and v != "sk-***":
+            return v
+    return ""
+
+def has_provider_key(provider: str) -> bool:
+    return bool(get_provider_key(provider))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TUIDS-LLM COLOR SYSTEM — 9 semantic roles + glyphs + belt-and-suspenders dim
+# ─────────────────────────────────────────────────────────────────────────────
+class C:
+    RST     = "\033[0m"
+    ERROR   = "\033[1;31m"
+    WARN    = "\033[1;33m"
+    SUCCESS = "\033[1;32m"
+    INFO    = "\033[1;36m"
+    METRICS= "\033[1;34m"
+    DEBUG   = "\033[1;35m"
+    ACCENT  = "\033[1;35m"
+    # Dim variants (belt-and-suspenders)
+    ERROR_D   = "\033[2;31m"
+    WARN_D    = "\033[2;33m"
+    SUCCESS_D = "\033[2;32m"
+    INFO_D    = "\033[2;36m"
+    METRICS_D = "\033[2;34m"
+    DEBUG_D   = "\033[2;35m"
+    ACCENT_D  = "\033[2;35m"
+    # Structural
+    PRIMARY   = ""
+    SECONDARY = "\033[2;37m"
+    META      = "\033[2;90m"
+    # Glyphs
+    CHECK  = "✓"
+    CROSS  = "✗"
+    WARN_G = "⚠"
+    ARROW  = "→"
+    DIAMOND= "◆"
+    BULLET = "●"
+
+def c(role, text): return f"{getattr(C, role.upper(), C.RST)}{text}{C.RST}"
+def t(role, text):
+    g = {"error": C.CROSS, "warn": C.WARN_G, "success": C.CHECK,
+         "info": C.ARROW, "accent": C.DIAMOND}.get(role.lower(), "")
+    return f"{g}{getattr(C, role.upper(), C.RST)}{text}{C.RST}"
+
+SPINNERS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+def spin(frame): return SPINNERS[frame % len(SPINNERS)]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AA FALLBACK SCORES — source: artificialanalysis.ai, May 2026
+# ─────────────────────────────────────────────────────────────────────────────
+AA = {
+    "owl-alpha":                                          {"ai": 72, "ac": 68, "am": 65, "mmlu": 0.82},
+    "poolside/laguna-m.1:free":                          {"ai": 65, "ac": 60, "am": 55, "mmlu": 0.76},
+    "openai/gpt-oss-120b:free":                          {"ai": 70, "ac": 72, "am": 68, "mmlu": 0.84},
+    "nvidia/nemotron-3-super-120b-a12b:free":            {"ai": 68, "ac": 65, "am": 60, "mmlu": 0.80},
+    "qwen/qwen3-coder:free":                             {"ai": 66, "ac": 74, "am": 62, "mmlu": 0.79},
+    "meta-llama/llama-3.3-70b-instruct:free":           {"ai": 64, "ac": 58, "am": 52, "mmlu": 0.77},
+    "minimax/minimax-m2.5:free":                         {"ai": 63, "ac": 58, "am": 54, "mmlu": 0.75},
+    "inclusionai/ling-2.6-1t:free":                       {"ai": 50, "ac": 45, "am": 40, "mmlu": 0.62},
+    "inclusionai/ling-2.6-flash:free":                    {"ai": 42, "ac": 38, "am": 35, "mmlu": 0.55},
+    "cerebras/qwen-3-235b-a22b-instruct-2507":           {"ai": 72, "ac": 70, "am": 65, "mmlu": 0.83},
+    "cerebras/llama3.1-8b":                              {"ai": 48, "ac": 42, "am": 38, "mmlu": 0.60},
+    "groq/openai/gpt-oss-120b":                          {"ai": 70, "ac": 72, "am": 68, "mmlu": 0.84},
+    "groq/llama-3.3-70b-versatile":                     {"ai": 64, "ac": 58, "am": 52, "mmlu": 0.77},
+    "groq/qwen/qwen3-32b":                               {"ai": 66, "ac": 62, "am": 58, "mmlu": 0.78},
+    "nvidia-nim/qwen/qwen3-next-80b-a3b-thinking":       {"ai": 74, "ac": 70, "am": 68, "mmlu": 0.85},
+    "opencode_go/qwen3.6-plus":                           {"ai": 68, "ac": 65, "am": 60, "mmlu": 0.80},
+    "claude-sonnet-4":                                    {"ai": 95, "ac": 90, "am": 88, "mmlu": 0.91},
+    "claude-3-5-sonnet":                                  {"ai": 93, "ac": 88, "am": 86, "mmlu": 0.90},
+    "deepseek-v4-pro":                                   {"ai": 92, "ac": 88, "am": 85, "mmlu": 0.89},
+    "gpt-4o":                                            {"ai": 88, "ac": 85, "am": 82, "mmlu": 0.86},
+    "gpt-4o-mini":                                       {"ai": 78, "ac": 76, "am": 74, "mmlu": 0.80},
+    "gemini-2.5-pro":                                    {"ai": 90, "ac": 86, "am": 83, "mmlu": 0.88},
+    "gemini-2.5-flash":                                  {"ai": 82, "ac": 79, "am": 76, "mmlu": 0.84},
+    "qwen2.5-72b":                                       {"ai": 72, "ac": 70, "am": 68, "mmlu": 0.81},
+    "llama-4-maverick":                                  {"ai": 80, "ac": 78, "am": 75, "mmlu": 0.83},
+    "minimax-2.7":                                       {"ai": 84, "ac": 80, "am": 78, "mmlu": 0.85},
+}
+
+def get_aa(model: str) -> dict:
+    if model in AA: return AA[model]
+    stripped = strip_prefix(model)
+    if stripped in AA: return AA[stripped]
+    or_prefixed = f"openrouter/{stripped}"
+    if or_prefixed in AA: return AA[or_prefixed]
+    return {}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UTILITIES
+# ─────────────────────────────────────────────────────────────────────────────
+def strip_prefix(model: str) -> str:
+    if "/" not in model: return model
+    p = model.split("/")[0].lower()
+    known = {"openrouter","openai","anthropic","google","meta-llama","qwen","nvidia",
+             "minimax","z-ai","cerebras","groq","poolside","inclusionai","tencent",
+             "deepseek","moonshotai","arcee-ai","stepfun","elephant","opencode_go",
+             "opencode-go","nvidia-nim","ollama"}
+    return "/".join(model.split("/")[1:]) if p in known else model
+
+def infer_moe(model: str) -> tuple:
+    m = re.search(r'(\d+)x(\d+(?:\.\d+)?)b', model, re.I)
+    if m:
+        return (float(m.group(1)) * float(m.group(2)), float(m.group(2)))
+    m = re.search(r'(?:^|[-/a-z])(\d+(?:\.\d+)?)b(?:[-/]|$)', model, re.I)
+    if m: return (float(m.group(1)), float(m.group(1)))
+    return (0.0, 0.0)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TIER GRADING — S/A/B/C based on composite score
+# S: >89, A: 84-89 (MiniMax-2.7 baseline), B: 70-83, C: 55-69, —: ungraded
+# ─────────────────────────────────────────────────────────────────────────────
+MINIMAX_BASELINE = 84
+
+def compute_tier(result: dict) -> str:
+    aa = get_aa(result.get("model",""))
+    ai_score = aa.get("ai", 0)
+    lat_s = result.get("lat_s", 999)
+    rel = result.get("reliability", 0)
+    if rel < 0.5: return "—"
+
+    composite = ai_score
+    if lat_s > 5:   composite -= 10
+    elif lat_s > 2: composite -= 5
+    elif lat_s > 1: composite -= 2
+    if rel >= 0.99: composite += 5
+
+    total, activated = infer_moe(result.get("model",""))
+    if activated and activated < total: composite += 3
+
+    if composite >= MINIMAX_BASELINE + 5: return "S"
+    elif composite >= MINIMAX_BASELINE: return "A"
+    elif composite >= 70: return "B"
+    elif composite >= 55: return "C"
+    return "—"
+
+def compute_composite(result: dict) -> int:
+    aa = get_aa(result.get("model",""))
+    composite = aa.get("ai", 0)
+    lat_s = result.get("lat_s", 999)
+    rel = result.get("reliability", 0)
+    if lat_s > 5:   composite -= 10
+    elif lat_s > 2: composite -= 5
+    elif lat_s > 1: composite -= 2
+    if rel >= 0.99: composite += 5
+    return max(0, int(composite))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROLE ASSIGNMENT — primary, reasoner, fast, vision, code, hybrid, general, —
+# ─────────────────────────────────────────────────────────────────────────────
+def assign_role(result: dict) -> str:
+    rel = result.get("reliability", 0)
+    tok_s = result.get("tok_s", 0)
+    aa = get_aa(result.get("model",""))
+    ai = aa.get("ai", 0)
+    has_tools = result.get("tools", False)
+    if rel < 0.5: return "—"
+
+    tier = compute_tier(result)
+    if tier == "S" and has_tools and ai >= 85: return "primary"
+    if ai >= 70 and not has_tools and tok_s < 50: return "reasoner"
+    if tok_s >= 100 and rel >= 0.9: return "fast"
+    model = result.get("model", "").lower()
+    if any(x in model for x in ["vision", "gemini", "claude"]): return "vision"
+    if aa.get("ac", 0) >= 65: return "code"
+    if has_tools and ai >= 60: return "hybrid"
+    if has_tools: return "general"
+    return "—"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STATUS & FAILURE ANALYSIS
+# ─────────────────────────────────────────────────────────────────────────────
+FAIL_TYPES = {
+    "auth_error": "401/403", "rate_limit": "429",
+    "empty": "empty", "timeout": "T/O",
+    "schema": "bad JSON", "http_4xx": "4xx",
+    "http_5xx": "5xx", "unknown": "?",
+}
+
+def get_status(result: dict) -> tuple:
+    rel = result.get("reliability", 0)
+    lat_s = result.get("lat_s", 0)
+    if rel >= 0.99: return (C.CHECK, "success", "")
+    elif rel >= 0.5:
+        reason = []
+        if lat_s > 5: reason.append(f"{lat_s:.0f}s")
+        dom = result.get("dom_fail", "")
+        if dom: reason.append(FAIL_TYPES.get(dom, dom))
+        return (C.WARN_G, "warn", " ".join(reason))
+    else:
+        dom = result.get("dom_fail", "")
+        reason = FAIL_TYPES.get(dom, dom) if dom else "?"
+        return (C.CROSS, "error", reason)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HTTP CLIENT
+# ─────────────────────────────────────────────────────────────────────────────
+try:
+    import httpx
+except ImportError:
+    print("Missing: pip install --user httpx", file=sys.stderr); sys.exit(1)
+
+def _get_api_model(provider: str, model: str, original: str = None) -> str:
+    """Get the model identifier to send to the API endpoint."""
+    orig = original or model
+    # For openrouter, ALWAYS use provider/model-id format
+    if provider == "openrouter":
+        return orig if orig else f"openrouter/{model}"
+    # Groq uses bare model names (no slash)
+    elif provider == "groq":
+        return model.split("/")[-1] if "/" in model else model
+    # Cerebras, OpenCode Go
+    elif provider in ("cerebras", "opencode_go"):
+        return model.split("/")[-1] if "/" in model else model
+    return model
+
+async def probe_model(client, provider: str, model: str, base_url: str,
+                      key_env: str, shots: int = 1, original: str = None) -> dict:
+    api_key = get_provider_key(provider)
+    if not api_key:
+        return {"provider": provider, "model": model, "reliability": 0,
+                "lat_s": 0, "tok_s": 0, "empty": 0, "tools": False,
+                "fails": {"auth_error": 1}, "dom_fail": "auth_error", "status": "no_key"}
+
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    api_model = _get_api_model(provider, model, original)
+
+    payload = {
+        "model": api_model,
+        "messages": [{"role": "user", "content": "reply with one word: pong"}],
+        "max_tokens": 256, "temperature": 0.0
+    }
+
+    ok = 0; empty = 0; lats = []; speeds = []; fails = []
+
+    for _ in range(shots):
+        t0 = time.perf_counter()
+        try:
+            resp = await client.post(url, json=payload, headers=headers, timeout=20)
+            elapsed = time.perf_counter() - t0
+
+            if resp.status_code in (401, 403): fails.append("auth_error"); continue
+            if resp.status_code == 429: fails.append("rate_limit"); continue
+            if resp.status_code >= 400: fails.append(f"http_{resp.status_code}"); continue
+
+            try: data = resp.json()
+            except: fails.append("schema"); continue
+
+            choices = data.get("choices", [])
+            if not choices: fails.append("empty"); empty += 1; continue
+
+            content = (choices[0].get("message", {}).get("content", "") or "").strip()
+            if not content: fails.append("empty"); empty += 1; continue
+
+            ok += 1; lats.append(elapsed)
+            usage = data.get("usage", {})
+            ct = usage.get("completion_tokens") or max(1, len(content.split()))
+            if elapsed > 0: speeds.append(ct / elapsed)
+
+        except httpx.TimeoutException: fails.append("timeout")
+        except Exception: fails.append("unknown")
+
+    rel = ok / shots if shots else 0
+    dom = Counter(fails).most_common(1)[0][0] if fails else None
+
+    return {
+        "provider": provider, "model": model,
+        "reliability": rel,
+        "lat_s": sum(lats)/len(lats) if lats else 0,
+        "tok_s": sum(speeds)/len(speeds) if speeds else 0,
+        "empty": empty, "tools": False,
+        "fails": dict(Counter(fails)), "dom_fail": dom,
+        "status": "ok" if rel >= 0.5 else "fail"
+    }
+
+async def probe_tools(client, provider: str, model: str, base_url: str, original: str = None) -> bool:
+    api_key = get_provider_key(provider)
+    if not api_key: return False
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    api_model = _get_api_model(provider, model, original)
+
+    payload = {
+        "model": api_model,
+        "messages": [{"role": "user", "content": "What is 2+2?"}],
+        "tools": [{"type": "function", "function": {
+            "name": "calc", "description": "math",
+            "parameters": {"type": "object", "properties": {"e": {"type": "string"}}, "required": ["e"]}
+        }}],
+        "max_tokens": 64, "temperature": 0.0
+    }
+
+    try:
+        resp = await client.post(url, json=payload, headers=headers, timeout=15)
+        if resp.status_code >= 400: return False
+        data = resp.json()
+        choices = data.get("choices", [])
+        if not choices: return False
+        msg = choices[0].get("message", {})
+        return bool(msg.get("tool_calls") or
+                    choices[0].get("finish_reason") in ("tool_calls", "function_call"))
+    except: return False
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER CONFIGURATION — curated list per user requirements
+# ─────────────────────────────────────────────────────────────────────────────
+PROVIDERS = {
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "key_env": "OPENROUTER_API_KEY",
+        "models": [
+            "owl-alpha", "poolside/laguna-m.1:free", "poolside/laguna-xs.2:free",
+            "openai/gpt-oss-120b:free", "openai/gpt-oss-20b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/nemotron-nano-9b-v2:free", "nvidia/nemotron-nano-12b-v2-vl:free",
+            "qwen/qwen3-coder:free", "qwen/qwen3-next-80b-a3b-thinking",
+            "qwen/qwen3-next-80b-a3b-instruct:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "minimax/minimax-m2.5:free",
+            "inclusionai/ling-2.6-1t:free", "inclusionai/ling-2.6-flash:free",
+            "z-ai/glm-4.5-air:free",
+            "tencent/hy3-preview:free",
+            "elephant-alpha",
+            "nousresearch/hermes-3-llama-3.3-70b:free",
+            "cognitivecomputations/dolphin3-llama-3.3-70b:free",
+            "liquid/lfm-2.5-1.2b-thinking:free", "liquid/lfm-2.5-1.2b-instruct:free",
+            "gemma-4-26b-a4b-it:free", "gemma-4-31b-it:free",
+            "lyria-3-pro-preview:free", "lyria-3-clip-preview:free",
+        ]
+    },
+    "cerebras": {
+        "base_url": "https://api.cerebras.ai/v1",
+        "key_env": "CEREBRAS_API_KEY",
+        "models": [
+            "qwen-3-235b-a22b-instruct-2507", "llama3.1-8b",
+            "qwen-3.5-32b-a3b-instruct", "qwen-3-14b-a3b-instruct",
+            "llama-3.3-70b-instruct", "mistral-24b-instruct",
+        ]
+    },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "key_env": "GROQ_API_KEY",
+        "models": [
+            "openai/gpt-oss-120b", "openai/gpt-oss-20b",
+            "llama-3.3-70b-versatile", "llama-3.2-1b-instruct",
+            "llama-3.2-3b-instruct", "llama-3.2-11b-instruct",
+            "qwen/qwen3-32b", "qwen/qwen3-14b",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "mistralai/mistral-nemo-12b-instruct",
+            "mistralai/mistral-small-3.1-24b-instruct",
+        ]
+    },
+    "nvidia": {
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env": "NVIDIA_API_KEY",
+        "models": [
+            "qwen/qwen3-next-80b-a3b-thinking",
+            "meta-llama/llama-3.1-8b-instruct",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvidia/nemotron-3-nano-30b-a3b",
+            "mistralai/mistral-7b-instruct-v0.3",
+            "google/gemma-2-9b-it",
+        ]
+    },
+    "opencode_go": {
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "key_env": "OPENCODE_GO_API_KEY",
+        "models": [
+            "qwen3.6-plus", "qwen3-coder-480b", "gpt-oss-120b",
+        ]
+    },
+    "anthropic": {
+        "base_url": "https://api.anthropic.com/v1",
+        "key_env": "ANTHROPIC_API_KEY",
+        "models": ["claude-sonnet-4", "claude-3-5-sonnet", "claude-3-5-haiku"]
+    },
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "key_env": "OPENAI_API_KEY",
+        "models": ["gpt-4o", "gpt-4o-mini"]
+    },
+    "google": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "key_env": "GOOGLE_API_KEY",
+        "models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
+    },
+    "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "key_env": "DEEPSEEK_API_KEY",
+        "models": ["deepseek-v4-pro", "deepseek-chat"]
+    },
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BAD MODELS TRACKING — skip repeatedly failing models
+# ─────────────────────────────────────────────────────────────────────────────
+BAD_MODELS_FILE = Path.home() / ".config" / "model-scan" / "bad_models.json"
+
+def load_bad_models() -> dict:
+    """Load bad models: {provider/model: fail_count}"""
+    if not BAD_MODELS_FILE.exists():
+        return {}
+    try:
+        return json.loads(BAD_MODELS_FILE.read_text())
+    except:
+        return {}
+
+def save_bad_models(bad: dict):
+    """Save bad models, incrementing fail counts"""
+    BAD_MODELS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    BAD_MODELS_FILE.write_text(json.dumps(bad, indent=2))
+
+def update_bad_models(results: list, bad: dict, threshold: int = 5):
+    """Update bad models based on scan results"""
+    changed = False
+    for r in results:
+        key = f"{r['provider']}/{r['model']}"
+        rel = r.get("reliability", 0)
+        dom_fail = r.get("dom_fail", "")
+        
+        # Skip quota/rate-limit - those recover
+        if dom_fail in ("rate_limit", "429"):
+            continue
+        
+        if rel < 0.5:
+            bad[key] = bad.get(key, 0) + 1
+            changed = True
+        elif rel >= 1.0:
+            # Model recovered - reduce count
+            if key in bad:
+                bad[key] = max(0, bad[key] - 1)
+                if bad[key] == 0:
+                    del bad[key]
+                changed = True
+    
+    if changed:
+        save_bad_models(bad)
+    
+    return bad
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODEL LIST BUILDER
+# ─────────────────────────────────────────────────────────────────────────────
+def build_model_list(skip_bad: bool = True) -> tuple:
+    models = []; seen = set(); providers_ok = []; providers_missing = []
+    bad = load_bad_models() if skip_bad else {}
+    
+    for prov_id, cfg in PROVIDERS.items():
+        if not has_provider_key(prov_id):
+            providers_missing.append(prov_id); continue
+        providers_ok.append(prov_id)
+
+        for m in cfg.get("models", []):
+            bare = strip_prefix(m)
+            key = (prov_id, bare)
+            if key in seen: continue
+            
+            # Skip bad models
+            if skip_bad and bad.get(key, 0) >= 5:
+                seen.add(key)
+                continue
+                
+            seen.add(key)
+            models.append({
+                "provider": prov_id, "model": bare,
+                "base_url": cfg["base_url"], "key_env": cfg["key_env"],
+                "original": m
+            })
+
+    return models, providers_ok, providers_missing, bad
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FETCH OPENROUTER FREE MODELS FROM API
+# ─────────────────────────────────────────────────────────────────────────────
+async def fetch_or_free_models(client) -> tuple:
+    or_key = get_provider_key("openrouter")
+    if not or_key: return [], {}
+
+    new_models = []; or_metadata = {}
+    try:
+        resp = await client.get(
+            "https://openrouter.ai/api/v1/models",
+            headers={"Authorization": f"Bearer {or_key}"}, timeout=20
+        )
+        if resp.status_code == 200:
+            for m in resp.json().get("data", []):
+                mid = m.get("id", "")
+                if not mid: continue
+                clean = strip_prefix(mid)
+                ctx = m.get("context_length")
+                pricing = m.get("pricing", {})
+                or_metadata[mid] = {"ctx": int(ctx) if ctx else None, "pricing": pricing}
+                or_metadata[clean] = or_metadata[mid]
+                is_free = (float(pricing.get("prompt", 1)) == 0 and
+                           float(pricing.get("completion", 1)) == 0)
+                key = ("openrouter", clean)
+                if key not in _seen_or and is_free:
+                    _seen_or.add(key)
+                    new_models.append({
+                        "provider": "openrouter", "model": clean,
+                        "base_url": "https://openrouter.ai/api/v1",
+                        "key_env": "OPENROUTER_API_KEY", "original": mid,
+                        "_ctx": int(ctx) if ctx else None, "_free": True
+                    })
+    except: pass
+    return new_models, or_metadata
+
+_seen_or = set()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODELS.DEV INTEGRATION — context, pricing, capabilities
+# ─────────────────────────────────────────────────────────────────────────────
+_MODELS_DEV_CACHE = None
+
+async def fetch_models_dev(client) -> dict:
+    global _MODELS_DEV_CACHE
+    if _MODELS_DEV_CACHE is not None: return _MODELS_DEV_CACHE
+
+    # Try models_dev Python module
+    try:
+        from models_dev import providers
+        data = {}
+        for p in providers():
+            for mid, m in p.models.items():
+                data[mid] = {
+                    "ctx": m.limit.context if hasattr(m, 'limit') else None,
+                    "output": m.limit.output if hasattr(m, 'limit') else None,
+                    "reasoning": getattr(m, 'reasoning', False),
+                    "tool_call": getattr(m, 'tool_call', False),
+                    "input_cost": m.cost.input if hasattr(m, 'cost') else None,
+                    "output_cost": m.cost.output if hasattr(m, 'cost') else None,
+                }
+        _MODELS_DEV_CACHE = data; return data
+    except ImportError: pass
+
+    # Fallback: models.dev API
+    try:
+        resp = await client.get("https://models.dev/api/v0/models", timeout=30)
+        if resp.status_code == 200:
+            data = {}
+            for p in resp.json():
+                for m in p.get("models", []):
+                    mid = m.get("id", "")
+                    data[mid] = {
+                        "ctx": m.get("context_length"),
+                        "output": m.get("max_output_tokens"),
+                        "reasoning": m.get("reasoning", False),
+                        "tool_call": m.get("tool_call", False),
+                        "input_cost": m.get("pricing", {}).get("prompt"),
+                        "output_cost": m.get("pricing", {}).get("completion"),
+                    }
+            _MODELS_DEV_CACHE = data; return data
+    except: pass
+
+    _MODELS_DEV_CACHE = {}; return {}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RENDER — TUIDS-LLM UNIFIED TABLE
+# ─────────────────────────────────────────────────────────────────────────────
+def render_table(results, duration, key_failures, healthy, degraded, failed, rerouted, total, providers_ok):
+    TIER_ORDER = {"S": 0, "A": 1, "B": 2, "C": 3, "—": 4}
+    def sort_key(r):
+        return (TIER_ORDER.get(r.get("_tier", "—"), 5), -r.get("_composite", 0), -r.get("reliability", 0))
+    results.sort(key=sort_key)
+
+    try:
+        import shutil; width = shutil.get_terminal_size().columns
+    except: width = 120
+    width = max(80, min(width, 160))
+
+    # Header
+    print()
+    print(f"{C.INFO}󱙺 {C.INFO_D}FORGE{C.RST}  "
+          f"{C.SECONDARY}{len(providers_ok)} providers{C.RST}  "
+          f"{C.PRIMARY}{total} models{C.RST}  "
+          f"{C.ERROR}{failed} failing{C.RST}  "
+          f"{C.SUCCESS}{C.CHECK}{C.RST} AA: {C.SUCCESS_D}✓{C.RST}  "
+          f"{C.META}│{C.RST}  {C.METRICS}⏱ {duration:.1f}s{C.RST}")
+
+    # Column headers - comprehensive table
+    sep = "─" * (width - 2)
+    print(f"┌─{sep}┐")
+    headers = (
+        f"│ {C.INFO_D}TIER{C.RST} │ "
+        f"{C.INFO_D}MODEL (provider){C.RST}".ljust(32) + " │ "
+        f"{C.INFO_D}ROLE{C.RST}".ljust(10) + " │ "
+        f"{C.INFO_D}AA{C.RST}".rjust(3) + " │ "
+        f"{C.INFO_D}Cd{C.RST}".rjust(3) + " │ "
+        f"{C.INFO_D}MLU{C.RST}".rjust(3) + " │ "
+        f"{C.INFO_D}Rel{C.RST}".rjust(4) + " │ "
+        f"{C.INFO_D}t/s{C.RST}".rjust(4) + " │ "
+        f"{C.INFO_D}Lat{C.RST}".rjust(4) + " │ "
+        f"{C.INFO_D}T{C.RST}".center(2) + " │ "
+        f"{C.INFO_D}Ctx{C.RST}".rjust(5) + " │ "
+        f"{C.INFO_D}STATUS{C.RST}".center(6) + " │"
+    )
+    print(headers)
+    print(f"├─{sep}┤")
+
+    # Rows
+    for r in results:
+        tier = r.get("_tier", "—")
+        model = r.get("model", ""); prov = r.get("provider", "")
+        role = r.get("_role", "—"); lat_s = r.get("lat_s", 0)
+        tok_s = r.get("tok_s", 0); rel = r.get("reliability", 0)
+        aa = get_aa(model)
+        ai_score = aa.get("ai", 0)
+        ac_score = aa.get("ac", 0)
+        mmlu_score = aa.get("mmlu", 0)
+        glyph, status_color, status_reason = get_status(r)
+        has_tools = r.get("tools", False)
+
+        # TIER coloring
+        tier_color = (C.SUCCESS if tier == "S" else C.SUCCESS_D if tier == "A"
+                      else C.SECONDARY if tier in ("B","C") else C.META)
+
+        # AA Intelligence score
+        if ai_score == 0: aa_str = f"{C.META}—{C.RST}".rjust(3)
+        elif ai_score >= 80: aa_str = f"{C.METRICS}{ai_score}{C.RST}".rjust(3)
+        elif ai_score >= 60: aa_str = f"{C.WARN}{ai_score}{C.RST}".rjust(3)
+        else: aa_str = f"{C.ERROR_D}{ai_score}{C.RST}".rjust(3)
+
+        # Coding score
+        if ac_score == 0: cd_str = f"{C.META}—{C.RST}".rjust(3)
+        elif ac_score >= 70: cd_str = f"{C.METRICS}{ac_score}{C.RST}".rjust(3)
+        elif ac_score >= 50: cd_str = f"{C.WARN}{ac_score}{C.RST}".rjust(3)
+        else: cd_str = f"{C.ERROR_D}{ac_score}{C.RST}".rjust(3)
+
+        # MMLU score
+        if mmlu_score == 0: mlu_str = f"{C.META}—{C.RST}".rjust(3)
+        else: mlu_str = f"{C.METRICS}{mmlu_score*100:.0f}{C.RST}".rjust(3)
+
+        # Reliability
+        if rel >= 0.99: rel_str = f"{C.SUCCESS}{rel*100:.0f}%{C.RST}".rjust(4)
+        elif rel >= 0.5: rel_str = f"{C.WARN}{rel*100:.0f}%{C.RST}".rjust(4)
+        else: rel_str = f"{C.ERROR_D}0%{C.RST}".rjust(4)
+
+        # T/S
+        if tok_s == 0: ts_str = f"{C.META}—{C.RST}".rjust(4)
+        elif tok_s < 1.0: ts_str = f"{C.WARN}{tok_s:.0f}{C.RST}".rjust(4)
+        else: ts_str = f"{C.METRICS}{tok_s:.0f}{C.RST}".rjust(4)
+
+        # LAT
+        if lat_s == 0: lat_str = f"{C.META}—{C.RST}".rjust(4)
+        elif lat_s > 5: lat_str = f"{C.ERROR}{lat_s:.0f}s{C.RST}".rjust(4)
+        elif lat_s > 2: lat_str = f"{C.WARN}{lat_s:.0f}s{C.RST}".rjust(4)
+        else: lat_str = f"{C.METRICS}{lat_s:.0f}s{C.RST}".rjust(4)
+
+        # Tools
+        tools_str = f"{C.SUCCESS}Y{C.RST}".center(2) if has_tools else f"{C.ERROR_D}n{C.RST}".center(2)
+
+        # Context
+        ctx = r.get("_ctx")
+        if ctx: ctx_str = f"{C.METRICS}{ctx//1000}K{C.RST}".rjust(5)
+        else: ctx_str = f"{C.META}—{C.RST}".rjust(5)
+
+        # STATUS
+        status_str = (f"{C.SUCCESS}{glyph}{C.RST}".center(6) if status_color == "success"
+                      else f"{C.WARN}{glyph}{C.RST}".center(6) if status_color == "warn"
+                      else f"{C.ERROR}{glyph}{C.RST}".center(6))
+
+        # ROLE
+        role_colors = {"primary": C.SUCCESS, "reasoner": C.INFO, "fast": C.METRICS,
+                       "vision": C.INFO, "code": C.INFO, "hybrid": C.INFO,
+                       "general": C.SECONDARY, "—": C.META}
+        role_color = role_colors.get(role, C.SECONDARY)
+        role_str = f"{role_color}{role}{C.RST}".ljust(10)
+
+        # MODEL (sacred content — no ANSI on name)
+        free_tag = f" {C.INFO_D}:free{C.RST}" if r.get("_free") else ""
+        prov_str = f"{C.SECONDARY}({prov}){C.RST}"
+        max_model = 22
+        model_disp = model[:max_model-1] + "…" if len(model) > max_model else model
+        model_str = f"{C.PRIMARY}{model_disp}{C.RST}" if tier == "S" else f"{C.SECONDARY}{model_disp}{C.RST}"
+
+        row = (
+            f"│ {tier_color}{tier}{C.RST} │ {model_str} {prov_str}{free_tag}".ljust(34) +
+            f" │ {role_str} │ {aa_str} │ {cd_str} │ {mlu_str} │ {rel_str} │ {ts_str} │ {lat_str} │ {tools_str} │ {ctx_str} │ {status_str} │"
+        )
+        print(row)
+
+    print(f"└─{sep}┘")
+
+    # Footer
+    print()
+    footer = []
+    if healthy: footer.append(f"{C.SUCCESS}{C.CHECK}{C.RST} {healthy} healthy")
+    if degraded: footer.append(f"{C.WARN}{C.WARN_G}{C.RST} {degraded} degraded")
+    if failed: footer.append(f"{C.ERROR}{C.CROSS}{C.RST} {failed} dead")
+    if rerouted: footer.append(f"{C.ACCENT}{C.DIAMOND}{C.RST} {rerouted} rerouted")
+    print("  ".join(footer))
+
+    if key_failures:
+        print()
+        print(f"{C.META}│{C.RST}  {C.ERROR}󰓎 {len(key_failures)} keys failing{C.RST}")
+        for kn, reason in key_failures.items():
+            print(f"    {C.ERROR}{C.CROSS}{C.RST} {C.SECONDARY}{kn}{C.RST}  {reason}")
+
+def render_detail(result):
+    model = result.get("model", ""); prov = result.get("provider", "")
+    aa = get_aa(model); glyph, status_color, reason = get_status(result)
+
+    print(); print(f"{C.META}─── Details: {model} ({prov}) ───{C.RST}")
+    print(f"{C.ERROR if status_color == 'error' else C.WARN} {glyph} {status_color.upper()}{C.RST} {reason}")
+
+    if aa:
+        print(f"{C.META}─── Score Breakdown ───{C.RST}")
+        print(f"  {C.SECONDARY}Artificial Analysis:{C.METRICS} {aa.get('ai', 0)}{C.RST}")
+        print(f"  {C.SECONDARY}Coding Score:     {C.METRICS} {aa.get('ac', 0)}{C.RST}")
+        print(f"  {C.SECONDARY}Math Score:       {C.METRICS} {aa.get('am', 0)}{C.RST}")
+        print(f"  {C.SECONDARY}MMLU:             {C.METRICS} {aa.get('mmlu', 0)*100:.0f}{C.META}%{C.RST}")
+        tier = result.get("_tier", "—"); composite = result.get("_composite", 0)
+        print(f"  {C.INFO}{C.ARROW}{C.INFO} Composite: {C.METRICS}{composite}{C.RST} → TIER: {C.SUCCESS}{tier}{C.RST}")
+
+    print(f"{C.META}─── Live Metrics ───{C.RST}")
+    print(f"  {C.SECONDARY}Latency:   {C.METRICS}{result.get('lat_s', 0):.1f}s{C.RST}")
+    print(f"  {C.SECONDARY}Throughput:{C.METRICS}{result.get('tok_s', 0):.1f} tok/s{C.RST}")
+    print(f"  {C.SECONDARY}Reliability:{C.METRICS}{result.get('reliability', 0)*100:.0f}%{C.RST}")
+    print(f"  {C.SECONDARY}Role:      {C.INFO}{result.get('_role', '—')}{C.RST}")
+    print(f"  {C.SUCCESS}  ✓ Tool-calling{C.RST}" if result.get('tools')
+          else f"  {C.ERROR_D}  ✗ No tool-calling{C.RST}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API KEY HEALTH CHECK
+# ─────────────────────────────────────────────────────────────────────────────
+def check_key_health() -> dict:
+    failures = {}
+    if not get_provider_key("openrouter"): failures["OPENROUTER_API_KEY"] = "Not found"
+    elif len(get_provider_key("openrouter")) < 10: failures["OPENROUTER_API_KEY"] = "Invalid"
+    if not get_provider_key("nvidia"): failures["NVIDIA_API_KEY"] = "Not found"
+    if not get_provider_key("groq"): failures["GROQ_API_KEY"] = "Not found"
+    if not get_provider_key("cerebras"): failures["CEREBRAS_API_KEY"] = "Not found"
+    return failures
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HISTORY / PERSISTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+CACHE_DIR = Path.home() / ".config" / "model-scan"
+RESULTS_FILE = CACHE_DIR / "results.json"
+
+def load_history() -> list:
+    if not RESULTS_FILE.exists(): return []
+    try:
+        h = json.loads(RESULTS_FILE.read_text())
+        return h[-30:] if isinstance(h, list) else [h]
+    except: return []
+
+def save_history(entry, history):
+    history.append(entry); history = history[-30:]
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    RESULTS_FILE.write_text(json.dumps(history, indent=2))
+    return history
+
+def get_problematic(history, min_fail=3) -> dict:
+    recent = history[-10:]; counts = {}
+    for run in recent:
+        for r in run.get("results", []):
+            key = f"{r['provider']}/{r['model']}"
+            if r.get("reliability", 1) < 0.5:
+                counts[key] = counts.get(key, 0) + 1
+    return {k: v for k, v in counts.items() if v >= min_fail}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SCAN LOOP — shared client for efficiency
+# ─────────────────────────────────────────────────────────────────────────────
+_md_data = None
+_http_client = None
+
+async def get_client():
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=20, limits=httpx.Limits(max_keepalive_connections=20))
+    return _http_client
+
+async def close_client():
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
+async def scan_one(m, idx, total, md_data, args):
+    """Scan a single model."""
+    if not args.quiet:
+        frame = (idx // 3) % len(SPINNERS)
+        rid = f"{idx:04x}"
+        print(f"\r{C.META}[{rid}]{C.RST} {C.INFO}{spin(frame)}{C.RST} "
+              f"{m['provider']}/{m['model'][:30]}...  ", end="", flush=True)
+
+    client = await get_client()
+    r = await probe_model(client, m["provider"], m["model"], m["base_url"],
+                          m["key_env"], shots=1, original=m.get("original", m["model"]))
+
+    if r["reliability"] >= 0.5:
+        r["tools"] = await probe_tools(client, m["provider"], m["model"],
+                                       m["base_url"], original=m.get("original", m["model"]))
+    else:
+        r["tools"] = False
+
+    # Attach metadata
+    ctx = m.get("_ctx")
+    if not ctx and md_data:
+        md_entry = md_data.get(m["model"]) or md_data.get(m.get("original", ""))
+        ctx = md_entry.get("ctx") if md_entry else None
+    r["_ctx"] = ctx
+    r["_free"] = m.get("_free", ":free" in m.get("original", ""))
+    r["_md"] = (md_data.get(m["model"]) or md_data.get(m.get("original", ""))) if md_data else {}
+
+    # Compute tier + role
+    r["_tier"] = compute_tier(r)
+    r["_composite"] = compute_composite(r)
+    r["_role"] = assign_role(r)
+
+    return r
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN SCAN
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def run_scan(args):
+    global _md_data
+    _md_data = None
+    t0 = time.perf_counter()
+
+    history = load_history()
+    problematic = get_problematic(history)
+    key_failures = check_key_health()
+
+    print(f"{C.INFO}󱙺 {C.INFO_D}FORGE{C.RST} {C.INFO}→{C.RST} {C.PRIMARY}model-scan v3{C.RST}")
+    print(f"{C.META}Scanning providers...{C.RST}")
+
+    model_list, providers_ok, providers_missing, bad_models = build_model_list(skip_bad=True)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Auto-fetch ALL OpenRouter free models (filter bad later via update_bad_models)
+        new_models, or_metadata = await fetch_or_free_models(client)
+        # Filter out already-known-bad models from OR fetch
+        for m in new_models:
+            key = f"openrouter/{m['model']}"
+            if bad_models.get(key, 0) < 5:
+                model_list.append(m)
+        _md_data = await fetch_models_dev(client)
+
+    if args.provider:
+        model_list = [m for m in model_list if args.provider.lower() in m["provider"].lower()]
+
+    if not model_list:
+        print(f"{C.WARN}⚠ No models to scan. Check API keys.{C.RST}")
+        return
+
+    # Report missing keys
+    if providers_missing:
+        print(f"{C.WARN}⚠ Missing keys: {', '.join(providers_missing)}{C.RST}")
+
+    total = len(model_list)
+    print(f"{C.META}Probing {total} models concurrently...{C.RST}")
+
+    # Concurrent scan with semaphore
+    _sem = asyncio.Semaphore(8)
+    
+    async def scan_with_sem(m, i):
+        async with _sem:
+            return await scan_one(m, i, total, _md_data, args)
+    
+    # Use gather with return_exceptions to catch any errors
+    tasks = [scan_with_sem(m, i) for i, m in enumerate(model_list)]
+    
+    # Force unbuffered output for progress
+    import sys
+    sys.stdout.flush()
+    
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Filter out exceptions
+    results = []
+    for i, r in enumerate(raw_results):
+        if isinstance(r, Exception):
+            print(f"\nError scanning model {i}: {r}", file=sys.stderr)
+        elif isinstance(r, dict):
+            results.append(r)
+        else:
+            print(f"\nUnexpected result type for model {i}: {type(r)}", file=sys.stderr)
+
+    duration = time.perf_counter() - t0
+    if not args.quiet: print()  # Clear progress line
+
+    # Save history
+    entry = {"scanned_at": datetime.now(timezone.utc).isoformat(), "results": results}
+    history = save_history(entry, history)
+
+    # Update bad models tracking
+    bad_models = update_bad_models(results, bad_models)
+    if bad_models:
+        skipped = sum(1 for k,v in bad_models.items() if v >= 5)
+        if skipped > 0:
+            print(f"{C.WARN}⚠ Skipping {skipped} known-bad models (5+ failures){C.RST}")
+
+    # Compute stats
+    healthy = sum(1 for r in results if r.get("reliability", 0) >= 0.99)
+    degraded = sum(1 for r in results if 0.5 <= r.get("reliability", 0) < 0.99)
+    failed = sum(1 for r in results if r.get("reliability", 0) < 0.5)
+    rerouted = 0
+
+    if args.json:
+        print(json.dumps(results, indent=2))
+    elif not args.quiet:
+        if args.working_only:
+            results = [r for r in results if r.get("reliability", 0) >= 0.5]
+
+        render_table(results, duration, key_failures, healthy, degraded,
+                     failed, rerouted, total, providers_ok)
+
+        if problematic:
+            print(); print(f"{C.WARN}⚠ {len(problematic)} historically problematic{C.RST}")
+            for m, c in sorted(problematic.items(), key=lambda x: -x[1])[:5]:
+                print(f"  {C.ERROR}{C.CROSS}{C.RST} {m}: {c}x failures")
+
+        if args.verbose and results:
+            for r in results:
+                if r.get("reliability", 0) < 0.5:
+                    render_detail(r)
+
+    await close_client()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+def main():
+    p = argparse.ArgumentParser(
+        description="model-scan v3 — TUIDS-LLM model diagnostic panel",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument("-w", "--working-only", action="store_true", help="Only show healthy models")
+    p.add_argument("--json", action="store_true", help="Emit JSON")
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress progress output")
+    p.add_argument("-v", "--verbose", action="store_true", help="Show detail pane for failed models")
+    p.add_argument("--provider", type=str, help="Filter by provider name")
+    args = p.parse_args()
+    asyncio.run(run_scan(args))
+
+if __name__ == "__main__":
+    main()

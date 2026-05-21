@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-19  
 **Version:** v5.1.0 (Free-Mode + Calculus Metrics)  
-**Project root:** `/home/cheta/code/model-scan/`  
+**Project root:** `~/code/model-scan/`  
 **Config root:** `~/.config/model-scan/`  
 
 ---

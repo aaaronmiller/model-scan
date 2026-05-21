@@ -91,7 +91,7 @@ def generate_hero():
     # (Optional, might slow down generation)
     # img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
     
-    output_path = '/home/cheta/code/model-scan/web/src/lib/assets/2026-05-20/001-hero-banner-wide.png'
+    output_path = '<project_root>/web/src/lib/assets/2026-05-20/001-hero-banner-wide.png'
     img.save(output_path)
     print(f"Banner saved to {output_path}")
 

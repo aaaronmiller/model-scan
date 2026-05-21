@@ -1,6 +1,6 @@
 # Claude Code Proxy → Ante Agent: Complete Feature Integration Plan
 
-**Source audited:** `/home/cheta/code/claude-code-proxy/`
+**Source audited:** `~/code/claude-code-proxy/`
 **Target:** Rust-based ante agent
 **Goal:** Fold every proxy feature into ante for a single turn-key agent. No independent proxies.
 
