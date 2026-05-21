@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>model-scan Analysis Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+:root {
+  --bg: #0f0f1a; --card: #1a1a2e; --border: #2a2a3e;
+  --fg: #e8e6e1; --muted: #6b7280; --accent: #6366f1;
+  --green: #059669; --cyan: #06b6d4; --orange: #f59e0b; --red: #ef4444;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  padding: 2rem;
+}
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);
+}
+.header h1 { font-size: 1.75rem; font-weight: 600; }
+.header span { color: var(--muted); font-size: 0.875rem; }
+.grid { display: grid; gap: 1.5rem; margin-bottom: 2rem; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 0.75rem; padding: 1.25rem;
+}
+.card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.75rem; }
+.card .value { font-size: 2rem; font-weight: 700; }
+.card .sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+.chart { width: 100%; height: 400px; }
+.chart-sm { height: 300px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+th { text-align: left; padding: 0.5rem 0.75rem; color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+tr:hover td { background: rgba(99,102,241,0.05); }
+.badge { display: inline-block; padding: 0.125rem 0.375rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 500; }
+.b-green { background: rgba(5,150,101,0.15); color: var(--green); }
+.b-cyan { background: rgba(6,182,212,0.15); color: var(--cyan); }
+.b-amber { background: rgba(245,158,11,0.15); color: var(--orange); }
+.b-red { background: rgba(239,68,68,0.15); color: var(--red); }
+.b-gray { background: rgba(107,114,128,0.15); color: var(--muted); }
+.tag { display: inline-block; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.7rem; background: rgba(99,102,241,0.1); color: var(--accent); margin-right: 0.25rem; }
+.loading { text-align: center; padding: 4rem; color: var(--muted); }
+.error { text-align: center; padding: 4rem; color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🧠 Model-Scan Analysis Dashboard</h1>
+    <span id="subtitle">Loading cross-referenced data from AA API + Models.dev + PinchBench...</span>
+  </div>
+  <div>
+    <span id="timestamp"></span>
+  </div>
+</div>
+
+<!-- KPI Row -->
+<div class="grid grid-4" id="kpi-row"></div>
+
+<!-- Charts Row 1 -->
+<div class="grid grid-2">
+  <div class="card"><h3>📊 Intelligence vs Speed — Pareto Frontier</h3><div id="chart-pareto" class="chart"></div></div>
+  <div class="card"><h3>💎 Composite Score Leaders</h3><div id="chart-composite" class="chart"></div></div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="grid grid-2">
+  <div class="card"><h3>💰 Cost-Adjusted Intelligence</h3><div id="chart-cai" class="chart chart-sm"></div></div>
+  <div class="card"><h3>🧩 Capability Clusters</h3><div id="chart-clusters" class="chart chart-sm"></div></div>
+</div>
+
+<!-- Charts Row 3 -->
+<div class="grid grid-3">
+  <div class="card"><h3>🏷️ Price-Intelligence Equilibrium</h3><div id="chart-equilibrium" class="chart chart-sm"></div></div>
+  <div class="card"><h3>⚡ Agent Value Index</h3><div id="chart-avi" class="chart chart-sm"></div></div>
+  <div class="card"><h3>📈 Benchmark Consistency</h3><div id="chart-consistency" class="chart chart-sm"></div></div>
+</div>
+
+<!-- Charts Row 4 -->
+<div class="grid grid-2">
+  <div class="card"><h3>📥 Community Popularity (HF Downloads)</h3><div id="chart-popularity" class="chart chart-sm"></div></div>
+  <div class="card"><h3>🔬 Data Provenance by Source</h3><div id="chart-provenance" class="chart chart-sm"></div></div>
+</div>
+
+<!-- Top Models Table -->
+<div class="card">
+  <h3>🏆 Top 30 Models by Composite Score</h3>
+  <div class="table-wrap"><table id="top-models-table"><thead>
+    <tr><th>Rank</th><th>Model ID</th><th>Composite</th><th>Intel</th><th>TPS</th><th>Cost $/M</th><th>Popularity</th><th>CAI</th><th>Data Source</th></tr>
+  </thead><tbody id="top-models-body"></tbody></table></div>
+</div>
+
+<script>
+const API_BASE = 'http://localhost:8123';
+let analysisData = null;
+
+function fmt(n, d = 1) { return n === null || n === undefined ? '—' : Number(n).toFixed(d); }
+function tag(text) { return `<span class="tag">${text}</span>`; }
+
+async function loadData() {
+  try {
+    const r = await fetch(`${API_BASE}/api/v1/analysis`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    analysisData = await r.json();
+    render();
+  } catch (e) {
+    // Fallback: fetch from local file
+    try {
+      const r2 = await fetch('/api/v1/analysis');
+      if (r2.ok) { analysisData = await r2.json(); render(); return; }
+    } catch(e2) {}
+    document.getElementById('subtitle').textContent = '⚠ Failed to load analysis data';
+    document.querySelector('.grid').innerHTML = `<div class="error">Cannot reach API server at ${API_BASE}.<br>Start it with: cd api && uvicorn main:app --port 8123</div>`;
+  }
+}
+
+function render() {
+  if (!analysisData) return;
+  document.getElementById('timestamp').textContent = `Generated: ${analysisData.generated_at || 'now'}`;
+  
+  const top = analysisData.top_by_composite || [];
+  const frontier = analysisData.pareto_frontier || [];
+  const clusters = analysisData.capability_clusters || {};
+  const equilibrium = analysisData.price_intelligence_equilibrium || {};
+  const segments = equilibrium.segments || [];
+  const sweet = equilibrium.sweet_spot || {};
+  const metrics = analysisData.derived_metrics || {};
+  const modelEntries = Object.entries(metrics);
+
+  // KPIs
+  const kpiData = [
+    { label: 'Models Analyzed', value: modelEntries.length, sub: `${analysisData.sources?.aa_models || 0} from AA` },
+    { label: 'Data Sources Fused', value: '3', sub: 'AA + Models.dev + PinchBench' },
+    { label: 'Derived Metrics', value: '16', sub: 'Novel cross-source dimensions' },
+    { label: 'Sweet Spot Price', value: sweet.cost ? `$${sweet.cost}/M` : '—', sub: sweet.model ? `by ${sweet.model}` : '' },
+  ];
+  document.getElementById('kpi-row').innerHTML = kpiData.map(k =>
+    `<div class="card"><div class="value">${k.value}</div><div class="sub">${k.label} &middot; ${k.sub}</div></div>`
+  ).join('');
+
+  // Chart 1: Pareto Frontier (Intelligence vs Speed)
+  const paretoChart = echarts.init(document.getElementById('chart-pareto'));
+  const paretoData = modelEntries.filter(([,m]) => m.ai_intelligence && m.tps).map(([id,m]) => [m.ai_intelligence, m.tps, id]);
+  const frontierPoints = frontier.map(f => [f.x, f.y, f.model_id]).filter(f => f[0] && f[1]);
+  
+  paretoChart.setOption({
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.data[2]}</b><br>Intel: ${fmt(p.data[0])}<br>TPS: ${fmt(p.data[1])}` },
+    grid: { left: 60, right: 20, top: 20, bottom: 40 },
+    xAxis: { name: 'Intelligence Index', nameLocation: 'center', nameGap: 30, type: 'value' },
+    yAxis: { name: 'TPS (tokens/sec)', type: 'value', axisLabel: { formatter: v => v + ' t/s' } },
+    series: [
+      { name: 'All Models', type: 'scatter', data: paretoData, symbolSize: 6, itemStyle: { color: 'rgba(99,102,241,0.4)' } },
+      { name: 'Pareto Frontier', type: 'line', data: frontierPoints.sort((a,b) => a[0]-b[0]), 
+        smooth: true, lineStyle: { color: '#f59e0b', width: 2 }, 
+        itemStyle: { color: '#f59e0b' }, symbolSize: 8,
+        areaStyle: { color: 'rgba(245,158,11,0.08)' }
+      }
+    ]
+  });
+
+  // Chart 2: Top 30 Composite
+  const top30 = top.slice(0, 30);
+  const compChart = echarts.init(document.getElementById('chart-composite'));
+  compChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 140, right: 40, top: 10, bottom: 20 },
+    xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+    yAxis: { type: 'category', data: top30.map(m => m.model_id.slice(0, 35)).reverse(), axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: top30.map(m => m.composite).reverse(),
+      itemStyle: { color: p => p.value > 80 ? '#059669' : p.value > 60 ? '#06b6d4' : p.value > 40 ? '#f59e0b' : '#6b7280',
+        borderRadius: [0, 4, 4, 0] 
+      },
+      label: { show: true, position: 'right', formatter: p => `${p.value}`, fontSize: 10 }
+    }]
+  });
+
+  // Chart 3: Cost-Adjusted Intelligence (Top 20)
+  const caiData = modelEntries.filter(([,m]) => m.derived?.cost_adjusted_intelligence)
+    .sort(([,a],[,b]) => (b.derived?.cost_adjusted_intelligence||0) - (a.derived?.cost_adjusted_intelligence||0))
+    .slice(0, 20);
+  const caiChart = echarts.init(document.getElementById('chart-cai'));
+  caiChart.setOption({
+    tooltip: { trigger: 'axis', formatter: p => `${p[0].name}<br>CAI: ${p[0].value}<br>Intel/$ per M tokens` },
+    grid: { left: 140, right: 30, top: 10, bottom: 20 },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: caiData.map(([id]) => id.slice(0, 35)).reverse(), axisLabel: { fontSize: 9 } },
+    series: [{ type: 'bar', data: caiData.map(([,m]) => m.derived.cost_adjusted_intelligence).reverse(),
+      itemStyle: { color: '#06b6d4', borderRadius: [0, 4, 4, 0] } }]
+  });
+
+  // Chart 4: Capability Clusters
+  const clusterNames = Object.keys(clusters);
+  const clusterCounts = clusterNames.map(n => clusters[n].length);
+  const clusterChart = echarts.init(document.getElementById('chart-clusters'));
+  clusterChart.setOption({
+    tooltip: { trigger: 'item', formatter: p => `${p.name}: ${p.value} models` },
+    series: [{
+      type: 'pie', radius: ['35%', '65%'], center: ['50%', '50%'],
+      data: clusterNames.map((n, i) => ({ name: n.replace(/_/g,' '), value: clusterCounts[i] })),
+      label: { formatter: '{b}: {c}', fontSize: 10 },
+      itemStyle: { borderRadius: 4 },
+      color: ['#6366f1', '#059669', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+    }]
+  });
+
+  // Chart 5: Price-Intelligence Equilibrium
+  const eqChart = echarts.init(document.getElementById('chart-equilibrium'));
+  if (segments.length > 0) {
+    eqChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 60, right: 30, top: 20, bottom: 40 },
+      xAxis: { type: 'category', data: segments.map(s => `$${s.cost_bracket}`), axisLabel: { rotate: 45, fontSize: 9 } },
+      yAxis: [
+        { type: 'value', name: 'Avg Intelligence', nameTextStyle: { fontSize: 10 } },
+        { type: 'value', name: 'Models in Bracket', nameTextStyle: { fontSize: 10 } }
+      ],
+      series: [
+        { type: 'line', data: segments.map(s => s.avg_intel), smooth: true, lineStyle: { color: '#6366f1', width: 2 }, itemStyle: { color: '#6366f1' } },
+        { type: 'bar', data: segments.map(s => s.count), yAxisIndex: 1, itemStyle: { color: 'rgba(99,102,241,0.15)' } }
+      ]
+    });
+  } else {
+    eqChart.setOption({ title: { text: 'Insufficient data', left: 'center', top: 'center', textStyle: { color: '#6b7280', fontSize: 14 } } });
+  }
+
+  // Chart 6: Agent Value Index (top 20 models with pinchbench data)
+  const aviData = modelEntries.filter(([,m]) => m.derived?.agent_value_index)
+    .sort(([,a],[,b]) => (b.derived?.agent_value_index||0) - (a.derived?.agent_value_index||0))
+    .slice(0, 20);
+  const aviChart = echarts.init(document.getElementById('chart-avi'));
+  if (aviData.length > 0) {
+    aviChart.setOption({
+      tooltip: { trigger: 'axis', formatter: p => `${p[0].name}<br>AVI: ${fmt(p[0].value)}` },
+      grid: { left: 140, right: 30, top: 10, bottom: 20 },
+      xAxis: { type: 'value' },
+      yAxis: { type: 'category', data: aviData.map(([id]) => id.slice(0, 35)).reverse(), axisLabel: { fontSize: 9 } },
+      series: [{ type: 'bar', data: aviData.map(([,m]) => m.derived.agent_value_index).reverse(),
+        itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] } }]
+    });
+  } else {
+    aviChart.setOption({ title: { text: 'Requires PinchBench data', left: 'center', top: 'center', textStyle: { color: '#6b7280', fontSize: 14 } } });
+  }
+
+  // Chart 7: Benchmark Consistency
+  const bciData = modelEntries.filter(([,m]) => m.derived?.benchmark_consistency && m.derived.benchmark_consistency < 999)
+    .sort(([,a],[,b]) => (b.derived?.benchmark_consistency||0) - (a.derived?.benchmark_consistency||0))
+    .slice(0, 20);
+  const bciChart = echarts.init(document.getElementById('chart-consistency'));
+  if (bciData.length > 0) {
+    // Higher consistency = more generalist. Also show task specialization
+    bciChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 140, right: 30, top: 10, bottom: 20 },
+      xAxis: { type: 'value', name: 'Consistency (higher=generalist)', nameTextStyle: { fontSize: 9 } },
+      yAxis: { type: 'category', data: bciData.map(([id]) => id.slice(0, 35)).reverse(), axisLabel: { fontSize: 9 } },
+      series: [{ type: 'bar', data: bciData.map(([,m]) => m.derived.benchmark_consistency).reverse(),
+        itemStyle: { color: p => p.value > 20 ? '#059669' : p.value > 10 ? '#06b6d4' : '#6b7280', borderRadius: [0, 4, 4, 0] } }]
+    });
+  } else {
+    bciChart.setOption({ title: { text: 'Insufficient benchmark data', left: 'center', top: 'center', textStyle: { color: '#6b7280', fontSize: 14 } } });
+  }
+
+  
+  // Chart 8: Community Popularity (Top 20)
+  const popChart = echarts.init(document.getElementById('chart-popularity'));
+  fetch('http://localhost:8123/api/v1/popularity')
+    .then(r => r.json())
+    .then(popData => {
+      if (!popData || !popData.length) return;
+      popChart.setOption({
+        tooltip: { trigger: 'axis', formatter: p => p[0].name + '<br>Popularity: ' + p[0].value + '/100' },
+        grid: { left: 140, right: 30, top: 10, bottom: 20 },
+        xAxis: { type: 'value', max: 100 },
+        yAxis: { type: 'category', data: popData.map(d => d.model_id.slice(0, 30)).reverse(), axisLabel: { fontSize: 9 } },
+        series: [{ type: 'bar', data: popData.map(d => d.popularity).reverse(),
+          itemStyle: { color: p => p.value > 60 ? '#059669' : p.value > 30 ? '#06b6d4' : '#f59e0b', borderRadius: [0, 4, 4, 0] },
+          label: { show: true, position: 'right', formatter: p => p.value, fontSize: 9 }
+        }]
+      });
+    }).catch(() => {});
+  
+  // Chart 9: Data Provenance
+  const provChart = echarts.init(document.getElementById('chart-provenance'));
+  const probeCount = modelEntries.filter(([,m]) => m.tps && m.tps > 0).length;
+  const aaCount = modelEntries.filter(([,m]) => m.ai_intelligence).length;
+  const benchCount = modelEntries.filter(([,m]) => m.derived?.benchmark_consistency).length;
+  const popCount = modelEntries.filter(([,m]) => m.derived?.knowledge_freshness_months !== undefined).length;
+  provChart.setOption({
+    tooltip: { trigger: 'item', formatter: p => p.name + ': ' + p.value + ' models' },
+    series: [{
+      type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
+      data: [
+        { name: '🔬 Live Probes', value: probeCount, itemStyle: { color: '#06b6d4' } },
+        { name: '📊 AA Benchmarks', value: aaCount, itemStyle: { color: '#6366f1' } },
+        { name: '📈 Verified Benchmarks', value: benchCount, itemStyle: { color: '#059669' } },
+        { name: '📥 Community Data', value: popCount, itemStyle: { color: '#f59e0b' } },
+      ],
+      label: { formatter: '{b}: {c} ({d}%)', fontSize: 10 }
+    }]
+  });
+  
+// Top 30 Table
+  const tbody = document.getElementById('top-models-body');
+  tbody.innerHTML = top.slice(0, 30).map((m, i) => {
+    const tierClass = m.composite > 80 ? 'b-green' : m.composite > 60 ? 'b-cyan' : m.composite > 40 ? 'b-amber' : 'b-red';
+    const sources = [];
+    if (m.has_scan) sources.push('🔬');
+    const srcTag = sources.join('');
+    return `<tr>
+      <td>${i + 1}</td>
+      <td><strong>${m.model_id}</strong></td>
+      <td><span class="badge ${tierClass}">${fmt(m.composite)}</span></td>
+      <td>${fmt(m.ai_intel)}</td>
+      <td>${fmt(m.tps, 0)}</td>
+      <td>${fmt(m.cost, 3)}</td>
+      <td>${m.agent_value_idx ? fmt(m.agent_value_idx) : '—'}</td>
+      <td>${m.cai ? fmt(m.cai) : '—'}</td>
+      <td>${m.pinchbench ? fmt(m.pinchbench) : '—'}</td>
+      <td>${srcTag}</td>
+    </tr>`;
+  }).join('');
+
+  // Resize charts on window resize
+  [paretoChart, compChart, caiChart, clusterChart, eqChart, aviChart, bciChart, popChart, provChart].forEach(c => {
+    window.addEventListener('resize', () => c.resize());
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>

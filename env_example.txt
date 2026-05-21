@@ -1,0 +1,16 @@
+# model-scan API Keys
+# Copy to .env and fill in your keys
+
+# Core scanning — at least one required
+OPENROUTER_API_KEY=sk-or-v1-...
+NVIDIA_API_KEY=nvapi-...
+GROQ_API_KEY=gsk_...
+CEREBRAS_API_KEY=cerebras_...
+
+# DeepSeek & Chinese providers
+OPENCODE_GO_API_KEY=ocgo_...     # OpenCode Go subscription
+OPENCODE_API_KEY=oc_zen_...      # OpenCode Zen (free tier)
+KILO_API_KEY=kilo_...            # Kilo Gateway
+
+# Augmentation
+AA_API_KEY=aa_...                # Artificial Analysis (free tier, 1000/day)

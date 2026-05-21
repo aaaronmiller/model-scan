@@ -1,0 +1,13 @@
+node_modules/
+web/build/
+web/.svelte-kit/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+api/venv/
+*.log
+.DS_Store
+*.db
+data/
