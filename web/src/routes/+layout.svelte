@@ -31,10 +31,13 @@
 
 	$effect(() => {
 		if ($page.url.pathname && mainEl) {
-			gsap.fromTo(mainEl,
-				{ opacity: 0, y: 20 },
-				{ opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
-			);
+			// Guard: only animate if mainEl has content
+			try {
+				gsap.fromTo(mainEl,
+					{ opacity: 0, y: 20 },
+					{ opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+				);
+			} catch(e) {}
 		}
 	});
 

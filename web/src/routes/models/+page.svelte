@@ -29,7 +29,7 @@
 	});
 
 	$effect(() => {
-		if (!loading && presetsEl) {
+		if (!loading && presetsEl && presetsEl.querySelectorAll('.preset-btn').length > 0) {
 			gsap.fromTo(presetsEl.querySelectorAll('.preset-btn'),
 				{ opacity: 0, y: -8 },
 				{ opacity: 1, y: 0, duration: 0.3, stagger: 0.05, ease: 'power2.out' }
@@ -110,7 +110,7 @@
 	}
 
 	$effect(() => {
-		if (!loading && tableEl) {
+		if (!loading && tableEl && tableEl.querySelectorAll('tbody tr').length > 0) {
 			gsap.fromTo(tableEl.querySelectorAll('tbody tr'),
 				{ opacity: 0, y: 8 },
 				{ opacity: 1, y: 0, duration: 0.3, stagger: 0.015, ease: 'power2.out' }

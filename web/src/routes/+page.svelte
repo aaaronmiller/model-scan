@@ -25,7 +25,7 @@
 
 	// GSAP entrance stagger
 	$effect(() => {
-		if (!loading && cardsEl) {
+		if (!loading && cardsEl && cardsEl.querySelectorAll('.anim-card').length > 0) {
 			gsap.fromTo(cardsEl.querySelectorAll('.anim-card'),
 				{ opacity: 0, y: 20 },
 				{ opacity: 1, y: 0, duration: 0.5, stagger: 0.07, ease: 'power3.out' }
