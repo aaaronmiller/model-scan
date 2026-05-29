@@ -1,0 +1,129 @@
+# ============================================================================
+#  MODEL BLOCKLIST — Models that must NEVER appear in model-scan candidates
+#  Location: ~/.config/model-scan/blocklist.yaml
+#
+#  This file is read at model-scan startup. Models on this list are:
+#  - Daily mode: hidden entirely from output
+#  - Weekly mode: shown in a separate "filtered out" section for review
+#
+#  RATIONALE: These models pollute the scan output and get recommended for
+#  slots they are fundamentally unsuited for, because the scan only considers
+#  latency, reliability, and (sometimes) AA scores — not qualitative tier
+#  assessments. The blocklist is the enforcement mechanism.
+# ============================================================================
+
+# ── D-TIER CHAT MODELS: Below qwen3.6-27b-moe threshold ───────────────────
+# These models have AA-Intelligence scores below 25, or are dense models
+# below 30B parameters with no AA score, or are known to be inferior to
+# the free DeepSeek V4 Flash that is available everywhere.
+
+d_tier_chat:
+  - pattern: "llama-3.3-70b*"
+    reason: "Dense 70B, no AA score, below threshold. Scan's #1 worst offender — recommended for R8/R9/R10/R11/R_skills_hub due to speed on Groq."
+  - pattern: "allam-2-7b"
+    reason: "7B dense Arabic-tuned. No AA score. Was compression/skills_hub incumbent — catastrophically misassigned."
+  - pattern: "baidu/cobuddy*"
+    reason: "Unknown capability, 3-14 t/s, was R5_fallback and proxy_SMALL."
+  - pattern: "openai/gpt-oss-20b*"
+    reason: "AA:24. MoE 21/3. Too small for reasoning."
+  - pattern: "nvidia/nemotron-3-nano-omni-30b*"
+    reason: "AA:21. MoE 30/3. Below threshold despite MoE architecture."
+  - pattern: "nvidia/nemotron-3-nano-30b-a3b*"
+    reason: "AA:13. MoE 30/3. Far below threshold."
+  - pattern: "nvidia/nvidia-nemotron-nano-9b*"
+    reason: "AA:13. Dense 9B. Far below threshold."
+  - pattern: "nvidia/llama-3.3-nemotron-super-49b*"
+    reason: "AA:14. Dense 49B. Below threshold despite size."
+  - pattern: "mistralai/mistral-7b*"
+    reason: "AA:7. Ancient 7B model."
+  - pattern: "mistralai/mixtral-8x7b*"
+    reason: "AA:8. Obsolete MoE."
+  - pattern: "liquid/lfm-2.5-1.2b*"
+    reason: "AA:8. Dense 1B. Trivially small."
+  - pattern: "meta/llama-4-maverick*"
+    reason: "AA:18. Below threshold."
+  - pattern: "meta/llama-3.2-3b*"
+    reason: "Dense 3B. No AA score. Too small."
+  - pattern: "meta/llama-3.1-8b*"
+    reason: "Dense 8B. No AA score. Too small."
+  - pattern: "llama3.1-8b"
+    reason: "Dense 8B on Cerebras. No AA score. Too small."
+  - pattern: "llama-3.1-8b-instant"
+    reason: "Dense 8B on Groq. No AA score. Too small."
+  - pattern: "sarvamai/sarvam-m"
+    reason: "AA:8. Unknown arch. Too weak."
+  - pattern: "devstral-small-2:24b"
+    reason: "AA:20. Dense 24B. Below threshold."
+  - pattern: "nvidia/nemotron-mini-4b-instruct"
+    reason: "Dense 4B. No AA score. Too small."
+  - pattern: "ministral-3:*"
+    reason: "Dense 3-14B. No AA score. Too small for reasoning."
+  - pattern: "rnj-1:8b"
+    reason: "Dense 8B. No AA score. Too small."
+  - pattern: "upstage/solar-10.7b*"
+    reason: "Dense 11B. No AA score. Too small."
+  - pattern: "nvidia/llama-3.1-nemotron-nano-8b*"
+    reason: "Dense 8B. No AA score. Too small."
+  - pattern: "google/gemma-3n-e*"
+    reason: "AA:5-6. Translation-only. Not general chat."
+
+# ── NOT-CHAT MODELS: Classifiers, guards, safety models ───────────────────
+# These are NOT chat models and should never be routed to any slot.
+
+not_chat_models:
+  - pattern: "nvidia/llama-3.1-nemoguard*"
+    reason: "Safety classifier, not a chat model."
+  - pattern: "nvidia/nemotron-content-safety*"
+    reason: "Content safety classifier, not a chat model."
+  - pattern: "nvidia/gliner-pii"
+    reason: "PII detection model, not a chat model."
+  - pattern: "meta/llama-guard*"
+    reason: "Guard model, not a chat model."
+  - pattern: "nvidia/ising-calibration*"
+    reason: "Calibration model, not a chat model."
+  - pattern: "nvidia/riva-translate*"
+    reason: "Translation model, not a general chat model."
+  - pattern: "nvidia/nemotron-content-safety-reasoning*"
+    reason: "Content safety reasoning, not a chat model."
+
+# ── OVERPRICED FOR QUALITY: Models that cost more than better alternatives ──
+# These aren't blocked entirely, but they should never appear above free
+# A-tier models in any slot ranking.
+
+overpriced_for_quality:
+  - pattern: "mistralai/mistral-large-3-675b*"
+    reason: "AA:23 at $0.75/M. DeepSeek V4 Flash at AA:46 costs $0.17/M. Absurd value gap."
+  - pattern: "mistralai/mistral-medium-3.5-128b*"
+    reason: "AA:39 at $3.00/M. V4 Pro at AA:52 costs $0.54/M. Worse and more expensive."
+  - pattern: "bytedance/seed-oss-36b-instruct"
+    reason: "AA:25 at $0.30/M. V4 Flash at AA:46 costs $0.17/M. Worse and more expensive."
+
+# ── CONDITIONALLY ALLOWED: C-tier models with speed justification ─────────
+# These are NOT blocked, but they should only appear in speed-critical slots
+# (compression, title_generation) where A-tier models are the primary and
+# these serve as speed fallbacks.
+
+conditionally_allowed:
+  - pattern: "gpt-oss-120b"
+    reason: "C-tier (AA:33) but 98-106 t/s on Cerebras. Acceptable ONLY for speed-critical auxiliary fallback, never for R1/R12."
+  - pattern: "openrouter/free"
+    reason: "Unknown model alias, 71 t/s. Acceptable ONLY as speed fallback, never as primary."
+
+# ── OVERPRICED/DECEPTIVE: Models that appear free but are NOT ─────────────
+# These models are on "free" tiers with misleading limits. They should
+# NEVER be used as primary choices — only as absolute last resort.
+
+misleadingly_free:
+  - pattern: "zai-glm-4.7"
+    reason: "Cerebras free tier has 1M tok/day, but this model costs $2.25/$2.75/M on paid. The free budget is better spent on gpt-oss-120b ($0.35/$0.75/M). REMOVED from all configs."
+
+# ── CURRENTLY UNAVAILABLE: Provider-plan-exhausted models ────────────────
+# These models are NOT blocked, but their provider is currently exhausted.
+# Model-scan should detect this via plan_health.json and set fitness=0.
+# When the provider recovers, these models become available again.
+
+provider_exhausted:
+  - pattern: "opencode-go/*"
+    reason: "OpenCode Go plan is CURRENTLY FULLY UTILIZED. All models via Go are unavailable until plan refills. Monitor with: /go-health"
+    until: "2026-06-01 or when Go plan refills"
+    fallback: "Use Ollama Cloud or OpenRouter free models instead"

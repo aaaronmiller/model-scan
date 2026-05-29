@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>model-scan Gateway Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --dim: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font: 14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    background: var(--bg); color: var(--text); padding: 20px;
+  }
+  h1 { font-size: 22px; margin-bottom: 8px; color: var(--blue); }
+  h2 { font-size: 16px; margin-bottom: 12px; color: var(--dim); }
+  h3 { font-size: 14px; margin-bottom: 8px; color: var(--text); }
+  .meta { color: var(--dim); font-size: 12px; margin-bottom: 16px; }
+  .dashboard { display: flex; flex-direction: column; gap: 16px; max-width: 1400px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; overflow-x: auto;
+  }
+  .card h4 { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .status-healthy { background: #0f2d1a; color: var(--green); }
+  .status-degraded { background: #2d1f0f; color: var(--orange); }
+  .status-unstable, .status-exhausted { background: #2d0f0f; color: var(--red); }
+  .status-unknown { background: #1a1a2e; color: var(--dim); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tr:hover td { background: #1c2333; }
+  .conflict { color: var(--orange); }
+  .error { color: var(--red); }
+  .good { color: var(--green); }
+  .warn { color: var(--orange); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .flex { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bar-bg { background: #1c2333; border-radius: 4px; height: 8px; min-width: 60px; }
+  .bar-fill { height: 8px; border-radius: 4px; }
+  .pill {
+    display: inline-block; padding: 1px 6px; border-radius: 10px;
+    font-size: 11px; background: #1c2333; color: var(--dim);
+  }
+  .tier-S { color: var(--orange); } .tier-A { color: var(--green); }
+  .tier-B { color: var(--cyan); } .tier-C { color: var(--dim); }
+  .tooltip { position: relative; cursor: help; border-bottom: 1px dashed var(--dim); }
+  .loading { display: flex; justify-content: center; align-items: center; height: 100px; color: var(--dim); }
+  .loading::after { content: ""; width: 24px; height: 24px; border: 2px solid var(--border); border-top: 2px solid var(--blue); border-radius: 50%; animation: spin .8s linear infinite; margin-left: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .header-bar {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  }
+  .refresh-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  .refresh-btn:hover { background: #1c2333; border-color: var(--blue); }
+  .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .slot-card {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 12px;
+  }
+  .slot-card .slot-name { color: var(--blue); font-size: 12px; font-weight: 600; }
+  .slot-card .slot-model { font-size: 13px; margin: 4px 0; word-break: break-all; }
+  .slot-card .slot-fitness { font-size: 18px; font-weight: 700; }
+  a { color: var(--blue); text-decoration: none; } a:hover { text-decoration: underline; }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--dim);
+    padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .filter-btn.active { background: #1f3a5f; border-color: var(--blue); color: var(--blue); }
+
+  /* ── Micro-animations ── */
+  .card { transition: transform .2s ease, box-shadow .2s ease; }
+  .card:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+  .card-content { animation: fadeIn .3s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+  .pulse-dot { animation: pulse 2s ease-in-out infinite; }
+  .bar-fill { transition: width .6s ease; }
+  .slot-card { transition: background .15s, border-color .15s; }
+  .slot-card:hover { background: #1c2333; border-color: var(--blue); }
+
+  /* ── Empty state SVG icon ── */
+  .empty-state { display: flex; flex-direction: column; align-items: center; padding: 24px; color: var(--dim); }
+  .empty-state svg { opacity: .35; margin-bottom: 8px; }
+  .empty-state-text { font-size: 12px; }
+
+  /* ── Connection indicator ── */
+  .conn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .conn-dot.online { background: var(--green); }
+  .conn-dot.offline { background: var(--red); }
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <div class="header-bar">
+    <div>
+      <h1>model-scan Gateway Dashboard</h1>
+      <div class="meta" id="scanTime">loading…</div>
+    </div>
+    <div class="flex">
+      <span id="connStatus" style="display:flex;align-items:center;font-size:12px;color:var(--dim);"><span class="conn-dot" id="connDot"></span><span id="connLabel">connecting</span></span>
+      <button id="autoRefreshBtn" class="refresh-btn" onclick="toggleAutoRefresh()">▶ Auto-refresh (30s)</button>
+      <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Row: Provider Health + Quota -->
+  <div class="row">
+    <div class="card" id="healthCard">
+      <h4>Provider Health</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+    <div class="card" id="quotaCard">
+      <h4>Quota & Credits</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+  </div>
+
+  <!-- Row: Programs + Conflicts -->
+  <div class="row">
+    <div class="card" id="programsCard">
+      <h4>Program Assignments</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+    <div class="card" id="conflictsCard">
+      <h4>Cross-Program Conflicts</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+  </div>
+
+  <!-- Row: Cron & Sessions -->
+  <div class="row">
+    <div class="card" id="cronCard">
+      <h4>Auto-Deployment</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+    <div class="card" id="sessionsCard">
+      <h4>Sessions</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+  </div>
+
+  <!-- Row: Configs -->
+  <div class="row">
+    <div class="card" id="configsCard">
+      <h4>Generated Configs</h4>
+      <div class="loading"><span>loading</span></div>
+    </div>
+  </div>
+
+  <!-- Row: Sessions & Quota Ledger -->
+  <div class="card" id="sessionsDashboardCard">
+    <h4>Session Management</h4>
+    <div class="loading"><span>loading</span></div>
+  </div>
+
+  <!-- Row: Slot Routes -->
+  <div class="card" id="routesCard">
+    <h4>Slot Routing</h4>
+    <div class="loading"><span>loading</span></div>
+  </div>
+
+  <!-- Row: Models -->
+  <div class="card" id="modelsCard">
+    <h4>Accessible Models</h4>
+    <div class="filter-bar" id="modelFilters"></div>
+    <div class="loading"><span>loading</span></div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+
+async function fetchJSON(path) {
+  const res = await fetch(`${API}${path}`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+const EMPTY_SVG = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 2v.01"/></svg>';
+
+// ── Health ──
+function renderHealth(data) {
+  const health = data.provider_health || {};
+  const providers = Object.keys(health).sort();
+  if (!providers.length) {
+    document.getElementById('healthCard').querySelector('.loading').outerHTML =
+      `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">no provider data</span></div>`;
+    return;
+  }
+  let html = '<div class="card-content"><table><tr><th>Provider</th><th>Status</th><th>Total</th><th>Healthy</th><th>Failed</th><th>Fail Rate</th></tr>';
+  for (const p of providers) {
+    const h = health[p];
+    const cls = `status-${h.status}`;
+    html += `<tr>
+      <td><strong>${p}</strong></td>
+      <td><span class="status-badge ${cls}">${h.status}</span></td>
+      <td class="num">${h.total}</td>
+      <td class="num good">${h.healthy}</td>
+      <td class="num ${h.failed > 0 ? 'error' : ''}">${h.failed}</td>
+      <td class="num ${h.fail_rate > 0.3 ? 'error' : (h.fail_rate > 0 ? 'warn' : '')}">${(h.fail_rate * 100).toFixed(1)}%</td>
+    </tr>`;
+  }
+  // Kiro info inline
+  if (data.kiro_credits != null) {
+    const pct = Math.round(data.kiro_credits / data.kiro_total * 100);
+    html += `<tr style="border-top:2px solid var(--border)">
+      <td><strong>Kiro</strong></td>
+      <td colspan="5">${data.kiro_credits}/${data.kiro_total} credits (${pct}%) · ${data.kiro_model}</td>
+    </tr>`;
+  }
+  // OCGo info
+  if (data.opencode_go_status) {
+    const cls = data.opencode_go_status === 'healthy' ? 'status-healthy' : 'status-exhausted';
+    const refill = data.opencode_go_refill || '?';
+    html += `<tr>
+      <td><strong>OCGo</strong></td>
+      <td><span class="status-badge ${cls}">${data.opencode_go_status}</span></td>
+      <td colspan="4">refill: ${refill}</td>
+    </tr>`;
+  }
+  html += '</table></div>';
+  document.getElementById('healthCard').querySelector('.loading').outerHTML = html;
+  if (data.scanned_at) {
+    const ts = new Date(data.scanned_at);
+    document.getElementById('scanTime').textContent = `last scan: ${ts.toLocaleString()}`;
+  }
+}
+
+// ── Quota ──
+function renderQuota(data) {
+  const kiro = data.kiro || {};
+  const ocgo = data.opencode_go || {};
+  const oczen = data.opencode_zen || {};
+  const provCounts = data.provider_model_counts || {};
+  const provKeys = Object.keys(provCounts).sort();
+
+  let html = '<table><tr><th>Resource</th><th>Status</th><th>Details</th></tr>';
+
+  // Kiro
+  const kiroPct = kiro.credits_total ? Math.round(kiro.credits_remaining / kiro.credits_total * 100) : 0;
+  const kiroCls = kiroPct > 30 ? 'good' : (kiroPct > 10 ? 'warn' : 'error');
+  html += `<tr><td>Kiro Credits</td>
+    <td><span class="${kiroCls}">${kiro.credits_remaining ?? '?'} / ${kiro.credits_total ?? '?'}</span></td>
+    <td>model: ${kiro.model_available ?? '?'} · resets: ${kiro.resets ?? '?'} · status: ${kiro.status ?? '?'}</td>
+  </tr>`;
+
+  // OCGo
+  const ocgoCls = ocgo.status === 'healthy' ? 'good' : 'error';
+  html += `<tr><td>OpenCode Go</td>
+    <td><span class="status-badge status-${ocgo.status || 'unknown'}">${ocgo.status || '?'}</span></td>
+    <td>refill: ${ocgo.estimated_refill || '?'}</td>
+  </tr>`;
+
+  // OCZen
+  const oczenCls = oczen.status === 'healthy' ? 'good' : 'warn';
+  html += `<tr><td>OpenCode Zen</td>
+    <td><span class="status-badge status-${oczen.status || 'unknown'}">${oczen.status || '?'}</span></td>
+    <td>—</td>
+  </tr>`;
+
+  // Provider model counts
+  for (const p of provKeys) {
+    const pc = provCounts[p];
+    html += `<tr><td>${p}</td>
+      <td class="num">${pc.accessible_models} / ${pc.total_models} models</td>
+      <td class="meta">accessible / total</td>
+    </tr>`;
+  }
+
+  html += '</table>';
+  document.getElementById('quotaCard').querySelector('.loading').outerHTML = html;
+}
+
+// ── Programs ──
+function renderPrograms(data) {
+  const progs = data.programs || {};
+  const names = Object.keys(progs).sort();
+  if (!names.length) {
+    document.getElementById('programsCard').querySelector('.loading').outerHTML =
+      `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">no programs configured</span></div>`;
+    return;
+  }
+  let html = '';
+  for (const name of names) {
+    const p = progs[name];
+    if (typeof p !== 'object') continue;
+    html += `<div style="margin-bottom: 12px;">
+      <strong style="color:var(--blue);font-size:13px;">${name}</strong>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">`;
+    for (const [k, v] of Object.entries(p)) {
+      if (k === 'provider_conflicts') continue;
+      html += `<span class="pill">${k}: ${v}</span>`;
+    }
+    // Conflicts
+    const cf = p.provider_conflicts;
+    if (cf && cf.length) {
+      for (const c of cf) {
+        html += `<span class="pill" style="border-color:var(--orange);color:var(--orange)">⚠ ${c}</span>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('programsCard').querySelector('.loading').outerHTML = html;
+}
+
+// ── Conflicts ──
+function renderConflicts(data) {
+  const conflicts = data.conflicts || data.conflicts;
+  if (!conflicts || !conflicts.length) {
+    document.getElementById('conflictsCard').querySelector('.loading').outerHTML =
+      `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">no cross-program conflicts</span></div>`;
+    return;
+  }
+  let html = '<table><tr><th>Programs</th><th>Slot/Model</th></tr>';
+  for (const c of conflicts) {
+    html += `<tr>
+      <td class="conflict">${c.programs.join(' ↔ ')}</td>
+      <td>${c.slot_model}</td>
+    </tr>`;
+  }
+  html += '</table>';
+  document.getElementById('conflictsCard').querySelector('.loading').outerHTML = html;
+}
+
+// ── Slot Routes ──
+const SLOTS = [
+  'R1_primary', 'R6_compression', 'R7_vision', 'R8_web_extract',
+  'R9_session_search', 'R10_approval', 'R11_flush_memories',
+  'R12_delegation', 'R_mcp', 'R_skills_hub'
+];
+
+async function renderRoutes() {
+  const container = document.getElementById('routesCard').querySelector('.loading');
+  let html = '<div class="slot-grid">';
+  const results = await Promise.allSettled(
+    SLOTS.map(s => fetchJSON(`/route?slot=${s}`).then(r => ({ slot: s, data: r })).catch(e => ({ slot: s, error: e.message })))
+  );
+  for (const res of results) {
+    if (res.value.error) {
+      html += `<div class="slot-card"><div class="slot-name">${res.value.slot}</div><div class="error">${res.value.error}</div></div>`;
+      continue;
+    }
+    const d = res.value.data;
+    const best = d.best;
+    html += `<div class="slot-card">
+      <div class="slot-name">${d.label || d.slot}</div>
+      <div class="slot-model">${best ? best.model_id : '<span class="meta">no candidate</span>'}</div>
+      <div class="flex">
+        <span class="slot-fitness ${best && best.fitness > 70 ? 'good' : (best && best.fitness > 50 ? 'warn' : '')}">${best ? best.fitness : '—'}</span>
+        ${best ? `<span class="tier-${best.tier}">${best.tier}</span>` : ''}
+        ${best ? `<span class="meta">${best.provider}</span>` : ''}
+      </div>
+      <div class="meta" style="font-size:11px;">
+        ${best ? `${best.tps.toFixed(0)} t/s · ${best.latency_s.toFixed(2)}s` : ''}
+        ${best && best.has_tools ? '· 🛠' : ''}
+        ${best && best.has_vision ? '· 📷' : ''}
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  container.outerHTML = html;
+}
+
+// ── Models ──
+let modelFilterTier = null;
+let modelFilterProvider = null;
+
+async function renderModels() {
+  const container = document.getElementById('modelsCard').querySelector('.loading');
+  try {
+    const data = await fetchJSON('/models?limit=200');
+    let models = data.models || [];
+
+    // Extract unique providers for filter
+    const providers = [...new Set(models.map(m => m.provider).filter(Boolean))].sort();
+
+    // Apply filters
+    if (modelFilterTier) models = models.filter(m => m.tier === modelFilterTier);
+    if (modelFilterProvider) models = models.filter(m => m.provider === modelFilterProvider);
+
+    // Render filter bar
+    let filterHtml = '';
+    filterHtml += `<button class="filter-btn ${!modelFilterTier ? 'active' : ''}" onclick="modelFilterTier=null;renderModels()">All Tiers</button>`;
+    for (const t of ['S', 'A', 'B', 'C']) {
+      filterHtml += `<button class="filter-btn ${modelFilterTier === t ? 'active' : ''}" onclick="modelFilterTier='${t}';renderModels()">Tier ${t}</button>`;
+    }
+    filterHtml += `<span style="width:8px"></span>`;
+    filterHtml += `<button class="filter-btn ${!modelFilterProvider ? 'active' : ''}" onclick="modelFilterProvider=null;renderModels()">All Providers</button>`;
+    for (const p of providers) {
+      filterHtml += `<button class="filter-btn ${modelFilterProvider === p ? 'active' : ''}" onclick="modelFilterProvider='${p}';renderModels()">${p}</button>`;
+    }
+    document.getElementById('modelFilters').innerHTML = filterHtml;
+
+    if (!models.length) {
+      container.outerHTML = `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">no models match filters</span></div>`;
+      return;
+    }
+
+    let html = '<table><tr><th>Model</th><th>Provider</th><th>Tier</th><th>IQ</th><th>TC</th><th>TPS</th><th>Latency</th><th>Arch</th><th>Tools</th><th>Vision</th></tr>';
+    for (const m of models) {
+      const iqBar = m.iq ? Math.round(m.iq / 1) : 0; // 0-100 scale
+      html += `<tr>
+        <td><strong>${m.model_id}</strong></td>
+        <td><span class="pill">${m.provider || '—'}</span></td>
+        <td><span class="tier-${m.tier}">${m.tier || '—'}</span></td>
+        <td class="num"><div class="flex"><span>${m.iq != null ? m.iq.toFixed(1) : '—'}</span><div class="bar-bg"><div class="bar-fill" style="width:${iqBar}%;background:var(--blue)"></div></div></div></td>
+        <td class="num">${m.tc}</td>
+        <td class="num">${m.tps ? m.tps.toFixed(0) : '—'}</td>
+        <td class="num">${m.latency_s != null ? m.latency_s.toFixed(2) + 's' : '—'}</td>
+        <td class="meta">${m.arch || '—'}</td>
+        <td>${m.has_tools ? '🛠' : ''}</td>
+        <td>${m.has_vision ? '📷' : ''}</td>
+      </tr>`;
+    }
+    html += '</table>';
+    container.outerHTML = html;
+  } catch (e) {
+    container.outerHTML = `<div class="error">Failed to load models: ${e.message}</div>`;
+  }
+}
+
+// ── Sessions ──
+async function renderSessions() {
+  const container = document.getElementById('sessionsCard').querySelector('.loading');
+  try {
+    const data = await fetchJSON('/sessions?limit=10');
+    const sessions = data.sessions || [];
+    if (!sessions.length) {
+      container.outerHTML = `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">no sessions found</span></div>`;
+      return;
+    }
+    let html = '<table><tr><th>Session</th><th>Agent</th><th>Model</th><th>State</th><th>Turns</th><th>Size</th></tr>';
+    for (const s of sessions) {
+      const stateCls = s.state === 'active' ? 'good' : (s.state === 'paused' ? 'warn' : 'meta');
+      html += `<tr onclick="showSessionDetail('${s.session_id}')" style="cursor:pointer;">
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${s.session_id}">${s.session_id.slice(0, 16)}…</td>
+        <td>${s.agent || '?'}</td>
+        <td class="meta">${s.model || '?'}</td>
+        <td><span class="${stateCls}">${s.state || '?'}</span></td>
+        <td class="num">${s.turn_count ?? '?'}</td>
+        <td class="num">${s.size_kb ?? '?'} KB</td>
+      </tr>`;
+    }
+    html += '</table>';
+    container.outerHTML = html;
+  } catch (e) {
+    container.outerHTML = `<div class="error">${e.message}</div>`;
+  }
+}
+
+// ── Configs ──
+async function renderConfigs() {
+  const container = document.getElementById('configsCard').querySelector('.loading');
+  try {
+    const data = await fetchJSON('/configs');
+    const templates = data.templates || [];
+    const history = data.history || [];
+    const issueSummary = data.issue_summary || {};
+    const issueCount = Object.keys(issueSummary).length;
+
+    let html = '';
+
+    // Templates
+    html += '<div style="margin-bottom:12px;"><strong style="font-size:13px;">Templates</strong>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">';
+    for (const t of templates) {
+      html += `<button class="filter-btn" onclick="generateConfig('${t.name}')" style="border-color:var(--blue);">▶ Gen ${t.name}</button>`;
+      html += `<button class="filter-btn" onclick="showConfigDiff('${t.name}')" style="border-color:var(--dim);font-size:10px;">📄 ${t.name}</button>`;
+    }
+    html += '</div>';
+
+    // Last changes
+    if (history.length) {
+      html += '<div style="margin-top:12px;"><strong style="font-size:13px;">Recent Changes</strong><table style="margin-top:6px;">';
+      html += '<tr><th>Time</th><th>Template</th><th>Hash</th><th>Changed</th></tr>';
+      for (const h of history.slice(-5).reverse()) {
+        const ts = new Date(h.timestamp);
+        const changed = h.changed ? '<span class="good">★</span>' : '<span class="meta">—</span>';
+        html += `<tr>
+          <td class="meta" style="font-size:11px;">${ts.toLocaleString()}</td>
+          <td>${h.template}</td>
+          <td class="meta" style="font-size:11px;">${h.hash || ''}</td>
+          <td>${changed}</td>
+        </tr>`;
+      }
+      html += '</table></div>';
+    }
+
+    // Issue scores
+    if (issueCount > 0) {
+      html += `<div style="margin-top:12px;"><strong style="font-size:13px;">Issue Mining</strong>`;
+      html += `<div class="meta">${issueCount} models with persistent issues from log analysis</div>`;
+      const topIssues = Object.entries(issueSummary).slice(0, 5);
+      for (const [model, count] of topIssues) {
+        html += `<div class="pill" style="border-color:var(--orange);color:var(--orange);margin:2px;">${model} (${count} issues)</div>`;
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    container.outerHTML = html;
+  } catch (e) {
+    container.outerHTML = `<div class="error">${e.message}</div>`;
+  }
+}
+
+// ── Generate Config (POST) ──
+async function generateConfig(template) {
+  const btn = event.target;
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/configs/generate/${template}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      btn.textContent = '✓ Done';
+      setTimeout(() => { btn.textContent = `▶ Gen ${template}`; btn.disabled = false; }, 2000);
+    } else {
+      btn.textContent = `✗ ${data.error || 'failed'}`;
+      btn.disabled = false;
+    }
+    // Refresh configs display
+    await renderConfigs();
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    btn.disabled = false;
+  }
+}
+
+// ── Sessions Dashboard ──
+async function renderSessionsDashboard() {
+  const container = document.getElementById('sessionsDashboardCard').querySelector('.loading');
+  try {
+    const [sessions, recs, quota] = await Promise.all([
+      fetchJSON('/sessions?limit=5'),
+      fetchJSON('/session-recommendations'),
+      fetchJSON('/quota/ledger'),
+    ]);
+
+    let html = '<div class="row" style="grid-template-columns:1fr 1fr;">';
+
+    // Left: session counts + top sessions
+    html += '<div>';
+    html += `<div class="flex" style="gap:12px;margin-bottom:8px;">
+      <span><strong>${sessions.total}</strong> total</span>
+      <span class="good"><strong>${sessions.active}</strong> active</span>
+      <span class="warn"><strong>${sessions.idle}</strong> idle</span>
+      <span class="meta"><strong>${sessions.paused || 0}</strong> paused</span>
+    </div>`;
+
+    // Top sessions
+    if (sessions.sessions && sessions.sessions.length) {
+      html += '<table style="font-size:12px;"><tr><th>Session</th><th>Priority</th><th>State</th></tr>';
+      for (const s of sessions.sessions.slice(0, 5)) {
+        const stateCls = s.state === 'active' ? 'good' : (s.state === 'idle' ? 'warn' : 'meta');
+        html += `<tr>
+          <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;" title="${s.session_id}">${s.session_id.slice(0, 16)}…</td>
+          <td class="num">${s.priority || 0}</td>
+          <td><span class="${stateCls}">${s.state}</span></td>
+        </tr>`;
+      }
+      html += '</table>';
+    }
+    html += '</div>';
+
+    // Right: provider slots + quota + recommendations
+    html += '<div>';
+
+    // Provider slots
+    const slots = quota.provider_slots || {};
+    const slotKeys = Object.keys(slots);
+    if (slotKeys.length) {
+      html += '<strong style="font-size:12px;">Provider Slots</strong><div style="margin:4px 0;">';
+      for (const p of slotKeys) {
+        const s = slots[p];
+        const pct = Math.round(s.used / s.limits.B * 100);
+        const cls = pct > 80 ? 'error' : (pct > 50 ? 'warn' : 'good');
+        html += `<span class="pill" style="border-color:var(--${cls})">${p}: ${s.used}/${s.limits.B} (${pct}%)</span> `;
+      }
+      html += '</div>';
+    }
+
+    // Quota
+    const provSumm = quota.provider_summary || {};
+    const provKeys = Object.keys(provSumm);
+    if (provKeys.length) {
+      html += '<strong style="font-size:12px;">Quota Usage</strong><table style="font-size:11px;margin:4px 0;">';
+      html += '<tr><th>Provider</th><th>Cost</th><th>Calls</th></tr>';
+      for (const p of provKeys.slice(0, 4)) {
+        const q = provSumm[p];
+        html += `<tr><td>${p}</td><td class="num">$${q.total_cost.toFixed(4)}</td><td class="num">${q.calls}</td></tr>`;
+      }
+      html += '</table>';
+    }
+
+    // Recommendations
+    if (recs.count > 0) {
+      html += '<div style="margin-top:4px;">';
+      for (const r of recs.recommendations.slice(0, 3)) {
+        const cls = r.type === 'zombie_detected' ? 'warn' : 'good';
+        html += `<div class="${cls}" style="font-size:11px;">◆ ${r.message}</div>`;
+      }
+      html += '</div>';
+    }
+
+    html += '</div></div>';
+    container.outerHTML = html;
+  } catch (e) {
+    container.outerHTML = `<div class="error">${e.message}</div>`;
+  }
+}
+
+// ── Cron ──
+async function renderCronStatus() {
+  const container = document.getElementById('cronCard').querySelector('.loading');
+  try {
+    const data = await fetchJSON('/cron');
+    const cfg = data.config || {};
+    let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+    for (const job of ['daily', 'weekly']) {
+      const j = cfg[job] || {};
+      const enabled = j.enabled;
+      const schedule = j.schedule || '—';
+      html += `<div style="border:1px solid var(--border);border-radius:6px;padding:10px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span class="${enabled ? 'pulse-dot' : ''}" style="font-size:14px;${enabled ? 'color:var(--green)' : 'color:var(--dim)'};">${enabled ? '●' : '○'}</span>
+          <strong style="text-transform:capitalize;">${job}</strong>
+        </div>
+        <div style="font-size:18px;font-weight:600;font-family:monospace;color:${enabled ? 'var(--blue)' : 'var(--dim)'};">${schedule}</div>
+        <div class="meta" style="margin-top:4px;">${enabled ? 'active' : 'disabled'}</div>
+      </div>`;
+    }
+    html += '</div>';
+    container.outerHTML = html;
+  } catch (e) {
+    container.outerHTML = `<div class="error">${e.message}</div>`;
+  }
+}
+
+// ── Refresh All ──
+async function refresh() {
+  const loaders = document.querySelectorAll('.loading');
+  for (const l of loaders) l.innerHTML = '<span>loading</span><div class="loading"></div>';
+
+  try {
+    const [health, quota, programs] = await Promise.all([
+      fetchJSON('/health'),
+      fetchJSON('/quota'),
+      fetchJSON('/programs'),
+    ]);
+    renderHealth(health);
+    renderQuota(quota);
+    renderPrograms(programs);
+    renderConflicts(programs);
+    // Connection status: online
+    document.getElementById('connDot').className = 'conn-dot online';
+    document.getElementById('connLabel').textContent = 'online';
+    // Update last refresh time
+    document.getElementById('scanTime').textContent = 'last refreshed: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    console.error('Failed to fetch:', e);
+    document.getElementById('connDot').className = 'conn-dot offline';
+    document.getElementById('connLabel').textContent = 'offline';
+    document.querySelectorAll('.card').forEach(c => {
+      const l = c.querySelector('.loading');
+      if (l) l.outerHTML = `<div class="empty-state card-content">${EMPTY_SVG}<span class="empty-state-text">Error: ${e.message}</span></div>`;
+    });
+  }
+
+  await Promise.all([
+    renderRoutes(),
+    renderModels(),
+    renderSessions(),
+    renderConfigs(),
+    renderSessionsDashboard(),
+    renderCronStatus(),
+  ]);
+}
+
+// ── Modal helpers ──
+function openModal(title, bodyHtml) {
+  let overlay = document.getElementById('modalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modalOverlay';
+    overlay.innerHTML = `
+      <div id="modalContent" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow:auto;position:relative;">
+        <button id="modalClose" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;">✕</button>
+        <h3 id="modalTitle" style="margin-bottom:12px;"></h3>
+        <div id="modalBody"></div>
+      </div>`;
+    Object.assign(overlay.style, {
+      position:'fixed',top:0,left:0,width:'100vw',height:'100vh',
+      background:'rgba(0,0,0,0.7)',zIndex:1000,
+      display:'flex',alignItems:'center',justifyContent:'center',
+    });
+    document.body.appendChild(overlay);
+    document.getElementById('modalClose').onclick = closeModal;
+    overlay.onclick = e => { if (e.target === overlay) closeModal(); };
+  }
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  overlay.style.display = 'flex';
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// Keyboard escape to close
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── Session detail modal ──
+async function showSessionDetail(sessionId) {
+  openModal('Session: ' + sessionId.slice(0, 24) + '…', '<div class="loading"><span>loading</span></div>');
+  try {
+    const data = await fetchJSON('/sessions/' + sessionId);
+    let html = '<table style="font-size:12px;">';
+    const fields = ['session_id','state','priority','agent','model','provider'];
+    for (const f of fields) {
+      if (data[f] != null) html += `<tr><td style="color:var(--dim);padding:3px 8px;">${f}</td><td>${data[f]}</td></tr>`;
+    }
+    if (data.quota) {
+      html += '<tr><td style="color:var(--dim);padding:3px 8px;">total_tokens_in</td><td>' + (data.quota.total_tokens_in || 0) + '</td></tr>';
+      html += '<tr><td style="color:var(--dim);padding:3px 8px;">total_tokens_out</td><td>' + (data.quota.total_tokens_out || 0) + '</td></tr>';
+      html += '<tr><td style="color:var(--dim);padding:3px 8px;">total_cost</td><td>$' + (data.quota.total_cost || 0).toFixed(6) + '</td></tr>';
+      if (data.quota.providers) {
+        html += '<tr><td style="color:var(--dim);padding:3px 8px;">providers</td><td>' + Object.keys(data.quota.providers).join(', ') + '</td></tr>';
+      }
+    }
+    if (data.logs && data.logs.length) {
+      html += '<tr><td style="color:var(--dim);padding:3px 8px;">logs</td><td>' + data.logs.map(l => l.name + ' (' + l.size_kb + 'KB)').join('<br>') + '</td></tr>';
+    }
+    html += '</table>';
+    document.getElementById('modalBody').innerHTML = html;
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML = '<div class="error">' + e.message + '</div>';
+  }
+}
+
+// ── Config diff viewer ──
+async function showConfigDiff(template) {
+  openModal('Config Diff: ' + template, '<div class="loading"><span>loading</span></div>');
+  try {
+    const data = await fetchJSON('/configs/' + template + '/diff');
+    let html = '';
+    if (data.diff) {
+      html += '<pre style="font-size:11px;background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;">' + escapeHtml(data.diff) + '</pre>';
+    } else if (data.content) {
+      html += '<pre style="font-size:11px;background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;">' + escapeHtml(data.content) + '</pre>';
+    } else {
+      html = '<div class="meta">No diff available</div>';
+    }
+    document.getElementById('modalBody').innerHTML = html;
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML = '<div class="error">' + e.message + '</div>';
+  }
+}
+
+// ── Issue distribution bar chart from /configs ──
+async function renderIssueChart() {
+  try {
+    const data = await fetchJSON('/configs');
+    const issueSummary = data.issue_summary || {};
+    const entries = Object.entries(issueSummary);
+    if (!entries.length) return;
+
+    const maxCount = Math.max(...entries.map(e => e[1]));
+    let html = '<div style="margin:12px 0;">';
+    for (const [model, count] of entries.slice(0, 10)) {
+      const pct = Math.round(count / maxCount * 100);
+      html += `<div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-size:11px;">
+        <span style="width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(model)}">${escapeHtml(model.slice(0, 20))}</span>
+        <div style="flex:1;height:14px;background:var(--border);border-radius:3px;">
+          <div style="height:100%;width:${pct}%;background:var(--orange);border-radius:3px;min-width:4px;"></div>
+        </div>
+        <span style="width:30px;text-align:right;color:var(--dim);">${count}</span>
+      </div>`;
+    }
+    html += '</div>';
+
+    // Inject into configs card
+    const card = document.getElementById('configsCard');
+    const chartArea = card.querySelector('.issue-chart');
+    if (chartArea) {
+      chartArea.innerHTML = html;
+    } else {
+      const container = card.querySelector('.loading') || card.lastElementChild;
+      if (container) {
+        const div = document.createElement('div');
+        div.className = 'issue-chart';
+        div.innerHTML = html;
+        container.after(div);
+      }
+    }
+  } catch (e) {
+    // chart not critical
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auto-refresh ──
+let refreshInterval = null;
+let isRefreshing = false;
+
+function toggleAutoRefresh() {
+  const btn = document.getElementById('autoRefreshBtn');
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+    btn.textContent = '▶ Auto-refresh (30s)';
+    btn.style.borderColor = 'var(--border)';
+  } else {
+    refreshInterval = setInterval(async () => {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      await refresh();
+      isRefreshing = false;
+    }, 30000);
+    btn.textContent = '● Auto-refresh ON';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+  }
+}
+
+// Patch generateConfig to also show diff button
+const _origGenerateConfig = window.generateConfig;
+window.generateConfig = async function(template) {
+  const btn = event && event.target || document.querySelector(`button[onclick*="${template}"]`);
+  if (btn) {
+    btn.textContent = '⏳ Generating…';
+    btn.disabled = true;
+  }
+  try {
+    const res = await fetch(`${API}/configs/generate/${template}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      if (btn) {
+        btn.textContent = '✓ Done';
+        setTimeout(() => { btn.textContent = `▶ Gen ${template}`; btn.disabled = false; }, 2000);
+      }
+    } else {
+      if (btn) { btn.textContent = `✗ ${data.error || 'failed'}`; btn.disabled = false; }
+    }
+    await renderConfigs();
+    await renderIssueChart();
+  } catch (e) {
+    if (btn) { btn.textContent = '✗ Error'; btn.disabled = false; }
+  }
+};
+
+// Initial load
+refresh();
+setTimeout(renderIssueChart, 1500); // delayed since /configs might not have issues on first load
+</script>
+</body>
+</html>

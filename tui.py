@@ -301,16 +301,28 @@ class StatusBar(Static):
     
     def __init__(self):
         super().__init__()
+        self.cron_text = " · [dim]cron: —[/]"
+        self.mode_text = ""
     
-    def update_status(self, models: list[dict]):
+    def update_status(self, models: list[dict], mode_info: str = ""):
         accessible = sum(1 for m in models if m.get("accessible"))
         total = len(models)
         providers = len(set(m.get("provider", "") for m in models))
+        self.mode_text = mode_info
         self.update(
             f"  [bold]{total}[/] models · "
             f"[green]{accessible}[/] accessible · "
             f"[dim]{providers}[/] providers"
+            f"{self.mode_text}"
+            f"{self.cron_text}"
         )
+    
+    def set_cron_status(self, status: str):
+        """Update cron schedule display."""
+        if status:
+            self.cron_text = f" · [dim]cron: {status}[/]"
+        else:
+            self.cron_text = " · [dim]cron: —[/]"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -328,12 +340,15 @@ class HelpScreen(ModalScreen):
                 "/           Search/filter models\n"
                 "s           Cycle sort order\n"
                 "c           Add to compare (C to show)\n"
+                "Ctrl+S      Save filtered list to file\n"
                 "p / P       Cycle preset: all → free → best value → agent ready → S-tier → DeepSeek\n"
                 "f           Cycle filter: all → qualified → incumbent → accessible\n"
                 "t           Cycle tier filter: all → S/A/B/C/—\n"
                 "Enter       Show model details\n"
+                "Tab         Cycle focus panels\n"
                 "v           Toggle compact/comfortable\n"
                 "r           Refresh scan data\n"
+                "k           Cron auto-deployment settings\n"
                 "q / Esc     Quit / close panel\n"
                 "1-9         Quick slot view\n"
                 "?           This help\n"
@@ -341,6 +356,39 @@ class HelpScreen(ModalScreen):
                 id="help-text",
             ),
             id="help-dialog",
+        )
+    
+    def on_key(self, event):
+        self.dismiss()
+
+
+class CronModal(ModalScreen):
+    """Cron auto-deployment settings modal."""
+    
+    def compose(self) -> ComposeResult:
+        try:
+            from cron_manager import load_config
+            cfg = load_config()
+        except Exception:
+            cfg = {"daily": {"enabled": False, "schedule": None}, "weekly": {"enabled": False, "schedule": None}}
+        
+        lines = []
+        lines.append("[bold]Auto-Deployment Cron Settings[/]\n")
+        lines.append("Configure schedules for automatic daily/weekly scans.\n")
+        lines.append("Set via CLI:   dink.py --cron-set daily \"30 6 * * *\"")
+        lines.append("")
+        for job in ("daily", "weekly"):
+            j = cfg.get(job, {})
+            enabled = j.get("enabled", False)
+            schedule = j.get("schedule") or "—"
+            icon = "●" if enabled else "○"
+            lines.append(f"  {icon} [bold]{job.title()}[/]  [dim]{schedule}[/]")
+        lines.append("")
+        lines.append("[dim]Press any key to close[/]")
+        
+        yield Grid(
+            Static("\n".join(lines), id="cron-text"),
+            id="cron-dialog",
         )
     
     def on_key(self, event):
@@ -436,7 +484,9 @@ class ModelScanTUI(App):
         Binding("r", "refresh_data", "Refresh"),
         Binding("p", "cycle_preset", "Preset"),
         Binding("P", "cycle_preset", "Preset"),
+        Binding("k", "show_cron", "Cron"),
         Binding("?", "show_help", "Help"),
+        Binding("ctrl+s", "save_selection", "Save"),
     ]
     
     # Messages
@@ -480,12 +530,34 @@ class ModelScanTUI(App):
         self.load_data()
         self.query_one("#detail-panel").display = self.show_detail
         self.query_one("#compare-panel").display = self.show_compare
+        # Load cron status in background
+        self.load_cron_status()
     
     def load_data(self):
         self.models = load_models()
         self._apply_filters()
         self._refresh_list()
         self._update_status()
+    
+    @work(thread=True)
+    def load_cron_status(self):
+        """Load cron status in a background thread."""
+        try:
+            from cron_manager import load_config
+            cfg = load_config()
+            parts = []
+            for job in ("daily", "weekly"):
+                j = cfg.get(job, {})
+                if j.get("enabled") and j.get("schedule"):
+                    parts.append(f"{job[0].upper()}:{j['schedule']}")
+            status = " ".join(parts) if parts else ""
+            self.call_from_thread(self._update_cron_status, status)
+        except Exception:
+            self.call_from_thread(self._update_cron_status, "")
+    
+    def _update_cron_status(self, status: str):
+        bar = self.query_one(StatusBar)
+        bar.set_cron_status(status)
         
     def _apply_filters(self):
         lst = self.models
@@ -540,7 +612,17 @@ class ModelScanTUI(App):
     def _update_status(self):
         status = self.query_one("#status-bar", StatusBar)
         if self.models:
-            status.update_status(self.models)
+            presets = {"all": "All", "free": "Free", "best_value": "Best$", "agent_ready": "Agent", "s_tier": "S-Tier", "deepseek": "DS"}
+            filters = {"all": "All", "accessible": "Acc", "S": "S", "A": "A", "B": "B", "C": "C"}
+            mode = f" · [{self._sort_color()}]{self.sort_key}[/]"
+            mode += f" · [dim]{filters.get(self.filter_mode, self.filter_mode)}[/]"
+            if self.preset_mode != "all":
+                mode += f" · [bold cyan]{presets.get(self.preset_mode, self.preset_mode)}[/]"
+            status.update_status(self.models, mode)
+    
+    def _sort_color(self) -> str:
+        colors = {"composite": "yellow", "tps": "green", "latency_s": "cyan", "ai_index": "magenta", "tier": "blue"}
+        return colors.get(self.sort_key, "dim")
     
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "search-input":
@@ -628,6 +710,25 @@ class ModelScanTUI(App):
     def action_show_help(self):
         self.push_screen(HelpScreen())
     
+    def action_show_cron(self):
+        self.push_screen(CronModal())
+    
+    def action_save_selection(self):
+        """Save filtered model list to a timestamped file."""
+        if not self.filtered_models:
+            self.notify("No models to save", severity="error")
+            return
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out = CONFIG_DIR / f"tui_export_{ts}.json"
+        data = [
+            {"model_id": m.get("model_id"), "provider": m.get("provider"),
+             "tier": m.get("tier"), "composite": m.get("composite"),
+             "tps": m.get("tps"), "ai_index": m.get("ai_index")}
+            for m in self.filtered_models
+        ]
+        out.write_text(json.dumps(data, indent=2))
+        self.notify(f"Saved {len(data)} models to {out.name}")
+    
     def on_key(self, event):
         if event.key == "enter" and self.filtered_models:
             idx = self.selected_index
@@ -643,15 +744,23 @@ class ModelScanTUI(App):
                 sid = slot_ids[slot_idx]
                 self.notify(f"Slot: {sid}")
         
-        # Arrow key navigation
-        if event.key == "up":
-            self.selected_index = max(0, self.selected_index - 1)
-            lv = self.query_one("#model-list", ListView)
-            lv.index = self.selected_index
-        elif event.key == "down":
-            self.selected_index = min(len(self.filtered_models) - 1, self.selected_index + 1)
-            lv = self.query_one("#model-list", ListView)
-            lv.index = self.selected_index
+        # Tab cycling
+        if event.key == "tab":
+            panels = [
+                self.query_one("#search-input", Input),
+                self.query_one("#model-list", ListView),
+                self.query_one("#detail-panel", ModelDetail),
+                self.query_one("#compare-panel", ComparePanel),
+            ]
+            panels = [p for p in panels if p.display]
+            current = self.focused or panels[0]
+            idx = next((i for i, p in enumerate(panels) if p is current or p.id == current.parent.id if current and hasattr(current, 'id')), -1)
+            if idx >= 0:
+                next_idx = (idx + 1) % len(panels)
+                if next_idx == 0:
+                    panels[0].focus()
+            else:
+                panels[0].focus()
 
 
 def main():

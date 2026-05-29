@@ -1,0 +1,345 @@
+# ============================================================================
+#  MODEL TIER REGISTRY — Static tier assignments for model-scan v4+
+#  Location: ~/.config/model-scan/tiers.yaml
+#
+#  CHANGES FROM PREVIOUS VERSION
+#  ──────────────────────────────────────────────────────────────────────────
+#  - PROMOTED: MiniMax M2.5 from B-tier → A-tier (SWE-Bench 80.2%,
+#    BFCL 76.8%, near-Opus-level coding at 1/10th cost)
+#  - PROMOTED: Owl Alpha from B-tier → B+ tier (1M ctx, agentic,
+#    #1 most-used on OR, BUT 13.5% structured output error rate)
+#  - CONFIRMED: GLM 4.5 Flash is B-tier (not A). AA ~35, decent but
+#    not competitive with V4-Flash or M2.5 for primary work.
+#  - REMOVED: zai-glm-4.7 from B-tier (NOT free, $2.25/$2.75/M paid,
+#    only "free" within 1M tok/day Cerebras budget)
+#  - ADDED: Qwen3 Coder 480B A35B as tentative S-tier if on OR free
+#  - ADDED: Hunter Alpha as tentative A-tier (stealth model, vision)
+#  - FIXED: OpenRouter free quota is 1,000/day/MODEL with $10 credits
+#
+#  TIER DEFINITIONS (as of 2026-05-28)
+#  ──────────────────────────────────────────────────────────────────────────
+#  S-tier: Frontier reasoning. Use for primary reasoning when budget allows.
+#  A-tier: Deployable for primary work. Strong tool-calling or coding.
+#  B+-tier: Strong for free but with real tradeoffs (owl-alpha territory).
+#  B-tier: Capable secondaries. Acceptable for auxiliary slots.
+#  C-tier: Functional but degrading. Only for speed-critical trivial tasks.
+#  D-tier: Below threshold. Never use for reasoning/summarization.
+#
+#  MAINTENANCE: Update weekly. When AA-Intelligence drops 5+ points below
+#  tier's expected range, demote one tier. When it rises 5+ above, promote.
+# ============================================================================
+
+# ── S-TIER: Frontier reasoning ─────────────────────────────────────────────
+S:
+  models:
+    - name: gpt-5.5
+      provider: openai
+      notes: "Primary via Plus plan. S-tier reasoning, rationed for user-facing turns."
+      aa_intelligence_expected: 60+
+      date_assigned: "2026-05-28"
+
+    - name: claude-opus-4-7
+      provider: anthropic
+      notes: "Not in scan (separate API). S-tier if available via Kiro Pro or direct."
+      aa_intelligence_expected: 62+
+      date_assigned: "2026-05-28"
+
+    - name: deepseek-v4-pro
+      provider: opencode-go
+      notes: "$0.54/M (permanent 75% discount). S-tier at A-tier price. ⚠️ Go is maxed out."
+      aa_intelligence_expected: 52+
+      date_assigned: "2026-05-28"
+
+    - name: deepseek-ai/deepseek-v4-pro
+      provider: nvidia-nim
+      notes: "Same via NIM. Slow (1-2 t/s) but S-tier when speed doesn't matter."
+      aa_intelligence_expected: 52+
+      date_assigned: "2026-05-28"
+
+    - name: moonshotai/kimi-k2.6
+      provider: nvidia-nim
+      notes: "S-tier reasoning, AA:54. Slow (6-7 t/s) but highest quality on NIM."
+      aa_intelligence_expected: 54+
+      date_assigned: "2026-05-28"
+
+    - name: kimi-k2.6
+      provider: ollama-cloud
+      notes: "S-tier via Ollama Cloud. 3hr refill quota. Premium quality for free."
+      aa_intelligence_expected: 54+
+      date_assigned: "2026-05-28"
+
+    - name: moonshotai/kimi-k2.6:free
+      provider: openrouter
+      notes: "S-tier, AA:54, FREE on OR. 1K/day quota. Separate from V4-Flash bucket."
+      aa_intelligence_expected: 54+
+      date_assigned: "2026-05-28"
+
+    - name: qwen3-coder-480b-a35b
+      provider: openrouter
+      notes: "TENTATIVE S-tier. Strongest free coding model on OR. Verify availability."
+      aa_intelligence_expected: 55+
+      date_assigned: "2026-05-28"
+
+# ── A-TIER: Deployable for primary work ────────────────────────────────────
+A:
+  models:
+    - name: deepseek-v4-flash-free
+      provider: opencode-zen
+      notes: "THE workhorse. Free, A-tier, tool-calling, 1M context. 20-26 t/s."
+      aa_intelligence_expected: 46+
+      date_assigned: "2026-05-28"
+
+    - name: deepseek-v4-flash
+      provider: opencode-go
+      notes: "Same via OCGo. $0.17/M. ⚠️ Go is CURRENTLY MAXED OUT."
+      aa_intelligence_expected: 46+
+      date_assigned: "2026-05-28"
+
+    - name: deepseek/deepseek-v4-flash:free
+      provider: openrouter
+      notes: "Same via OR. 1K/day free quota. Intermittent 402/RL."
+      aa_intelligence_expected: 46+
+      date_assigned: "2026-05-28"
+
+    - name: deepseek-ai/deepseek-v4-flash
+      provider: nvidia-nim
+      notes: "Same via NIM. Slow (1-2 t/s) but always available. $0.17/M."
+      aa_intelligence_expected: 46+
+      date_assigned: "2026-05-28"
+
+    - name: z-ai/glm-4.5-air:free
+      provider: openrouter
+      notes: "A-tier. BFCL tool-calling #1 at 76.7%. FREE on OR. Best tool-calling model."
+      aa_intelligence_expected: 35-38
+      bfcl_score: 76.7
+      date_assigned: "2026-05-28"
+
+    - name: minimax/minimax-m2.5:free
+      provider: openrouter
+      notes: "A-tier. SWE-Bench 80.2% (near Opus!), BFCL 76.8%, 1M ctx. FREE on OR. PROMOTED from B-tier."
+      aa_intelligence_expected: 42+
+      swe_bench: 80.2
+      bfcl_score: 76.8
+      date_assigned: "2026-05-28"
+
+    - name: glm-5.1
+      provider: ollama-cloud
+      notes: "A-tier, AA:51. Strong MoE-reasoning. Free with 3hr refill."
+      aa_intelligence_expected: 51+
+      date_assigned: "2026-05-28"
+
+    - name: glm-5
+      provider: opencode-go
+      notes: "A-tier, AA:50. ⚠️ Go is CURRENTLY MAXED OUT. Use Ollama Cloud instead."
+      aa_intelligence_expected: 50+
+      date_assigned: "2026-05-28"
+
+    - name: qwen3.6-plus
+      provider: opencode-go
+      notes: "A-tier, AA:50. ⚠️ Go is CURRENTLY MAXED OUT."
+      aa_intelligence_expected: 50+
+      date_assigned: "2026-05-28"
+
+    - name: minimax-m2.7
+      provider: ollama-cloud
+      notes: "A-tier. Ollama Cloud exclusive. Premium quality. 3hr refill."
+      aa_intelligence_expected: 45+
+      date_assigned: "2026-05-28"
+
+    - name: qwen/qwen3.5-397b-a17b
+      provider: nvidia-nim
+      notes: "A-tier multimodal, AA:45. Vision-capable. $1.35/M."
+      aa_intelligence_expected: 45+
+      date_assigned: "2026-05-28"
+
+    - name: hunter-alpha
+      provider: openrouter
+      notes: "TENTATIVE A-tier. Stealth model, vision support, 1M ctx. Verify quality."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: claude-sonnet-4.5
+      provider: kiro
+      notes: "A-tier via Kiro Code 50 credits/month. Available on the 1st. NOT Opus."
+      aa_intelligence_expected: 48+
+      date_assigned: "2026-05-28"
+
+# ── B+-TIER: Strong for free but with real tradeoffs ──────────────────────
+B_plus:
+  models:
+    - name: openrouter/owl-alpha
+      provider: openrouter
+      notes: "B+ tier. 1M context, native tool use, #1 most-used on OR. BUT 13.5% structured output error rate, ~5s latency. Great for agentic/long-ctx, NOT for tool-critical slots."
+      aa_intelligence_expected: "~"
+      structured_output_error_rate: 13.47
+      tool_call_error_rate: 3.39
+      date_assigned: "2026-05-28"
+
+# ── B-TIER: Capable secondaries ────────────────────────────────────────────
+B:
+  models:
+    - name: google/gemma-4-31b-it:free
+      provider: openrouter
+      notes: "B-tier, AA:39, multimodal (vision+text), FREE on OR. 256K ctx. Best free vision."
+      aa_intelligence_expected: 39+
+      date_assigned: "2026-05-28"
+
+    - name: google/gemma-4-26b-a4b-it:free
+      provider: openrouter
+      notes: "B-tier, AA:31, MoE 25.2/3.8B, FREE on OR. Smaller but efficient."
+      aa_intelligence_expected: 30+
+      date_assigned: "2026-05-28"
+
+    - name: glm-4.5-flash
+      provider: various
+      notes: "B-tier (NOT A). AA ~35. Decent but not competitive with V4-Flash or M2.5 for primary work."
+      aa_intelligence_expected: 33+
+      date_assigned: "2026-05-28"
+
+    - name: minimax-m2.5
+      provider: ollama-cloud
+      notes: "B-tier on Ollama (not OR free). AA:42. Acceptable for aux slots."
+      aa_intelligence_expected: 40+
+      date_assigned: "2026-05-28"
+
+    - name: minimax-m2.1
+      provider: ollama-cloud
+      notes: "B-tier, AA:39. 51 t/s. Good speed/quality for auxiliary slots."
+      aa_intelligence_expected: 38+
+      date_assigned: "2026-05-28"
+
+    - name: qwen/qwen3-32b
+      provider: groq
+      notes: "B-tier. Free on Groq with rate limits. Best non-D model on Groq."
+      aa_intelligence_expected: 35+
+      date_assigned: "2026-05-28"
+
+    - name: qwen/qwen3-32b
+      provider: cerebras
+      notes: "B-tier. $0.40/$0.80/M on Cerebras. Free within 1M tok/day budget."
+      aa_intelligence_expected: 35+
+      date_assigned: "2026-05-28"
+
+    - name: meta/llama-3.2-11b-vision-instruct
+      provider: nvidia-nim
+      notes: "B-tier vision. Fallback if Gemma-4-31B fails. 5-11 t/s."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+# ── C-TIER: Functional but degrading ───────────────────────────────────────
+C:
+  models:
+    - name: nvidia/nemotron-3-super-120b-a12b:free
+      provider: openrouter
+      notes: "B/C-tier. AA:36. MoE-hybrid. FREE on OR. Acceptable for title_gen only."
+      aa_intelligence_expected: 34+
+      date_assigned: "2026-05-28"
+
+    - name: gpt-oss-120b
+      provider: cerebras
+      notes: "C-tier, AA:33. ONLY useful model on Cerebras. 98-106 t/s. Speed only."
+      aa_intelligence_expected: 32+
+      date_assigned: "2026-05-28"
+
+    - name: openai/gpt-oss-120b:free
+      provider: openrouter
+      notes: "C-tier, AA:33. Free on OR. 11-19 t/s. Speed-critical trivial tasks only."
+      aa_intelligence_expected: 32+
+      date_assigned: "2026-05-28"
+
+    - name: openai/gpt-oss-120b
+      provider: nvidia-nim
+      notes: "C-tier, AA:33. Same model on NIM. $0.25/M. Speed only."
+      aa_intelligence_expected: 32+
+      date_assigned: "2026-05-28"
+
+    - name: stepfun-ai/step-3.5-flash
+      provider: nvidia-nim
+      notes: "C-tier, AA:38. $0.15/M. Functional but below A-tier threshold."
+      aa_intelligence_expected: 36+
+      date_assigned: "2026-05-28"
+
+    - name: kimi-k2.5
+      provider: opencode-go
+      notes: "C-tier, AA:37. K2.6 is much better. ⚠️ Go is maxed out anyway."
+      aa_intelligence_expected: 35+
+      date_assigned: "2026-05-28"
+
+# ── D-TIER: Below threshold — DO NOT USE for reasoning ─────────────────────
+D:
+  models:
+    - name: llama-3.3-70b-versatile
+      provider: groq
+      notes: "D-tier. Dense 70B. No AA score. Fast on Groq but incapable. THE worst offender."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: meta/llama-3.3-70b-instruct
+      provider: nvidia-nim
+      notes: "D-tier. Same model on NIM. No AA score. Avoid."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: allam-2-7b
+      provider: groq
+      notes: "D-tier. 7B dense Arabic-tuned. No AA score. Catastrophic misassignment risk."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: baidu/cobuddy:free
+      provider: openrouter
+      notes: "D-tier. Unknown capability. 3-14 t/s."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+      provider: openrouter
+      notes: "D-tier. AA:21. Below threshold."
+      aa_intelligence_expected: 20+
+      date_assigned: "2026-05-28"
+
+    - name: nvidia/nemotron-3-nano-30b-a3b
+      provider: nvidia-nim
+      notes: "D-tier. AA:13. Sub-threshold."
+      aa_intelligence_expected: 12+
+      date_assigned: "2026-05-28"
+
+    - name: zai-glm-4.7
+      provider: cerebras
+      notes: "D-tier for cost reasons. $2.25/$2.75/M on paid tier. NOT free. Only usable within 1M tok/day Cerebras free budget, which is better spent on gpt-oss-120b. REMOVED from all configs."
+      aa_intelligence_expected: "~"
+      date_assigned: "2026-05-28"
+
+    - name: openai/gpt-oss-20b
+      provider: nvidia-nim
+      notes: "D-tier. AA:24. Too small for reasoning."
+      aa_intelligence_expected: 22+
+      date_assigned: "2026-05-28"
+
+# ── NOT-CHAT-MODELS: Safety classifiers, PII detectors, etc. ──────────────
+NOT_CHAT:
+  models:
+    - name: nvidia/llama-3.1-nemoguard-8b-content-safety
+      provider: nvidia-nim
+      notes: "Content safety classifier. Not a chat model."
+    - name: nvidia/llama-3.1-nemoguard-8b-topic-control
+      provider: nvidia-nim
+      notes: "Topic control classifier. Not a chat model."
+    - name: nvidia/nemotron-3-content-safety
+      provider: nvidia-nim
+      notes: "Content safety. Not a chat model."
+    - name: nvidia/gliner-pii
+      provider: nvidia-nim
+      notes: "PII detection model. Not a chat model."
+    - name: nvidia/nemotron-content-safety-reasoning-4b
+      provider: nvidia-nim
+      notes: "Content safety reasoning. Not a chat model."
+    - name: meta/llama-guard-4-12b
+      provider: nvidia-nim
+      notes: "Guard model. Not a chat model."
+    - name: nvidia/ising-calibration-1-35b-a3b
+      provider: nvidia-nim
+      notes: "Calibration model. Not a chat model."
+    - name: nvidia/riva-translate-4b-instruct-v1.1
+      provider: nvidia-nim
+      notes: "Translation model. Not a general chat model."

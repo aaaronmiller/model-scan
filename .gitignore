@@ -37,3 +37,12 @@ local_settings.py
 .vscode/
 *.swp
 *.swo
+
+# Research docs / transcripts (not source code)
+transcript.md
+transcript.txt
+*-refinement-guide*.md
+model-scan-dynamic-addendum.md
+benchmark-info-*.md
+benchmarks-info-*.md
+hermes-config-role-table.md

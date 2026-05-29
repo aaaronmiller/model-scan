@@ -165,6 +165,9 @@ RESULTS_FILE   = CONFIG_DIR / "results.json"
 DATABASE_FILE  = CONFIG_DIR / "model_scan.db"
 TIERS_FILE     = CONFIG_DIR / "tiers.yaml"
 SLOTS_FILE     = CONFIG_DIR / "slot_definitions.yaml"
+BLOCKLIST_FILE = CONFIG_DIR / "blocklist.yaml"
+PROGRAM_ASSIGNMENTS_FILE = CONFIG_DIR / "program_assignments.json"
+PROVIDER_HOURS_FILE      = CONFIG_DIR / "provider_hour_windows.yaml"
 
 HERMES_CONFIG  = Path.home() / ".hermes" / "config.yaml"
 PROXY_ENV      = Path.home() / "code" / "claude-code-proxy" / ".env"
@@ -342,9 +345,6 @@ def _db_save_run(dossiers: list, duration: float, aa_provenance: str,
 
         conn.commit()
         conn.close()
-    except Exception as e:
-        print(f"  {C.WARN}{C.TRI} DB save failed: {e}{C.RST}", file=sys.stderr)
-
     except Exception as e:
         import traceback; traceback.print_exc()
         print(f"  {C.WARN}{C.TRI} DB save failed: {e}{C.RST}", file=sys.stderr)
@@ -524,7 +524,178 @@ def load_slot_defs() -> dict:
     SLOTS_FILE.write_text(yaml.safe_dump(DEFAULT_SLOTS, sort_keys=False))
     return DEFAULT_SLOTS
 
-# ── FREE-MODE WHITELIST ──────────────────────────────────────────────
+def load_blocklist() -> dict:
+    """Load blocklist.yaml. Returns {exact: [...], patterns: [...], provider_rules: {...}}."""
+    if BLOCKLIST_FILE.exists():
+        try:
+            return yaml.safe_load(BLOCKLIST_FILE.read_text()) or {}
+        except Exception:
+            pass
+    return {}
+
+def is_blocklisted(prov: str, mid: str, blocklist: dict) -> tuple[bool, str]:
+    """Check if a model is blocklisted. Returns (blocked, reason)."""
+    # Check exact matches
+    for exact in blocklist.get("exact", []):
+        if exact == f"{prov}/{mid}":
+            return True, "blocklisted"
+    # Check regex patterns
+    for pat in blocklist.get("patterns", []):
+        if re.search(pat, mid, re.I) or re.search(pat, f"{prov}/{mid}", re.I):
+            return True, f"pattern:{pat}"
+    # Check provider rules
+    rules = blocklist.get("provider_rules", {}).get(prov, {})
+    if rules.get("block_unless_chat_prefix"):
+        block_unless = rules["block_unless_chat_prefix"]
+        if not any(mid.startswith(p) for p in block_unless):
+            return True, f"{prov} non-chat model"
+    return False, ""
+
+# ── PROGRAM ASSIGNMENTS (Phase 4: Multi-program monitoring) ──────────
+def load_program_assignments() -> dict:
+    """Load program_assignments.json. Returns {} if missing."""
+    if PROGRAM_ASSIGNMENTS_FILE.exists():
+        try:
+            return json.loads(PROGRAM_ASSIGNMENTS_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+def save_program_assignments(data: dict) -> None:
+    """Save program_assignments.json with pretty-printing."""
+    data["last_updated"] = datetime.now(timezone.utc).isoformat()
+    PROGRAM_ASSIGNMENTS_FILE.write_text(json.dumps(data, indent=2, default=str))
+
+def render_multi_program_status(programs: dict, plan_health: dict) -> list[str]:
+    """Render multi-program status section lines.
+
+    Returns a list of rendered lines, color-coded per program.
+    """
+    lines = [f"  {C.ACCENT}MULTI-PROGRAM STATUS{C.RST}"]
+    lines.append("")
+
+    # Hermes
+    hermes = programs.get("hermes_primary", {})
+    primary = hermes.get("primary", "?")
+    delegation = hermes.get("delegation", "?")
+    conflicts = hermes.get("provider_conflicts", [])
+    conflict_str = f" {C.WARN}⚠ conflicting: {', '.join(conflicts)}{C.RST}" if conflicts else ""
+    lines.append(f"  {C.ACCENT}Hermes:{C.RST}      {primary} → {delegation}{conflict_str}")
+
+    # Claude Code
+    cc = programs.get("claude_code", {})
+    big = cc.get("big", "?")
+    med = cc.get("med", "?")
+    small = cc.get("small", "?")
+    cc_conflicts = cc.get("provider_conflicts", [])
+    cc_cs = f" {C.WARN}⚠ {', '.join(cc_conflicts)}{C.RST}" if cc_conflicts else ""
+    lines.append(f"  {C.ACCENT}Claude Code:{C.RST}  big={big}, med={med}, small={small}{cc_cs}")
+
+    # Codex
+    codex = programs.get("codex", {})
+    coord = codex.get("coord", "?")
+    bulk = codex.get("bulk", "?")
+    quality = codex.get("quality", "?")
+    speed = codex.get("speed", "?")
+    cx_conflicts = codex.get("provider_conflicts", [])
+    cx_cs = f" {C.WARN}⚠ {', '.join(cx_conflicts)}{C.RST}" if cx_conflicts else ""
+    lines.append(f"  {C.ACCENT}Codex:{C.RST}       coord={coord}, bulk={bulk}, quality={quality}, speed={speed}{cx_cs}")
+
+    # OpenCode
+    oc = programs.get("opencode", {})
+    oc_zen = oc.get("zen_status", "?")
+    oc_go = oc.get("go_status", "?")
+    oc_go_refill = oc.get("go_estimated_refill", "?")
+    zen_clr = C.SUCCESS if oc_zen == "healthy" else C.WARN
+    go_clr = C.SUCCESS if oc_go == "healthy" else C.ERROR
+    lines.append(f"  {C.ACCENT}OpenCode:{C.RST}    Zen={zen_clr}{oc_zen}{C.RST}, Go={go_clr}{oc_go}{C.RST}"
+                 f" (refill: {oc_go_refill})")
+
+    # Pi Agent
+    pi = programs.get("pi_agent", {})
+    pi_primary = pi.get("primary", "?")
+    pi_quality = pi.get("quality", "?")
+    pi_conflicts = pi.get("provider_conflicts", [])
+    pi_cs = f" {C.WARN}⚠ {', '.join(pi_conflicts)}{C.RST}" if pi_conflicts else ""
+    lines.append(f"  {C.ACCENT}Pi Agent:{C.RST}    {pi_primary} → {pi_quality}{pi_cs}")
+
+    # Kiro Code
+    kiro = programs.get("kiro", {})
+    kiro_creds = kiro.get("credits_remaining", "?")
+    kiro_total = kiro.get("credits_total", "?")
+    kiro_resets = kiro.get("resets", "?")
+    kiro_status = kiro.get("status", "?")
+    kiro_clr = C.SUCCESS if kiro_status == "healthy" else C.WARN
+    kiro_model = kiro.get("model_available", "?")
+    # Color credits: green=healthy, amber=low (<10), red=crtical (<5)
+    cred_clr = C.SUCCESS if isinstance(kiro_creds, (int, float)) and kiro_creds >= 10 else (
+        C.WARN if isinstance(kiro_creds, (int, float)) and kiro_creds >= 5 else C.ERROR)
+    lines.append(f"  {C.ACCENT}Kiro:{C.RST}        {kiro_clr}{kiro_status}{C.RST}"
+                 f" {cred_clr}{kiro_creds}/{kiro_total}{C.RST} credits ({kiro_model})"
+                 f" resets {kiro_resets}")
+
+    lines.append("")
+    return lines
+
+def detect_cross_program_conflicts(programs: dict) -> list[tuple[str, str, str, str]]:
+    """Detect model/provider conflicts between programs.
+
+    Returns list of (program_a, program_b, conflict_model, provider) tuples.
+    Each conflict means both programs are using the same model from the same provider,
+    which could drain quota faster than expected.
+    """
+    conflicts: list[tuple[str, str, str, str]] = []
+    # Collect all model assignments per program
+    assignments: dict[str, list[tuple[str, str, str]]] = {}  # program -> [(slot, model, provider)]
+    
+    provider_model_map: dict[str, dict[str, list[str]]] = {}  # provider -> model -> [programs...]
+    
+    for prog_name, prog_data in programs.items():
+        if not isinstance(prog_data, dict):
+            continue
+        if prog_name == "version" or prog_name == "last_updated":
+            continue
+        assignments[prog_name] = []
+        for slot_key, model_val in prog_data.items():
+            if slot_key in ("provider_conflicts", "zen_status", "go_status",
+                           "go_estimated_refill", "zen_estimated_refill"):
+                continue
+            if isinstance(model_val, str) and model_val and model_val != "?":
+                # Guess provider from model name or use conflict list
+                prov = None
+                for known_prov in PROVIDERS:
+                    if known_prov in model_val.lower() or model_val.startswith(known_prov):
+                        prov = known_prov
+                        break
+                if not prov:
+                    # Heuristic: openrouter models have :free suffix
+                    if ":free" in model_val:
+                        prov = "openrouter"
+                    elif model_val.startswith("deepseek"):
+                        prov = "opencode_zen"
+                    elif model_val.startswith("gpt-"):
+                        prov = "openai"
+                    elif model_val.startswith("claude"):
+                        prov = "anthropic"
+                    else:
+                        prov = "unknown"
+                assignments[prog_name].append((slot_key, model_val, prov))
+                
+                p_key = f"{prov}/{model_val}"
+                if p_key not in provider_model_map:
+                    provider_model_map[p_key] = []
+                if prog_name not in provider_model_map[p_key]:
+                    provider_model_map[p_key].append(prog_name)
+
+    # Find conflicts: same provider+model used by >1 program
+    for p_key, progs in provider_model_map.items():
+        if len(progs) > 1:
+            prov, model = p_key.split("/", 1)
+            for i in range(len(progs)):
+                for j in range(i + 1, len(progs)):
+                    conflicts.append((progs[i], progs[j], model, prov))
+    
+    return conflicts
 FREE_WHITELIST_PATH = CONFIG_DIR / "free_model_whitelist.json"
 
 def load_free_whitelist() -> dict:
@@ -1553,12 +1724,14 @@ def _estimate_intelligence(d: Dossier) -> float | None:
     if any(p in mid for p in ['kimi-k2.6', 'kimi-k2.5']):
         return 59.0   # 58.6% SWE-Pro, best agentic coder
     if any(p in mid for p in ['kimi-k2-thinking', 'minimax-m2.7']):
-        return 52.0   # K2-thinking: AA~52; M2.7: 100 tok/s, 80.2% SWE-Verified (M2.5)
+        return 56.0   # M2.7 = A-tier anchor per tiers.yaml (A≥55)
     # Kimi-K2 (non-reasoning, catch-all after specific checks): AA ~37-50
     if 'kimi-k2' in mid:
         return 42.0
-    if any(p in mid for p in ['deepseek-v4-flash', 'deepseek-v4-pro']):
-        return 60.0   # 79% SWE-Verified, 55% SWE-Pro (DeepSeek V4 family)
+    if 'deepseek-v4-pro' in mid:
+        return 67.0   # S-tier anchor per tiers.yaml: DeepSeek-V4-Pro = S reference
+    if 'deepseek-v4-flash' in mid:
+        return 60.0   # 79% SWE-Verified, 55% SWE-Pro, fast/cheap alternative
     if any(p in mid for p in ['glm-5.1', 'glm-5']):
         return 58.0   # 58.4% SWE-Pro, best reasoning among Go models
     if any(p in mid for p in ['qwen3.6-plus', 'qwen3.6-max']):
@@ -1701,6 +1874,339 @@ def compute_tier(composite: float, ai_index: float | None, thresholds: dict) -> 
         return "C"
     return "—"
 
+# ──────────────────────────────────────────────────────────────────────────
+# TC (TOOL-CALLING) SCORE ESTIMATION
+# ──────────────────────────────────────────────────────────────────────────
+def _estimate_tc(d: Dossier) -> tuple[float | None, str]:
+    """Estimate tool-calling capability score (0-100) and source label.
+
+    Source hierarchy:
+    1. BFCL v3 score from benchmarks.json (percentage)
+    2. Live probe: has_tools flag (passed tool-calling probe → 75)
+    3. No data → None (unknown)
+
+    Returns (score_0_100_or_None, source_label).
+    """
+    # Check BFCL from benchmarks.json
+    bfcl = _load_benchmarks().get("bfcl_v3", {}).get("models", {})
+    mid = d.model.lower().replace("/", "-").replace("_", "-")
+    for key, val in bfcl.items():
+        norm = key.lower().replace("-", "")
+        if norm in mid.replace("-", "") or mid.replace("-", "") in norm:
+            return float(val), "bfcl"
+    # Live probe result — passed a tool-calling test
+    if d.has_tools:
+        return 75.0, "probe"
+    return None, "none"
+
+# ── PHASE 5: FITNESS FORMULA ENHANCEMENTS ────────────────────────────
+def load_provider_hours() -> dict:
+    """Load provider_hour_windows.yaml. Returns {} if missing."""
+    if PROVIDER_HOURS_FILE.exists():
+        try:
+            return yaml.safe_load(PROVIDER_HOURS_FILE.read_text()) or {}
+        except Exception:
+            pass
+    return {}
+
+def get_provider_hour_availability(provider: str, hours_data: dict) -> float:
+    """Get availability multiplier for a provider based on current UTC time.
+
+    Checks provider_hour_windows.yaml for matching time windows.
+    Returns 0.0-1.0 multiplier.
+    """
+    prov_hours = hours_data.get(provider, {})
+    if not prov_hours:
+        return 1.0  # no data = full availability assumed
+
+    default_avail = prov_hours.get("default_availability", 1.0)
+    now = datetime.now(timezone.utc)
+    current_hour = now.hour
+    current_minute = now.minute
+    current_minutes = current_hour * 60 + current_minute
+    current_day = now.strftime("%a")
+
+    for window in prov_hours.get("windows", []):
+        hours_str = window.get("hours", "")
+        days_str = window.get("days", "")
+        avail = window.get("availability", default_avail)
+
+        # Check day match
+        day_match = False
+        if "Mon-Sun" in days_str or "Mon-Sat" in days_str or "Sun-Sat" in days_str:
+            day_match = True
+        elif "Mon-Fri" in days_str:
+            day_match = current_day in ("Mon", "Tue", "Wed", "Thu", "Fri")
+        elif "Sat-Sun" in days_str:
+            day_match = current_day in ("Sat", "Sun")
+        elif "Sat" in days_str and current_day == "Sat":
+            day_match = True
+        elif "Sun" in days_str and current_day in ("Sun",):
+            day_match = True
+        else:
+            day_match = True  # assume all days if not specified
+
+        if not day_match:
+            continue
+
+        # Check hour match
+        if "-" in hours_str:
+            parts = hours_str.split("-")
+            try:
+                start_str, end_str = parts[0].strip(), parts[1].strip()
+                # Parse HH:MM or HH format
+                if ":" in start_str:
+                    sh, sm = start_str.split(":")
+                    start_mins = int(sh) * 60 + int(sm)
+                else:
+                    start_mins = int(start_str) * 60
+
+                if ":" in end_str:
+                    eh, em = end_str.split(":")
+                    end_mins = int(eh) * 60 + int(em)
+                else:
+                    end_mins = int(end_str) * 60
+
+                # Handle overnight windows (end < start)
+                if end_mins <= start_mins:
+                    # Overnight window: check if current time is >= start OR < end
+                    if current_minutes >= start_mins or current_minutes < end_mins:
+                        return avail
+                else:
+                    if start_mins <= current_minutes < end_mins:
+                        return avail
+            except (ValueError, IndexError):
+                continue
+
+    return default_avail
+
+def get_latency_consistency_multiplier(provider: str, model: str) -> float:
+    """Compute latency consistency multiplier for a model.
+
+    Reads last 5 latency measurements from DB.
+    High variance → penalty. Consistent → 1.0.
+    Returns 0.5 (bad) to 1.0 (perfect).
+    """
+    try:
+        conn = sqlite3.connect(str(DATABASE_FILE))
+        c = conn.cursor()
+        c.execute("""
+            SELECT latency_s FROM models
+            WHERE provider=? AND model_id=?
+              AND accessible=1 AND latency_s > 0
+            ORDER BY scanned_at DESC LIMIT 5
+        """, (provider, model))
+        rows = c.fetchall()
+        conn.close()
+        if len(rows) < 2:
+            return 1.0  # not enough data → assume consistent
+        latencies = [r[0] for r in rows if r[0] is not None and r[0] > 0]
+        if len(latencies) < 2:
+            return 1.0
+        mean_lat = sum(latencies) / len(latencies)
+        variance = sum((l - mean_lat) ** 2 for l in latencies) / len(latencies)
+        std_dev = variance ** 0.5
+        # Coefficient of variation: std_dev / mean
+        cv = std_dev / mean_lat if mean_lat > 0 else 0
+        # cv of 0.0 → 1.0, cv of 0.5 → 0.75, cv of 1.0 → 0.5
+        multiplier = max(0.5, 1.0 - cv * 0.5)
+        return round(multiplier, 3)
+    except Exception:
+        return 1.0
+
+def get_aa_current_multiplier(aa_provenance: str) -> float:
+    """Get multiplier based on how fresh the AA cache data is.
+
+    'cached-Nd' → N days old → slight decay per day
+    'fresh' → 1.0
+    None/empty → 0.9 (slightly reduced confidence without AA)
+    """
+    if not aa_provenance or aa_provenance == "none":
+        return 0.9
+    if aa_provenance == "fresh":
+        return 1.0
+    # Parse 'cached-Nd' or cached-Nh
+    import re as _re
+    m = _re.match(r"cached-(\d+)d", aa_provenance)
+    if m:
+        days = int(m.group(1))
+        # Decay: day 0 = 1.0, day 7 = 0.7, day 30 = 0.3
+        return max(0.3, 1.0 - days * 0.1)
+    m = _re.match(r"cached-(\d+)h", aa_provenance)
+    if m:
+        hours = int(m.group(1))
+        return max(0.5, 1.0 - hours * 0.02)
+    return 0.9
+
+def get_slot_arch_bonus(arch: str, slot_def: dict) -> float:
+    """Compute architecture bonus for a slot.
+
+    Returns bonus factor (0.0 = no bonus, 0.1 = 10% boost, etc.).
+    Currently provides +5% for preferred architectures, +10% for
+    special combos (MoE for compression, multimodal for vision).
+    """
+    preferred = slot_def.get("preferred_arch", [])
+    if not arch or not preferred:
+        return 0.0
+    if arch in preferred:
+        # Extra bonus for slot-arch efficiency combos
+        slot_id = slot_def.get("label", "")
+        if "compression" in slot_id and "MoE" in arch:
+            return 0.10  # MoE excels at compression
+        if "vision" in slot_id and "multimodal" in arch:
+            return 0.10  # multimodal for vision
+        if "tool" in slot_id and "dense" in arch:
+            return 0.08  # dense archs often better at function calling
+        return 0.05
+    return 0.0
+
+# ── Logfile Mining Integration (Phase 8) ──────────────────────────────────
+ISSUE_SCORES_CACHE: dict | None = None
+ISSUE_SCORES_MTIME: float = 0
+
+
+def load_issue_scores() -> dict:
+    """Load model_issue_scores.json with caching.
+
+    Returns dict: {model: {slot: {category: {...}}}}
+    """
+    global ISSUE_SCORES_CACHE, ISSUE_SCORES_MTIME
+
+    path = Path.home() / ".config" / "model-scan" / "model_issue_scores.json"
+    if not path.exists():
+        return {}
+
+    mtime = path.stat().st_mtime
+    if ISSUE_SCORES_CACHE is not None and mtime <= ISSUE_SCORES_MTIME:
+        return ISSUE_SCORES_CACHE
+
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        ISSUE_SCORES_CACHE = data.get("scores", {})
+        ISSUE_SCORES_MTIME = mtime
+        return ISSUE_SCORES_CACHE
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def get_historical_issue_multiplier(
+    model: str,
+    slot_id: str,
+    issue_scores: dict | None = None,
+) -> float:
+    """Get historical issue multiplier for a (model, slot) pair.
+
+    Persistence score (P) → multiplier = 1.0 - P
+    - P = 0.0  → 1.0 (no issues)
+    - P = 0.5  → 0.5 (significant issues)
+    - P = 0.8  → 0.2 (severe issues)
+    - P = 1.0  → 0.0 (completely broken)
+
+    Slot-specific: if a model has issues only in slot X but we're
+    scoring for slot Y, only slot X issues affect slot X.
+    """
+    if issue_scores is None:
+        issue_scores = load_issue_scores()
+
+    if not issue_scores:
+        return 1.0
+
+    model_scores = issue_scores.get(model, {})
+    if not model_scores:
+        return 1.0
+
+    # Find max persistence score across all categories for this (model, slot)
+    max_p = 0.0
+    for slot_key, categories in model_scores.items():
+        # Check for both exact slot match and global issues
+        if slot_key != slot_id and slot_key != "_global":
+            continue
+        for cat_data in categories.values():
+            p = cat_data.get("score", 0)
+            max_p = max(max_p, p)
+
+    # Also check _global which affects all slots
+    if "_global" in model_scores:
+        for cat_data in model_scores["_global"].values():
+            p = cat_data.get("score", 0)
+            max_p = max(max_p, p)
+
+    multiplier = 1.0 - max_p
+    return max(0.0, multiplier)
+
+
+# ── Capability Detection Integration ──────────────────────────────────────
+_CAPABILITY_CACHE: dict | None = None
+_CAPABILITY_MODULES_LOADED = False
+
+
+def _ensure_extractors_path():
+    """Ensure extractors directory is on sys.path (idempotent)."""
+    global _CAPABILITY_MODULES_LOADED
+    if not _CAPABILITY_MODULES_LOADED:
+        p = str(Path.home() / ".config" / "model-scan" / "extractors")
+        if p not in sys.path:
+            sys.path.insert(0, p)
+        _CAPABILITY_MODULES_LOADED = True
+
+
+def load_capability_index() -> dict:
+    """Load endpoint capability index with caching."""
+    global _CAPABILITY_CACHE
+    if _CAPABILITY_CACHE is not None:
+        return _CAPABILITY_CACHE
+    _ensure_extractors_path()
+    path = Path.home() / ".config" / "model-scan" / "endpoint_capabilities.json"
+    if not path.exists():
+        # Try to build it
+        try:
+            from endpoint_prober import build_capability_index  # type: ignore
+            _CAPABILITY_CACHE = build_capability_index()
+        except (ImportError, Exception):
+            _CAPABILITY_CACHE = {}
+    else:
+        try:
+            with open(path) as f:
+                _CAPABILITY_CACHE = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            _CAPABILITY_CACHE = {}
+    return _CAPABILITY_CACHE
+
+
+def get_capability_multiplier(model: str, slot_label: str) -> float:
+    """Get capability match multiplier for (model, slot).
+
+    Returns 1.0 if no capability data, 0.0 if hard gate violated,
+    or 0.3-1.0 if bonus capabilities missing.
+    """
+    try:
+        _ensure_extractors_path()
+        from endpoint_prober import normalize_model_key, compute_capability_match_multiplier, infer_capabilities, SLOT_CAPABILITY_REQUIREMENTS
+
+        caps = load_capability_index()
+        model_key = normalize_model_key(model)
+        slot_reqs = SLOT_CAPABILITY_REQUIREMENTS.get(slot_label, {})
+        if not slot_reqs:
+            return 1.0
+
+        # Find model in index
+        model_caps = None
+        for known_key, data in caps.items():
+            if known_key.startswith("_"):
+                continue
+            if data.get("_normalized", "") == model_key or model_key in data.get("_normalized", ""):
+                model_caps = data
+                break
+
+        if model_caps is None:
+            model_caps = infer_capabilities(model, "")
+
+        return compute_capability_match_multiplier(model_caps, slot_label)
+    except (ImportError, Exception):
+        return 1.0
+
+
 def slot_fitness(d: Dossier, slot_def: dict, use_scoring_engine: bool = False,
                 free_mode: bool = False) -> tuple[float, list[str]]:
     """Returns (0-100 fitness score, list of disqualification reasons).
@@ -1803,36 +2309,139 @@ def slot_fitness(d: Dossier, slot_def: dict, use_scoring_engine: bool = False,
             if d.ocgo_budget_score is not None and (bw := slot_def.get("weight_budget", 0)) > 0:
                 fitness = fitness * (1 - bw) + d.ocgo_budget_score * bw
                 fitness = min(100, fitness)
-            
+
+            # Historical issue multiplier from logfile mining
+            hist_issue = get_historical_issue_multiplier(d.model, slot_def.get("label", ""))
+            fitness = fitness * hist_issue
+            fitness = min(100, max(0, fitness))
+
+            # Capability match multiplier from endpoint probing
+            cap_mult = get_capability_multiplier(d.model, slot_def.get("label", ""))
+            if cap_mult <= 0:
+                return 0.0, ["capability-gate-failed"]
+            fitness = fitness * cap_mult
+            fitness = min(100, max(0, fitness))
+
             return round(fitness, 1), reasons
         except ImportError:
             # Fall through to heuristic if scoring engine not available
             pass
 
     # ── Heuristic fitness (default) ──
-    intel_score = ai if ai is not None else 50
+    # Compute intelligence score
+    intel_score = ai if ai is not None else 28.0
+    # Compute TC score for potential blending
+    tc_score, tc_src = _estimate_tc(d)
+    tc_for_gate = tc_score if tc_score is not None else 0.0
+
+    # === TIER GATE ===
+    min_tier_gate = slot_def.get("min_tier", "")
+    if min_tier_gate:
+        tier_order = {"S": 0, "A": 1, "B": 2, "C": 3, "—": 4}
+        model_tier_val = tier_order.get(d.tier, 5)
+        gate_tier_val = tier_order.get(min_tier_gate, 5)
+        if model_tier_val > gate_tier_val:
+            reasons.append(f"tier<{min_tier_gate} ({d.tier})")
+            return 0.0, reasons
+
+    # === IQ GATE ===
+    min_iq_gate = slot_def.get("min_iq", 0)
+    if min_iq_gate > 0 and intel_score < min_iq_gate:
+        reasons.append(f"iq<{min_iq_gate} ({intel_score:.0f})")
+        return 0.0, reasons
+
+    # === TC GATE ===
+    min_tc_gate = slot_def.get("min_tc", 0)
+    if min_tc_gate > 0:
+        if tc_for_gate < min_tc_gate:
+            # If no TC data and min_tc>0, check if model passed live tool probe
+            if d.has_tools and min_tc_gate <= 75:
+                pass  # live probe qualifies (~75)
+            else:
+                reasons.append(f"tc<{min_tc_gate} ({tc_for_gate:.0f})")
+                return 0.0, reasons
+
+    if reasons:
+        return 0.0, reasons
+
+    # === WEIGHT INIT ===
+    w_intel = slot_def.get("weight_intelligence", 0.4)
+    w_speed = min(slot_def.get("weight_speed", 0.3), 0.50)  # hard cap: max 0.50
+    w_rel   = slot_def.get("weight_reliability", 0.3)
+    w_tc    = slot_def.get("weight_toolcalling", 0.0)
+
+    # Normalize weights to sum 1.0
+    total_pre = w_intel + w_speed + w_rel + w_tc
+    if total_pre > 0:
+        w_intel /= total_pre
+        w_speed /= total_pre
+        w_rel   /= total_pre
+        w_tc    /= total_pre
+
     tps_contribution = min(100, d.tps / 60.0 * 50.0)  # normalized: 60 tps → 50 pts
     lat_contribution = max(0, 50 - d.latency_s * 10)  # 5s latency → 0 pts
     speed_score = min(100, tps_contribution + lat_contribution)
     rel_score = d.reliability * 100
+    tc_contribution = tc_for_gate if tc_score is not None else 50.0  # unknown = neutral
 
-    fitness = (
-        slot_def.get("weight_intelligence", 0.4) * intel_score
-        + slot_def.get("weight_speed", 0.3) * speed_score
-        + slot_def.get("weight_reliability", 0.3) * rel_score
-    )
+    # ════════════════════════════════════════════════════════════════════
+    # Phase 5 Enhancements: modifiers applied pre-composition
+    # ════════════════════════════════════════════════════════════════════
+
+    # 1) AA Current Multiplier: boosts/reduces intel score based on
+    #    how fresh the AA cache is (fresh=1.0, cached-7d=0.3)
+    aa_mult = get_aa_current_multiplier(d.aa_provenance)
+    intel_score_adj = intel_score * aa_mult
+
+    # 2) Latency Consistency Multiplier: penalizes models with high
+    #    variance in observed latencies across scan history
+    lat_cons = get_latency_consistency_multiplier(d.provider, d.model)
+    speed_score_adj = speed_score * lat_cons
+
+    # 3) Historical Issue Multiplier: penalizes models with persistent
+    #    issues detected via logfile mining (persistence_score = 0.8 → mult = 0.2)
+    hist_issue = get_historical_issue_multiplier(d.model, slot_def.get("label", ""))
+
+    # 4) Provider Hour Availability: post-composition multiplier
+    #    based on time-of-day provider windows
+    prov_hours_data = load_provider_hours()
+    prov_avail = get_provider_hour_availability(d.provider, prov_hours_data)
+
+    # ════════════════════════════════════════════════════════════════════
+
+    fitness = (w_intel * intel_score_adj
+               + w_speed * speed_score_adj
+               + w_rel * rel_score
+               + w_tc * tc_contribution)
     # Clamp fitness to 0-100 before applying bonuses
     fitness = min(100, max(0, fitness))
 
-    # Architecture bonus for preferred archs
-    if (preferred := slot_def.get("preferred_arch")) and d.arch in preferred:
-        fitness = min(100, fitness * 1.05)
+    # Architecture bonus using slot-specific logic
+    arch_bonus = get_slot_arch_bonus(d.arch, slot_def)
+    if arch_bonus > 0:
+        fitness = min(100, fitness * (1.0 + arch_bonus))
 
     # Budget score for OpenCode Go slots — blend in requests-per-dollar efficiency
     if d.ocgo_budget_score is not None and (bw := slot_def.get("weight_budget", 0)) > 0:
         # Normalize budget score to same 0-100 scale
         fitness = fitness * (1 - bw) + d.ocgo_budget_score * bw
         fitness = min(100, fitness)
+
+    # Historical issue multiplier: post-composition adjustment
+    # Slots-specific: a model with MCP issues is penalized only for MCP slot
+    fitness = fitness * hist_issue
+    fitness = min(100, max(0, fitness))
+
+    # Capability match multiplier: post-composition adjustment
+    cap_mult = get_capability_multiplier(d.model, slot_def.get("label", ""))
+    if cap_mult <= 0:
+        return 0.0, ["capability-gate-failed"]
+    fitness = fitness * cap_mult
+    fitness = min(100, max(0, fitness))
+
+    # Provider hour availability: post-composition adjustment
+    fitness = fitness * prov_avail
+    fitness = min(100, max(0, fitness))
 
     return round(fitness, 1), reasons
 
@@ -1864,8 +2473,12 @@ def generate_hermes_patch(dossiers: list[Dossier], slot_defs: dict) -> str:
             continue
         best = max(qualified, key=lambda d: d.slot_fitness.get(slot_id, 0))
         fit = best.slot_fitness.get(slot_id, 0)
+        iq = _estimate_intelligence(best)
+        tc, tc_src = _estimate_tc(best)
+        iq_part = f" iq={iq:.0f}" if iq else ""
+        tc_part = f" tc={tc:.0f}" if tc else ""
         lines.append(f"# {slot_id} ({label}):")
-        lines.append(f"#   → {best.api_model} ({best.provider}) fit={fit:.1f} tps={best.tps:.0f}")
+        lines.append(f"#   → {best.api_model} ({best.provider}) fit={fit:.1f} tps={best.tps:.0f}{iq_part}{tc_part}")
         lines.append("")
 
     lines.extend([
@@ -1895,16 +2508,66 @@ def generate_hermes_patch(dossiers: list[Dossier], slot_defs: dict) -> str:
 
     return "\n".join(lines)
 
+# ──────────────────────────────────────────────────────────────────────────
+# PROVIDER HEALTH CHECK (Phase 2)
+# ──────────────────────────────────────────────────────────────────────────
+def check_provider_health() -> dict[str, dict]:
+    """Check health status of each provider by analysing recent scan history.
+
+    Reads model_scan.db for last 24h failure rates per provider.
+    Returns dict of {provider: status_info}.
+    """
+    health: dict[str, dict] = {}
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    try:
+        conn = sqlite3.connect(str(DATABASE_FILE))
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        for prov, cfg in PROVIDERS.items():
+            key_var = cfg.get("key_env", "")
+            has_key = bool(os.environ.get(key_var, "").strip()) if key_var else True
+            if not has_key:
+                health[prov] = {"status": "no_key", "fail_rate": 0, "total_attempts": 0, "failures": 0}
+                continue
+            # Count recent probes and failures — models table has provider + accessible + scanned_at
+            c.execute("""
+                SELECT COUNT(*) as total,
+                       COALESCE(SUM(CASE WHEN accessible=0 THEN 1 ELSE 0 END), 0) as failures
+                FROM models
+                WHERE provider=? AND scanned_at>?
+            """, (prov, cutoff))
+            row = c.fetchone()
+            total = row["total"] if row else 0
+            failures = row["failures"] if row and row["failures"] else 0
+            fail_rate = failures / total if total > 0 else 0
+            if total == 0:
+                status = "untested"
+            elif fail_rate > 0.5:
+                status = "degraded"
+            elif fail_rate > 0.2:
+                status = "unstable"
+            else:
+                status = "healthy"
+            health[prov] = {"status": status, "fail_rate": round(fail_rate, 3),
+                           "total_attempts": total, "failures": failures}
+        conn.close()
+    except Exception:
+        for prov in PROVIDERS:
+            health[prov] = {"status": "unknown", "fail_rate": 0, "total_attempts": 0, "failures": 0}
+    return health
+
 def render_banner(provider_count: int, model_count: int, scan_seconds: float,
                   aa_provenance: str, hermes_slots: int, total_candidates: int = 0,
                   skipped_count: int = 0, providers_active: list[str] = None,
-                  providers_skipped: list[str] = None):
+                  providers_skipped: list[str] = None, plan_health: dict = None,
+                  scan_mode: str = "full"):
     aa_color = (C.SUCCESS_N if aa_provenance == "fresh"
                 else C.INFO_N if aa_provenance.startswith("cached")
                 else C.WARN_N if aa_provenance.startswith("stale") or aa_provenance == "rate-limited"
                 else C.ERROR_N)
+    mode_tag = f" {C.ACCENT}[{scan_mode}]{C.RST}" if scan_mode != "full" else ""
     print()
-    print(f"{C.INFO}{C.ARROW} model-scan v4{C.RST}  "
+    print(f"{C.INFO}{C.ARROW} model-scan v4{mode_tag}{C.RST}  "
           f"{C.PRIMARY}{model_count} models{C.RST}  "
           f"{aa_color}AA: {aa_provenance}{C.RST}  "
           f"{C.SECONDARY}{hermes_slots} slots{C.RST}  "
@@ -1917,6 +2580,11 @@ def render_banner(provider_count: int, model_count: int, scan_seconds: float,
         else:
             skipped_str = ""
         print(f"  {C.META}{active_str}{skipped_str}{C.RST}")
+    # Provider health summary in banner
+    if plan_health:
+        unhealthy = [p for p, h in plan_health.items() if h.get("status") in ("degraded", "unstable", "no_key")]
+        if unhealthy:
+            print(f"  {C.WARN}{C.TRI} health: {', '.join(unhealthy)}{C.RST}")
 
 def render_incumbent_panel(dossiers: list[Dossier], hermes_slots: dict,
                            proxy_tiers: dict, slot_defs: dict):
@@ -2061,6 +2729,12 @@ def render_per_slot_view(dossiers: list[Dossier], slot_defs: dict, hermes_slots:
             tools_str = "T" if d.has_tools else "·"
             vision_str = "V" if d.has_vision_capability else "·"
 
+            # IQ and TC scores
+            iq_val = _estimate_intelligence(d)
+            iq_str = f"IQ:{iq_val:.0f}" if iq_val else "IQ:?"
+            tc_val, tc_src = _estimate_tc(d)
+            tc_str = f"TC:{tc_val:.0f}" if tc_val else "TC:?"
+
             # Benchmark + OCGo budget indicators
             bench_str = ""
             if d.benchmark_swe_verified is not None:
@@ -2078,7 +2752,7 @@ def render_per_slot_view(dossiers: list[Dossier], slot_defs: dict, hermes_slots:
                   f"{C.PRIMARY if is_incumbent else C.SECONDARY}{d.model:<48}{C.RST}"
                   f"{bench_str}{budget_str} "
                   f"{C.METRICS_D}{PROVIDERS[d.provider]['abbrev']:<5}{C.RST} "
-                  f"{C.METRICS}fit:{fit:.0f}{delta_str}{C.RST}  "
+                  f"{C.METRICS}{iq_str} {tc_str} fit:{fit:.0f}{delta_str}{C.RST}  "
                   f"{C.METRICS_D}{ai_str:<6} {d.tps:>3.0f}t/s {d.latency_s:.1f}s [{tools_str}{vision_str}]{C.RST}"
                   f"{'  ' + marker if marker else ''}")
 
@@ -2107,8 +2781,8 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
 
     accessible.sort(key=sort_key)
 
-    # Compact header — single line
-    print(f"  {C.INFO_D}{'TIER':<4}{C.RST} {C.INFO_D}{'MODEL':<46}{C.RST} {C.INFO_D}{'PROV':<5}{C.RST} {C.INFO_D}{'AA-I':>4}{C.RST} {C.INFO_D}{'AA-C':>4}{C.RST} {C.INFO_D}{'TPS':>4}{C.RST} {C.INFO_D}{'LAT':>5}{C.RST} {C.INFO_D}{'T':<1}{C.RST} {C.INFO_D}{'V':<1}{C.RST} {C.INFO_D}{'ARCH':<10}{C.RST} {C.INFO_D}{'SIZE':<7}{C.RST} {C.INFO_D}{'$/M':>5}{C.RST} {C.INFO_D}{'SLOTS':<18}{C.RST}")
+    # Compact header — single line with IQ + TC
+    print(f"  {C.INFO_D}{'TIER':<4}{C.RST} {C.INFO_D}{'MODEL':<42}{C.RST} {C.INFO_D}{'PROV':<5}{C.RST} {C.INFO_D}{'IQ':>4}{C.RST} {C.INFO_D}{'TC':>4}{C.RST} {C.INFO_D}{'TPS':>4}{C.RST} {C.INFO_D}{'LAT':>5}{C.RST} {C.INFO_D}{'T':<1}{C.RST} {C.INFO_D}{'V':<1}{C.RST} {C.INFO_D}{'ARCH':<10}{C.RST} {C.INFO_D}{'SIZE':<7}{C.RST} {C.INFO_D}{'$/M':>5}{C.RST} {C.INFO_D}{'SLOTS':<18}{C.RST}")
     print(f"  {C.META}{C.HRULE * (width - 4)}{C.RST}")
 
     for d in accessible:
@@ -2135,20 +2809,30 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
         if d.benchmark_swe_verified is not None:
             bench_suffix = f"{tier_color}[{d.benchmark_swe_verified:.0f}]{C.RST}"
 
-        model_str = (f"{C.PRIMARY}{d.model[:45]:<46}{C.RST}" if d.tier in ("S", "A")
-                    else f"{C.SECONDARY}{d.model[:45]:<46}{C.RST}")
+        model_str = (f"{C.PRIMARY}{d.model[:41]:<42}{C.RST}" if d.tier in ("S", "A")
+                    else f"{C.SECONDARY}{d.model[:41]:<42}{C.RST}")
 
         prov_abbr = PROVIDERS[d.provider]["abbrev"]
         prov_str = f"{C.METRICS_D}{prov_abbr:<5}{C.RST}"
 
-        if d.ai_index is not None:
-            ai_str = f"{C.METRICS}{d.ai_index:>4.0f}{C.RST}"
-        elif d.aa_provenance == "snapshot":
-            ai_str = f"{C.META}{'—':>4}{C.RST}"
+        # IQ: comprehensive intelligence estimate (AA + heuristics + benchmarks)
+        iq = _estimate_intelligence(d)
+        if iq is not None:
+            iq_color = (C.BENCH_S if iq >= 65 else C.BENCH_A if iq >= 55
+                       else C.BENCH_B if iq >= 40 else C.BENCH_C if iq >= 25
+                       else C.META)
+            iq_str = f"{iq_color}{iq:>4.0f}{C.RST}"
         else:
-            ai_str = f"{C.META}{'~':>4}{C.RST}"  # ~ = heuristic estimate
-        ac_str = (f"{C.METRICS}{d.ai_coding:>4.0f}{C.RST}" if d.ai_coding
-                  else f"{C.META}{'?':>4}{C.RST}")
+            iq_str = f"{C.META}{'--':>4}{C.RST}"
+
+        # TC: tool-calling capability score
+        tc_score, tc_src = _estimate_tc(d)
+        if tc_score is not None:
+            tc_color = (C.SUCCESS if tc_score >= 75 else C.METRICS_N if tc_score >= 50
+                       else C.WARN_N)
+            tc_str = f"{tc_color}{tc_score:>4.0f}{C.RST}"
+        else:
+            tc_str = f"{C.META}{'--':>4}{C.RST}"
 
         tps_color = (C.METRICS if d.tps >= 50 else C.WARN_N if d.tps < 20 else C.METRICS_D)
         tps_str = f"{tps_color}{d.tps:>4.0f}{C.RST}"
@@ -2176,14 +2860,14 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
         slots_color = C.SUCCESS_N if d.qualified_slots else C.META
         slots_disp = f"{slots_color}{slots_str[:18]:<18}{C.RST}"
 
-        print(f"  {tier_str} {model_str}{bench_suffix} {prov_str} {ai_str} {ac_str} {tps_str} {lat_str} {t_str} {v_str} {arch_str} {size_str:<7} {price_str} {slots_disp}")
+        print(f"  {tier_str} {model_str}{bench_suffix} {prov_str} {iq_str} {tc_str} {tps_str} {lat_str} {t_str} {v_str} {arch_str} {size_str:<7} {price_str} {slots_disp}")
 
     failed_count = len([d for d in dossiers if not d.accessible])
     if failed_count:
         print(f"  {C.META}{failed_count} inaccessible/skipped — see {RESULTS_FILE} for details{C.RST}")
 
 def render_footer(dossiers: list[Dossier], aa_provenance: str, missing_keys: list[str],
-                  permanent_skips: int):
+                  permanent_skips: int, plan_health: dict | None = None):
     print()
     width = term_width()
     print(f"{C.SECONDARY}{C.HRULE * width}{C.RST}")
@@ -2202,6 +2886,37 @@ def render_footer(dossiers: list[Dossier], aa_provenance: str, missing_keys: lis
     if permanent_skips:
         parts.append(f"{C.META}skip-list: {permanent_skips}{C.RST}")
     print("  ".join(parts))
+
+    # Provider health summary
+    if plan_health:
+        unhealthy = [p for p, h in plan_health.items() if h.get("status") in ("degraded", "unstable", "no_key")]
+        if unhealthy:
+            parts = []
+            for p in unhealthy:
+                h = plan_health[p]
+                st = h.get("status", "?")
+                parts.append(f"{p}({st})")
+            print(f"  {C.WARN}{C.TRI} provider health: {', '.join(parts)}{C.RST}")
+        # Multi-program status summary (compact for footer)
+        programs = load_program_assignments()
+        if programs:
+            # Kiro credits check
+            kiro = programs.get("kiro", {})
+            creds = kiro.get("credits_remaining", 0)
+            if isinstance(creds, (int, float)) and 0 < creds < 10:
+                cred_clr = C.WARN if creds >= 5 else C.ERROR
+                print(f"  {cred_clr}{C.TRI} Kiro: {creds} credits remaining{cred_clr}")
+
+            # OpenCode Go status
+            oc = programs.get("opencode", {})
+            if oc.get("go_status") == "exhausted":
+                print(f"  {C.WARN}{C.TRI} OpenCode Go: plan exhausted (refill: {oc.get('go_estimated_refill', '?')}){C.RST}")
+
+            # Cross-program conflict check
+            conflicts = detect_cross_program_conflicts(programs)
+            if conflicts:
+                conflict_str = "; ".join(f"{a}↔{b}({m})" for a, b, m, _ in conflicts[:3])
+                print(f"  {C.WARN}{C.TRI} {len(conflicts)} cross-program conflicts: {conflict_str}{C.RST}")
 
     if missing_keys:
         print(f"\n  {C.WARN}{C.TRI} missing API keys: {', '.join(missing_keys)}{C.RST}")
@@ -2229,6 +2944,10 @@ async def run_scan(args) -> int:
     tiers = load_tiers()
     slot_defs = load_slot_defs()
     bad = load_bad()
+    blocklist = load_blocklist()
+
+    # Provider health check
+    plan_health = check_provider_health()
 
     hermes_slots = parse_hermes_slots()
     proxy_tiers = parse_proxy_tiers()
@@ -2251,6 +2970,76 @@ async def run_scan(args) -> int:
         print(f"{C.ERROR}no providers available — set at least one API key{C.RST}", file=sys.stderr)
         return 1
 
+    # ── Daily mode: health check only (skip full probe) ──
+    if args.mode == "daily":
+        print(f"\n  {C.INFO}{C.DIAMOND} daily-mode health scan{C.RST}")
+        for prov, cfg in active_providers:
+            hp = plan_health.get(prov, {})
+            status = hp.get("status", "unknown")
+            st_clr = (C.SUCCESS if status == "healthy" else C.WARN if status in ("degraded", "unstable")
+                     else C.ERROR if status == "no_key" else C.META)
+            print(f"  {C.DOT} {prov:<15} {st_clr}{status}{C.RST}"
+                  f"  {C.META}({hp.get('total_attempts', 0)} probes, {hp.get('failures', 0)} fails){C.RST}")
+        # Multi-program status section
+        programs = load_program_assignments()
+        prog_lines = render_multi_program_status(programs, plan_health)
+        if prog_lines:
+            for line in prog_lines:
+                print(line)
+        # Cross-program conflicts
+        conflicts = detect_cross_program_conflicts(programs)
+        if conflicts:
+            print(f"  {C.ACCENT}CROSS-PROGRAM CONFLICTS{C.RST}")
+            print(f"  {C.WARN}The following programs share the same model/provider:{C.RST}")
+            for prog_a, prog_b, model, prov in conflicts:
+                print(f"  {C.WARN}  {C.TRI} {prog_a} ↔ {prog_b}: {model} ({prov}){C.RST}")
+            print()
+        # Session management snapshot
+        try:
+            from session_manager import SessionManager
+            sm = SessionManager()
+            ssum = sm.get_session_summary()
+            print(f"  {C.ACCENT}SESSION POOL{C.RST}"
+                  f"  {C.META}{ssum['total_sessions']} total,"
+                  f" {C.SUCCESS}{ssum['active']} active,"
+                  f" {C.WARN}{ssum['idle']} idle,"
+                  f" {C.META}{ssum['paused']} paused{C.RST}")
+            recs = sm.get_recommendations()
+            for r in recs[:3]:
+                print(f"  {C.WARN}  {C.TRI} {r['message']}{C.RST}")
+        except Exception:
+            pass
+        # Generate configs for all templates
+        try:
+            import sys
+            templates_dir = CONFIG_DIR / "templates"
+            if str(templates_dir) not in sys.path:
+                sys.path.insert(0, str(templates_dir))
+            from config_generator import generate_config, load_models_from_db, load_issue_scores, load_slot_defs, load_db, get_latest_scan
+            conn = load_db()
+            scan_id = get_latest_scan(conn)
+            if scan_id:
+                models = load_models_from_db(conn, scan_id)
+                issue_scores = load_issue_scores()
+                slot_defs = load_slot_defs()
+                conn.close()
+                generated_dir = CONFIG_DIR / "generated"
+                generated_dir.mkdir(parents=True, exist_ok=True)
+                for tf in sorted(templates_dir.glob("template-*.yaml")):
+                    template_name = tf.stem.replace("template-", "")
+                    cfg = generate_config(template_name, models, issue_scores, slot_defs)
+                    if cfg:
+                        out_path = generated_dir / f"config-{template_name}.yaml"
+                        out_path.write_text(cfg)
+                        print(f"  {C.CYAN}  ∎ generated {template_name}{C.RST}")
+            else:
+                print(f"  {C.META}  ∎ no scan data — skipping config generation{C.RST}")
+        except Exception as exc:
+            print(f"  {C.WARN}  ∎ config generation skipped: {exc}{C.RST}")
+        print(f"\n  {C.SECONDARY}run with --mode weekly for full scan{C.RST}")
+        render_footer([], aa_provenance="", missing_keys=missing_keys, permanent_skips=0, plan_health=plan_health)
+        return 0
+
     async with httpx.AsyncClient(timeout=30) as client:
         # Fetch AA data first (parallel with other work)
         aa_lookup, aa_provenance = await fetch_aa_data(client, force=args.refresh_aa)
@@ -2265,20 +3054,32 @@ async def run_scan(args) -> int:
                 print(f"  {C.INFO_D}{prov:<15}{C.RST} {len(cat)} catalog-only (skip probe){C.RST}", file=sys.stderr)
                 continue
             skipped_count = 0
+            blocklisted_count = 0
             for mid, pricing in cat:
                 key = f"{prov}/{mid}"
                 skipped, why = is_permanently_skipped(bad, key)
                 if skipped:
                     skipped_count += 1
                     continue
+                # Blocklist check
+                bl, bl_reason = is_blocklisted(prov, mid, blocklist)
+                if bl:
+                    blocklisted_count += 1
+                    continue
                 all_candidates.append((prov, mid, pricing, cfg))
             # Show per-provider stats: candidates and skipped
             n_candidates = len(cat)
             n_skipped = skipped_count
+            n_blocked = blocklisted_count
             if prov == "venice":
                 print(f"  {C.INFO_D}{prov:<15}{C.RST} {n_candidates} catalog{C.RST}", file=sys.stderr)
-            elif n_skipped > 0:
-                print(f"  {C.INFO_D}{prov:<15}{C.RST} {n_candidates} probed  {C.META}{n_skipped} skipped{C.RST}", file=sys.stderr)
+            elif n_skipped > 0 or n_blocked > 0:
+                extra = []
+                if n_skipped:
+                    extra.append(f"{C.META}{n_skipped} skipped{C.RST}")
+                if n_blocked:
+                    extra.append(f"{C.META}{n_blocked} blocked{C.RST}")
+                print(f"  {C.INFO_D}{prov:<15}{C.RST} {n_candidates} probed  {' '.join(extra)}", file=sys.stderr)
             else:
                 print(f"  {C.INFO_D}{prov:<15}{C.RST} {n_candidates} probed{C.RST}", file=sys.stderr)
 
@@ -2339,9 +3140,6 @@ async def run_scan(args) -> int:
             d.price_blended = aa.get("price_blended")
             if not d.tps and aa.get("median_tps"):
                 d.tps = aa["median_tps"]
-
-                if not d.tps and aa.get("median_tps"):
-                    d.tps = aa["median_tps"]
 
         # Pricing fallback from provider catalog
         if d.price_blended is None and pricing:
@@ -2418,14 +3216,15 @@ async def run_scan(args) -> int:
     healthy = sum(1 for d in dossiers if d.reliability >= 0.99)
     degraded = sum(1 for d in dossiers if 0.5 <= d.reliability < 0.99)
     failed_count = sum(1 for d in dossiers if d.reliability < 0.5)
-    _db_save_run(dossiers, duration, aa_provenance, prov_counts,
+    await asyncio.to_thread(_db_save_run, dossiers, duration, aa_provenance, prov_counts,
                  hermes_slots, proxy_tiers, healthy, degraded,
                  failed_count, permanent_skips)
 
     # Build per-provider counts from the candidate enumeration phase
     # We track skipped_count in the scan loop but need to pass it through
     # For now, just show total and accessible
-    render_banner(len(active_providers), len(dossiers), duration, aa_provenance, len(hermes_slots))
+    render_banner(len(active_providers), len(dossiers), duration, aa_provenance, len(hermes_slots),
+                  plan_health=plan_health, scan_mode=args.mode)
 
     if not args.no_incumbent:
         render_incumbent_panel(dossiers, hermes_slots, proxy_tiers, slot_defs)
@@ -2438,7 +3237,7 @@ async def run_scan(args) -> int:
     if not args.no_appendix:
         render_appendix(dossiers, by=args.by)
 
-    render_footer(dossiers, aa_provenance, missing_keys, permanent_skips)
+    render_footer(dossiers, aa_provenance, missing_keys, permanent_skips, plan_health=plan_health)
     return 0
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -2713,6 +3512,8 @@ def main():
                   help="override slot eval_mode for this run")
     p.add_argument("--refresh-free", action="store_true",
                   help="refresh free-model whitelist from providers")
+    p.add_argument("--mode", choices=["daily", "weekly", "full"], default="full",
+                  help="scan mode: daily (fast, health-only), weekly (full scan), full (all providers)")
     p.add_argument("--audit", action="store_true",
                   help="run independent audit against verified benchmarks")
     p.add_argument("--tui", action="store_true",
@@ -2729,8 +3530,100 @@ def main():
                   help="refresh and show model popularity scores (HF downloads)")
     p.add_argument("--config-snapshot", action="store_true",
                   help="snapshot current config for drift tracking")
+    p.add_argument("--programs", action="store_true",
+                  help="show multi-program status (Claude Code, Codex, OpenCode, Pi, Kiro)")
+    p.add_argument("--update-program", nargs=3,
+                  metavar=("PROGRAM", "KEY", "VALUE"),
+                  help="update program assignment (e.g. opencode go_status exhausted)")
+
+    p.add_argument("--config-generate", nargs="?",
+                   const="primary", metavar="TEMPLATE",
+                   help="generate Hermes config from template (primary|worker-a|worker-b)")
+
+    # ── Cron auto-deployment ──
+    cron_group = p.add_argument_group("cron auto-deployment")
+    cron_group.add_argument("--cron-status", action="store_true",
+                           help="show current cron job status")
+    cron_group.add_argument("--cron-set", nargs=2,
+                           metavar=("JOB", "SCHEDULE"),
+                           help="set cron schedule for daily|weekly (e.g. '0 6 * * *')")
+    cron_group.add_argument("--cron-remove", metavar="JOB",
+                           help="disable a cron job (daily|weekly)")
+    cron_group.add_argument("--cron-install", action="store_true",
+                           help="install/update all enabled cron jobs from config")
+    cron_group.add_argument("--cron-uninstall", action="store_true",
+                           help="remove all model-scan cron entries")
 
     args = p.parse_args()
+
+    if args.config_generate:
+        try:
+            sys.path.insert(0, str(Path.home() / ".config" / "model-scan" / "templates"))
+            from config_generator import main as cfg_main
+            # Override sys.argv to pass template name
+            orig_argv = sys.argv
+            sys.argv = ["config_generate.py", "--template", args.config_generate]
+            cfg_main()
+            sys.argv = orig_argv
+        except ImportError as e:
+            print(f"  {C.ERROR}{C.CROSS} config_generator not available: {e}{C.RST}")
+        return
+
+    # ── Cron auto-deployment commands ──
+    if args.cron_status:
+        from cron_manager import show_status, load_config
+        print(show_status())
+        return
+
+    if args.cron_set:
+        job_key, schedule = args.cron_set
+        if job_key not in ("daily", "weekly"):
+            print(f"  {C.ERROR}job must be 'daily' or 'weekly'{C.RST}")
+            return 1
+        from cron_manager import load_config, save_config
+        cfg = load_config()
+        if job_key not in cfg:
+            cfg[job_key] = {"enabled": False, "schedule": None, "extra_args": f"--mode {job_key} --no-color"}
+        cfg[job_key]["schedule"] = schedule
+        cfg[job_key]["enabled"] = True
+        save_config(cfg)
+        from cron_manager import sync_crontab
+        status = sync_crontab(cfg)
+        print(f"  {C.CHECK} {job_key} → {schedule}")
+        for k, v in status.items():
+            print(f"    {k}: {v}")
+        return
+
+    if args.cron_remove:
+        job_key = args.cron_remove
+        if job_key not in ("daily", "weekly"):
+            print(f"  {C.ERROR}job must be 'daily' or 'weekly'{C.RST}")
+            return 1
+        from cron_manager import load_config, save_config, sync_crontab
+        cfg = load_config()
+        cfg[job_key]["enabled"] = False
+        cfg[job_key]["schedule"] = None
+        save_config(cfg)
+        status = sync_crontab(cfg)
+        print(f"  {C.CHECK} {job_key} disabled")
+        for k, v in status.items():
+            print(f"    {k}: {v}")
+        return
+
+    if args.cron_install:
+        from cron_manager import load_config, sync_crontab
+        cfg = load_config()
+        status = sync_crontab(cfg)
+        print(f"  {C.CHECK} cron jobs installed")
+        for k, v in status.items():
+            print(f"    {k}: {v}")
+        return
+
+    if args.cron_uninstall:
+        from cron_manager import remove_cron_jobs
+        result = remove_cron_jobs()
+        print(f"  {C.CHECK} cron jobs removed: {result.get('removed', '?')}")
+        return
 
     if args.config_snapshot:
         try:
@@ -2740,6 +3633,32 @@ def main():
         except ImportError as e:
             print(f"  {C.ERROR}{C.CROSS} config_tracker not available: {e}{C.RST}")
             return
+
+    if args.programs:
+        programs = load_program_assignments()
+        plan_health = check_provider_health()
+        lines = render_multi_program_status(programs, plan_health)
+        for line in lines:
+            print(line)
+        # Show cross-program conflicts
+        conflicts = detect_cross_program_conflicts(programs)
+        if conflicts:
+            print(f"  {C.ACCENT}CROSS-PROGRAM CONFLICTS{C.RST}")
+            for prog_a, prog_b, model, prov in conflicts:
+                print(f"  {C.WARN}{C.TRI} {prog_a} ↔ {prog_b}: {model} ({prov}){C.RST}")
+            print()
+        return
+
+    if args.update_program:
+        program_key, field_key, field_value = args.update_program
+        programs = load_program_assignments()
+        if program_key not in programs:
+            print(f"  {C.ERROR}Unknown program: {program_key}{C.RST}")
+            return 1
+        programs[program_key][field_key] = field_value
+        save_program_assignments(programs)
+        print(f"  {C.SUCCESS}Updated {program_key}.{field_key} = {field_value}{C.RST}")
+        return
 
     if args.refine_analysis:
         try:
@@ -3032,4 +3951,4 @@ def main():
     sys.exit(asyncio.run(run_scan(args)))
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
