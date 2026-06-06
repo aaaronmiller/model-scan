@@ -17,9 +17,16 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from routing_snapshot import (
+    DEFAULT_SNAPSHOT_PATH,
+    RELIABILITY_FEEDBACK_PATH,
+    build_snapshot_from_db,
+    load_latest_snapshot,
+    write_snapshot,
+)
 
 try:
-    from fastapi import FastAPI, Query
+    from fastapi import FastAPI, Query, Request
     from fastapi.responses import JSONResponse, FileResponse
     import uvicorn
 except ImportError:
@@ -356,6 +363,46 @@ async def gateway_quota():
         },
         "provider_model_counts": provider_counts,
     }, status_code=200)
+
+
+@app.get("/routing-snapshot")
+async def gateway_routing_snapshot():
+    """Return the latest claude-code-proxy routing snapshot."""
+    snapshot = load_latest_snapshot(DEFAULT_SNAPSHOT_PATH)
+    if snapshot is None:
+        snapshot = build_snapshot_from_db(DATABASE_FILE)
+        if snapshot is not None:
+            write_snapshot(snapshot, DEFAULT_SNAPSHOT_PATH)
+    if snapshot is None:
+        return JSONResponse(
+            {"error": "No routing snapshot available. Run: model-scan --emit-snapshot"},
+            status_code=404,
+        )
+    return JSONResponse(snapshot)
+
+
+@app.post("/reliability")
+async def gateway_reliability(request: Request):
+    """Accept router reliability feedback for future scan weighting."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    if not isinstance(payload, dict):
+        return JSONResponse({"error": "payload must be an object"}, status_code=400)
+    row = {
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        **payload,
+    }
+    RELIABILITY_FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with RELIABILITY_FEEDBACK_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+    return JSONResponse(
+        {
+            "accepted": True,
+            "providers": sorted((payload.get("providers") or {}).keys()),
+        }
+    )
 
 
 @app.get("/programs")
@@ -880,6 +927,7 @@ def main():
     print(f"  GET /health          — Provider health summary")
     print(f"  GET /models          — List accessible models with IQ/TC")
     print(f"  GET /route?slot=     — Best model for a slot")
+    print(f"  GET /routing-snapshot — claude-code-proxy routing snapshot")
     print(f"  GET /quota           — Remaining credits per provider")
     print(f"  GET /programs        — Monitored program status")
     print(f"  GET /swap?model_id=  — Recommend alternative model")

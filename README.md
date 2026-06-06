@@ -19,6 +19,7 @@ export AA_API_KEY=aa_...                   # benchmark data (free tier)
 model-scan                                # full scan
 model-scan --slot R1                      # single slot analysis
 model-scan --free-mode                    # free models only
+model-scan --emit-snapshot                # write ~/.config/model-scan/routing_snapshot.json
 model-scan --analyze                      # multi-source analysis
 model-scan --tui                          # keyboard terminal UI
 ```
@@ -31,6 +32,7 @@ model-scan --tui                          # keyboard terminal UI
 | `model-scan` | Full scan across all configured providers |
 | `--slot R1` | Candidates for a specific Hermes task slot |
 | `--free-mode` | Only probe/evaluate free-whitelisted models |
+| `--emit-snapshot [PATH]` | Emit the claude-code-proxy routing snapshot contract |
 | `--score-engine` | Multi-axis scoring (Intel/Speed/Agentic/Coding) |
 | `--gold-standard` | Generate optimal config patches with reasoning traces |
 | `--cpmr` | Config Patch Match Rate vs gold standard |
@@ -42,6 +44,36 @@ model-scan --tui                          # keyboard terminal UI
 | `--tui` | Keyboard-driven terminal UI |
 | `--refine` | Weekly refinement pipeline |
 | `--json` | Machine-readable output |
+
+### claude-code-proxy Routing Snapshot
+
+`model-scan --emit-snapshot` writes a credential-free routing snapshot for
+claude-code-proxy:
+
+```bash
+model-scan --mode daily --emit-snapshot
+# default: ~/.config/model-scan/routing_snapshot.json
+```
+
+The gateway also serves it:
+
+```bash
+python3 gateway.py 8124
+curl http://127.0.0.1:8124/routing-snapshot
+```
+
+claude-code-proxy can post reliability summaries back to the gateway:
+
+```bash
+curl -X POST http://127.0.0.1:8124/reliability \
+  -H 'content-type: application/json' \
+  -d '{"providers":{"openrouter":{"requests":10,"error_rate":0.1,"rate_limit_frequency":0.0}}}'
+```
+
+The gateway appends those rows to `~/.config/model-scan/reliability_feedback.jsonl` and uses the
+latest provider rates to degrade provider health in rebuilt snapshots.
+
+Daily and weekly cron jobs installed by `cron_manager.py` include `--emit-snapshot` by default.
 
 ### Data Sources
 | Source | Models | Data |

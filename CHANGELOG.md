@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - v5.0.0
 
 ### Added
+- **claude-code-proxy routing snapshot producer** (`routing_snapshot.py`, `dink.py --emit-snapshot`) — Emits credential-free `routing_snapshot.json` using the shared contract in `contracts/routing_snapshot.schema.json`, with per-role ranked candidates, provider health, blocklist export, atomic writes, and contract tests.
+- **Gateway routing snapshot endpoint** (`GET /routing-snapshot`) — Serves the latest emitted snapshot and rebuilds from SQLite when the file is missing.
+- **Router reliability feedback endpoint** (`POST /reliability`) — Persists claude-code-proxy reliability summaries and feeds provider error/rate-limit rates into future snapshot provider-health status.
+- **Cron snapshot emission** (`cron_manager.py`) — Daily and weekly cron defaults now include `--emit-snapshot`; `dink.py` accepts `--no-color` for those existing cron arguments.
 - **Dashboard UX polish** — auto-refresh toggle (30s interval), session detail modal with quota ledger, config diff viewer modal, issue distribution bar chart
 - **Daily mode config generation** — generates all templates (primary, worker-a, worker-b) during `--mode daily` scan, writing to `generated/config-{template}.yaml`
 - **Improved Hermes log model extraction** — captures `:free` suffix, `model_name=` syntax, provider-prefixed models (nvidia/, openrouter/, z-ai/, etc.), and special cases (openai-codex)

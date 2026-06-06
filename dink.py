@@ -48,6 +48,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+from routing_snapshot import DEFAULT_SNAPSHOT_PATH, build_snapshot_from_dossiers, load_blocklist_values, load_provider_quota, write_snapshot
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DEPS
@@ -345,9 +346,11 @@ def _db_save_run(dossiers: list, duration: float, aa_provenance: str,
 
         conn.commit()
         conn.close()
+        return scan_id
     except Exception as e:
         import traceback; traceback.print_exc()
         print(f"  {C.WARN}{C.TRI} DB save failed: {e}{C.RST}", file=sys.stderr)
+        return None
 
 # ──────────────────────────────────────────────────────────────────────────
 # DEFAULT TIER BOUNDARIES (Ice-ninja's anchor: minimax-2.7=A, GLM-5.1/DeepSeek-V4-Pro=S)
@@ -503,6 +506,71 @@ DEFAULT_SLOTS = {
         "weight_intelligence": 0.2,
         "weight_speed": 0.55,
         "weight_reliability": 0.25,
+    },
+    "R_title_gen": {
+        "label": "title_generation",
+        "eval_mode": "cost_basis",
+        "needs_tools": False,
+        "needs_vision": False,
+        "min_ai": 30,
+        "min_tps": 20,
+        "max_latency_s": 2.0,
+        "min_ctx_k": 16,
+        "weight_intelligence": 0.45,
+        "weight_speed": 0.35,
+        "weight_reliability": 0.20,
+    },
+    "R_triage": {
+        "label": "triage",
+        "eval_mode": "cost_basis",
+        "needs_tools": True,
+        "needs_vision": False,
+        "min_ai": 35,
+        "min_tps": 15,
+        "max_latency_s": 3.0,
+        "min_ctx_k": 32,
+        "weight_intelligence": 0.50,
+        "weight_speed": 0.25,
+        "weight_reliability": 0.25,
+    },
+    "R_kanban": {
+        "label": "kanban",
+        "eval_mode": "cost_basis",
+        "needs_tools": True,
+        "needs_vision": False,
+        "min_ai": 35,
+        "min_tps": 15,
+        "max_latency_s": 3.0,
+        "min_ctx_k": 32,
+        "weight_intelligence": 0.45,
+        "weight_speed": 0.30,
+        "weight_reliability": 0.25,
+    },
+    "R_profile_desc": {
+        "label": "profile_description",
+        "eval_mode": "cost_basis",
+        "needs_tools": False,
+        "needs_vision": False,
+        "min_ai": 35,
+        "min_tps": 15,
+        "max_latency_s": 3.0,
+        "min_ctx_k": 32,
+        "weight_intelligence": 0.55,
+        "weight_speed": 0.25,
+        "weight_reliability": 0.20,
+    },
+    "R_curator": {
+        "label": "knowledge_curator",
+        "eval_mode": "cost_basis",
+        "needs_tools": True,
+        "needs_vision": False,
+        "min_ai": 45,
+        "min_tps": 10,
+        "max_latency_s": 5.0,
+        "min_ctx_k": 64,
+        "weight_intelligence": 0.65,
+        "weight_speed": 0.15,
+        "weight_reliability": 0.20,
     },
 }
 
@@ -3216,9 +3284,29 @@ async def run_scan(args) -> int:
     healthy = sum(1 for d in dossiers if d.reliability >= 0.99)
     degraded = sum(1 for d in dossiers if 0.5 <= d.reliability < 0.99)
     failed_count = sum(1 for d in dossiers if d.reliability < 0.5)
-    await asyncio.to_thread(_db_save_run, dossiers, duration, aa_provenance, prov_counts,
-                 hermes_slots, proxy_tiers, healthy, degraded,
-                 failed_count, permanent_skips)
+    scan_id = await asyncio.to_thread(
+        _db_save_run,
+        dossiers,
+        duration,
+        aa_provenance,
+        prov_counts,
+        hermes_slots,
+        proxy_tiers,
+        healthy,
+        degraded,
+        failed_count,
+        permanent_skips,
+    )
+    if args.emit_snapshot:
+        snapshot = build_snapshot_from_dossiers(
+            dossiers,
+            slot_defs,
+            scan_id=int(scan_id or 0),
+            blocklist=load_blocklist_values(BLOCKLIST_FILE),
+            provider_quota=load_provider_quota(),
+        )
+        snapshot_path = write_snapshot(snapshot, args.emit_snapshot)
+        print(f"  {C.SUCCESS}{C.CHECK} routing snapshot: {snapshot_path}{C.RST}")
 
     # Build per-provider counts from the candidate enumeration phase
     # We track skipped_count in the scan loop but need to pass it through
@@ -3469,11 +3557,19 @@ def main():
     p.add_argument("--no-incumbent", action="store_true", help="skip incumbent panel")
     p.add_argument("--no-slots", action="store_true", help="skip per-slot view")
     p.add_argument("--no-appendix", action="store_true", help="skip flat appendix")
+    p.add_argument("--no-color", action="store_true", help="accepted for cron/non-TTY compatibility")
     p.add_argument("--snapshot", action="store_true",
                   help="show incumbent panel from cache only (no probes, instant)")
     p.add_argument("--patch-hermes", action="store_true",
                   help="generate hermes config patch with best model replacements")
     p.add_argument("--json", action="store_true", help="emit JSON to stdout")
+    p.add_argument(
+        "--emit-snapshot",
+        nargs="?",
+        const=str(DEFAULT_SNAPSHOT_PATH),
+        metavar="PATH",
+        help="emit routing_snapshot.json for claude-code-proxy",
+    )
     p.add_argument("--analyze-history", metavar="SLOT",
                   help="show historical patterns for a slot (e.g. R1_primary)")
     p.add_argument("--rank-vs-benchmark", action="store_true",
@@ -3583,7 +3679,7 @@ def main():
         from cron_manager import load_config, save_config
         cfg = load_config()
         if job_key not in cfg:
-            cfg[job_key] = {"enabled": False, "schedule": None, "extra_args": f"--mode {job_key} --no-color"}
+            cfg[job_key] = {"enabled": False, "schedule": None, "extra_args": f"--mode {job_key} --no-color --emit-snapshot"}
         cfg[job_key]["schedule"] = schedule
         cfg[job_key]["enabled"] = True
         save_config(cfg)

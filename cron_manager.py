@@ -30,12 +30,12 @@ DEFAULT_CONFIG: dict = {
     "daily": {
         "schedule": None,  # e.g. "0 6 * * *"
         "enabled": False,
-        "extra_args": "--mode daily --no-color",
+        "extra_args": "--mode daily --no-color --emit-snapshot",
     },
     "weekly": {
         "schedule": None,  # e.g. "0 7 * * 1"
         "enabled": False,
-        "extra_args": "--mode weekly --no-color",
+        "extra_args": "--mode weekly --no-color --emit-snapshot",
     },
 }
 
