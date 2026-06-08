@@ -3079,17 +3079,16 @@ async def run_scan(args) -> int:
             pass
         # Generate configs for all templates
         try:
-            import sys
             templates_dir = CONFIG_DIR / "templates"
             if str(templates_dir) not in sys.path:
                 sys.path.insert(0, str(templates_dir))
-            from config_generator import generate_config, load_models_from_db, load_issue_scores, load_slot_defs, load_db, get_latest_scan
+            from config_generator import generate_config, load_models_from_db, load_issue_scores, load_slot_defs as load_slot_defs_cg, load_db, get_latest_scan
             conn = load_db()
             scan_id = get_latest_scan(conn)
             if scan_id:
                 models = load_models_from_db(conn, scan_id)
                 issue_scores = load_issue_scores()
-                slot_defs = load_slot_defs()
+                slot_defs = load_slot_defs_cg()
                 conn.close()
                 generated_dir = CONFIG_DIR / "generated"
                 generated_dir.mkdir(parents=True, exist_ok=True)
