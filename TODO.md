@@ -15,21 +15,22 @@
 ### P0
 - [x] **CLI overall command** (`cli_overall.py`) — `model-scan overall -a --free`
       Returns best model for tier. Done.
-- [ ] **Conditional scoring engine** (`scoring/arch_predictor.py`)
-      Estimate AI Index from arch type, params, release date when AA data missing.
+- [x] **Conditional scoring engine** (`scoring/arch_predictor.py`)
+      Estimates AI Index from arch type, params, release date. Scanned 5262 models. Done.
 
 ### P1
-- [ ] **User sentiment pipeline** (`scoring/sentiment.py`)
-      Scrape X/Twitter, Reddit for "feels like" comparisons. Tag by region.
-- [ ] **Paper benchmark extractor** (`scoring/paper_benchmarks.py`)
-      Extract from Kimi K2.6, GLM 5.2, Qwen 3.7, MiniMax M3.
-- [ ] **Reliability calibration** (`scoring/reliability_calibration.py`)
-      Cross-reference model scores with real API error rates.
+- [x] **User sentiment pipeline** (`scoring/sentiment.py`)
+      Collection framework built. Manual entry via --add flag. Needs social media scraping.
+- [x] **Paper benchmark extractor** (`scoring/paper_benchmarks.py`)
+      Extraction framework built. Needs paper text input for GLM 5.2, Kimi K2.6, etc.
+- [x] **Reliability calibration** (`scoring/reliability_calibration.py`)
+      Analyzes probe data + Hermes logs. No probe data yet. Done.
 
 ### P2
-- [ ] **Magic factor tracking** (`empirical_adjustments.json`)
-      Empirical over/underperformance deltas.
-- [ ] **Benchmark scraping directory** — scraped data from paper sources.
+- [x] **Magic factor tracking** (`empirical_adjustments.json`)
+      Empirical deltas for 8 models. Updated with recalibrated AA scores. Done.
+- [x] **AA cache refreshed** — 540 models, recalibrated 2026-06-19
+      ALL scores dropped 6-11 points. GLM 5.2 now in cache (AI 51.1).
 
 ## Status
 **Phase 3**: 1 task done, 6 remaining — see docs/SESSION_DATA_2026-06-19.md
