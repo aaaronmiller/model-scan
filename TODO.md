@@ -8,27 +8,29 @@
 - [ ] Supplemental benchmark integration (Terminal-Bench, BFCL, Arena ELO)
 - [ ] Iterative refinement (cron job)
 
-## Phase 2: Token Economics Analysis (NEW - Ice-ninja Specification)
-- [x] Research: Live pricing from all providers (OpenAI, Anthropic, Google, xAI, DeepSeek, NVIDIA, Cerebras, Groq, OCGo, Venice)
-- [x] Research: Verify ≥80% prices via web search (≥92% verified ✅)
-- [x] Research: Read AA Intelligence Index from artificialanalysis.ai (top 20+ models indexed, live)
-- [x] Research: Find recent forum/Reddit threads for empirical usage patterns
-- [x] Implement: Subscription multiplier framework (5×, 10× rules with effective tokens/mo estimates)
-- [x] Implement: Workload-specific blended ratios (58/42 conversational, 75/25 tool-call, 30/70 code gen)
-- [x] Implement: Reasoning-token overhead calculation (50% overhead for reasoning models)
-- [x] Implement: Context-tier pricing handling (noted for 200K+ token tiers)
-- [x] Implement: Cache-rate assumptions (80% standard, 50% conservative, 0% worst-case)
-- [x] Implement: Quality % calculation anchored at GPT-5.5 (AA=60 = 100% quality)
-- [x] Generate: Top-3 recommendations (DeepSeek V4 Flash, Google One AI Pro, Claude Max 20x)
-- [x] Generate: Main contenders table (15 rows, sorted by $/M QA)
-- [x] Generate: Hybrid recommendations for 4 user profiles (5M, 15M, 50M, 500M tok/mo)
-- [x] Generate: Caveats section (20 footguns covering pricing, quality, workflow)
-- [x] Generate: Full appendix table (30+ rows, 4 tiers, all columns)
-- [x] Verify: No empty fields (verified/inferred/estimated for all cells)
-- [x] Created `token-economics/pricing-research.md` with verified data
-- [x] Created `token-economics/token-economics-analysis.md` — full analysis document
+## Phase 2: Token Economics Analysis
+- [x] All tasks complete (see token-economics/ directory)
+
+## Phase 3: Calibration & Empirical Validation (added 2026-06-19)
+### P0
+- [x] **CLI overall command** (`cli_overall.py`) — `model-scan overall -a --free`
+      Returns best model for tier. Done.
+- [ ] **Conditional scoring engine** (`scoring/arch_predictor.py`)
+      Estimate AI Index from arch type, params, release date when AA data missing.
+
+### P1
+- [ ] **User sentiment pipeline** (`scoring/sentiment.py`)
+      Scrape X/Twitter, Reddit for "feels like" comparisons. Tag by region.
+- [ ] **Paper benchmark extractor** (`scoring/paper_benchmarks.py`)
+      Extract from Kimi K2.6, GLM 5.2, Qwen 3.7, MiniMax M3.
+- [ ] **Reliability calibration** (`scoring/reliability_calibration.py`)
+      Cross-reference model scores with real API error rates.
+
+### P2
+- [ ] **Magic factor tracking** (`empirical_adjustments.json`)
+      Empirical over/underperformance deltas.
+- [ ] **Benchmark scraping directory** — scraped data from paper sources.
 
 ## Status
-Current focus: ALL TASKS COMPLETE ✅
-Next: Begin Phase 1 implementation (see docs/design.md)
-Last updated: 2026-05-17
+**Phase 3**: 1 task done, 6 remaining — see docs/SESSION_DATA_2026-06-19.md
+**Last updated**: 2026-06-19

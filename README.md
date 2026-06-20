@@ -204,3 +204,29 @@ cd api && uvicorn main:app --port 8123
 ## License
 
 MIT © 2026 Aaron Miller
+
+## Session Tasks — 2026-06-19 (14 items)
+
+These tasks were defined during the calibration planning session. See
+`docs/RAW_USER_PROMPTS_2026-06-19.md` for full verbatim source.
+
+### P0 — Must build
+- [ ] **Conditional scoring engine** (`scoring/arch_predictor.py`): Estimate AI Index
+      from arch type, params, release date when AA data is missing
+- [ ] **CLI overall command** (`cli_overall.py`): `model-scan overall -a --free`
+      returns best model ID for tier. Done — see `cli_overall.py`
+
+### P1 — Core improvements
+- [ ] **User sentiment pipeline** (`scoring/sentiment.py`): Scrape X/Reddit for
+      empirical "feels like" comparisons with region tags
+- [ ] **Paper benchmark extractor** (`scoring/paper_benchmarks.py`): Extract
+      benchmark tables from Kimi 2.6, GLM 5.2, Qwen 3.7, MiniMax M3 papers
+- [ ] **Reliability calibration** (`scoring/reliability_calibration.py`):
+      Cross-reference scores with real API error logs
+- [ ] **Model size × AI Index cross-ref**: Apply size/arch data from models.dev
+      to intelligence scores
+
+### P2 — Nice to have
+- [ ] **Magic factor tracking** (`empirical_adjustments.json`): Empirical
+      over/underperformance deltas per model
+- [ ] **Benchmark directory**: Scraped data from paper-referenced benchmark sources
