@@ -37,6 +37,7 @@ _PROVIDER_KEYS = {
     "google":      ["GOOGLE_API_KEY",     "PROVIDERS_GOOGLE_API_KEY"],
     "openai":      ["OPENAI_API_KEY",     "PROVIDERS_OPENAI_API_KEY"],
     "deepseek":    ["DEEPSEEK_API_KEY",   "PROVIDERS_DEEPSEEK_API_KEY"],
+    "nous":        ["NOUS_API_KEY",       "PROVIDERS_NOUS_API_KEY"],
 }
 
 def get_provider_key(provider: str) -> str:
