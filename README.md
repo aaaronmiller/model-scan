@@ -75,6 +75,26 @@ latest provider rates to degrade provider health in rebuilt snapshots.
 
 Daily and weekly cron jobs installed by `cron_manager.py` include `--emit-snapshot` by default.
 
+### Clutch Capability Evidence
+
+The successor Gateway boundary keeps capability evidence separate from callable
+provider identity. Publish it from a saved dossier JSON file without probing a
+provider:
+
+```bash
+python capability_evidence.py \
+  --dossiers dossiers.json \
+  --output ~/.config/model-scan/capability_evidence.json \
+  --evidence-ref scan:2026-07-23
+```
+
+The publisher writes atomically, keeps an independent
+`capability_evidence.last-known-good.json` recovery copy, and never emits
+provider API IDs, endpoints, credential references, or callable IDs. Those are
+joined later through the Gateway's explicit identity map. The older
+`routing_snapshot.py` format remains supported for the existing default-off
+integration but is not the successor callable-identity contract.
+
 ### Data Sources
 | Source | Models | Data |
 |--------|--------|------|
