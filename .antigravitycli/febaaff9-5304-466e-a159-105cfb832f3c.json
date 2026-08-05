@@ -1,1 +1,14 @@
-/home/cheta/.gemini/config/projects/febaaff9-5304-466e-a159-105cfb832f3c.json
+{
+  "id": "febaaff9-5304-466e-a159-105cfb832f3c",
+  "name": "/home/cheta/code/model-scan",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "file:///home/cheta/code/model-scan",
+          "allowWrite": true
+        }
+      }
+    ]
+  }
+}
