@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ardf.local/schema/unified-model-evidence.schema.json",
+  "title": "ARDF v6 unified model evidence record",
+  "description": "Row schema for the sole canonical CSV. Observation rows contain exactly one raw capability or cost measurement. Catalog rows preserve every canonical model/reasoning configuration even when one or both numeric axes are missing.",
+  "$comment": "Calibration output fields are dynamic. Properties beginning cal_ are calibrated values or explicit status/diagnostic companions. Generated task-price observations remain ordinary observation rows with transparent source_id, formula notes, quality, and confidence.",
+  "type": "object",
+  "required": ["record_type", "observation_id", "model_key", "source_id", "metric_axis", "metric_name"],
+  "properties": {
+    "record_type": {"enum": ["observation", "catalog"]},
+    "observation_id": {"type": "string", "minLength": 1},
+    "model_key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "display_name": {"type": "string"},
+    "official_model_id": {"type": "string"},
+    "provider": {"type": "string"},
+    "family": {"type": "string"},
+    "effort": {"type": "string"},
+    "harness": {"type": "string"},
+    "release_date": {"type": "string"},
+    "availability": {"type": "string"},
+    "is_open_weights": {"type": ["boolean", "integer", "string"]},
+    "input_price_per_m": {"type": ["number", "string", "null"]},
+    "output_price_per_m": {"type": ["number", "string", "null"]},
+    "context_window": {"type": ["number", "string", "null"]},
+    "source_id": {"type": "string"},
+    "source_label": {"type": "string"},
+    "source_publisher": {"type": "string"},
+    "source_version": {"type": "string"},
+    "source_date": {"type": "string"},
+    "source_url": {"type": "string"},
+    "source_mirror_url": {"type": "string"},
+    "retrieved_at": {"type": "string"},
+    "metric_axis": {"enum": ["capability", "cost", "catalog"]},
+    "metric_name": {"type": "string"},
+    "raw_value": {"type": ["number", "string", "null"]},
+    "raw_unit": {"type": "string"},
+    "raw_direction": {"enum": ["higher", "lower", ""]},
+    "is_reference_scale": {"type": ["boolean", "integer", "string"]},
+    "quality": {"type": "string"},
+    "confidence": {"type": "string"},
+    "base_weight": {"type": ["number", "string"]},
+    "use_in_aggregate": {"type": ["boolean", "integer", "string"]},
+    "is_historical": {"type": ["boolean", "integer", "string"]},
+    "identity_mapping": {"type": "string"},
+    "notes": {"type": "string"},
+    "calibrated_score": {"type": ["number", "string", "null"]},
+    "calibrated_score_unit": {"type": "string"},
+    "calibrated_score_algorithm": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"record_type": {"const": "observation"}}},
+      "then": {
+        "properties": {"metric_axis": {"enum": ["capability", "cost"]}},
+        "required": ["raw_value", "raw_unit", "source_url", "quality", "confidence"]
+      }
+    },
+    {
+      "if": {"properties": {"record_type": {"const": "catalog"}}},
+      "then": {"properties": {"metric_axis": {"const": "catalog"}}}
+    }
+  ],
+  "additionalProperties": true
+}

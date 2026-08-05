@@ -1,0 +1,111 @@
+{
+  "$comment": "The graph defaults to one visible entry for every cataloged model/reasoning configuration. Unpriced and unscored configurations are placed on explicit evidence shelves instead of being deleted by an inner join.",
+  "schema_version": "2.0.0",
+  "data_source": "data/unified-model-evidence.csv",
+  "calibration_source": "config/calibration-algorithms.json",
+  "views": [
+    {
+      "id": "all-models",
+      "entrypoint": "dashboard.html",
+      "scope": {"type": "all"},
+      "graph": {
+        "type": "all_configuration_scatter_with_empirical_pareto_overlay",
+        "default_point_mode": "model-configurations",
+        "default_labels": "all",
+        "default_scale": "log",
+        "default_plot_width": 3400,
+        "x": "USD per standardized task (token use × token price, calibrated)",
+        "y": "AA-equivalent completion/intelligence index",
+        "incomplete_policy": "display in labeled unpriced and unscored shelves",
+        "frontier_input": "visible paired configuration points only"
+      }
+    },
+    {
+      "id": "claude-code",
+      "entrypoint": "dashboard-claude-code.html",
+      "scope": {
+        "provider": "Anthropic",
+        "family_pattern": "^Claude (Haiku|Sonnet|Opus|Fable)",
+        "include_claude_code_harness": true
+      },
+      "graph": {"inherits": "all-models.graph"}
+    }
+  ],
+  "filters": [
+    "capability_algorithm",
+    "cost_algorithm",
+    "capability_source_ids",
+    "cost_source_ids",
+    "provider",
+    "effort",
+    "harness",
+    "release_date_range",
+    "lifecycle_status",
+    "open_weights",
+    "evidence_date",
+    "quality",
+    "completeness_state",
+    "cost_provenance",
+    "point_mode",
+    "frontier_overlay",
+    "x_scale",
+    "label_mode",
+    "label_style",
+    "color_mode",
+    "plot_size",
+    "search"
+  ],
+  "tables": [
+    {
+      "id": "configuration-table",
+      "record_grain": "one row per canonical model_key after current filters",
+      "default_sort": "task_cost_ascending",
+      "columns": [
+        "display_name",
+        "model_key",
+        "provider",
+        "family",
+        "effort",
+        "harness",
+        "release_date",
+        "lifecycle",
+        "capability",
+        "task_cost",
+        "cost_method",
+        "capability_observations",
+        "cost_observations",
+        "source_count",
+        "frontier_status",
+        "dominated_by"
+      ]
+    },
+    {
+      "id": "pinned-evidence-inspector",
+      "record_grain": "all currently selected atomic observations for one model_key",
+      "columns": [
+        "metric_axis",
+        "source_label",
+        "source_date",
+        "metric_name",
+        "raw_value",
+        "raw_unit",
+        "selected_calibrated_value",
+        "calibration_algorithm",
+        "anchor_count",
+        "rmse",
+        "quality",
+        "confidence",
+        "source_url",
+        "notes"
+      ]
+    }
+  ],
+  "cost_evidence_priority": [
+    "direct AA task cost",
+    "observed benchmark task cost",
+    "AA model-specific token-price proxy",
+    "standardized task token-price estimate",
+    "other calibrated cost evidence"
+  ],
+  "frontier_rule": "Among currently visible paired configuration points, sort by ascending task cost and retain a point only when its capability is strictly greater than every cheaper retained point."
+}

@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0.0",
+  "package_version": "6.0.0",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 7318,
+      "sha256": "e79bc639ebb2dd1d4e14195df7a6d48b747ecfd0a2c33ad1db99286615772ca7"
+    },
+    {
+      "path": "calibration-studio.html",
+      "bytes": 27529,
+      "sha256": "8a07ec137bec3aab3717d3053f82b97b2a20e11bd88e1a0c451cdb06f1b93f0c"
+    },
+    {
+      "path": "config/calibration-algorithms.json",
+      "bytes": 4852,
+      "sha256": "b97a83559ccbb5105173f1cdf0d1f5abdfaefcfa8aec1dcef4b1aeb3ffc2fadf"
+    },
+    {
+      "path": "config/dashboard-views.json",
+      "bytes": 3316,
+      "sha256": "40a0395c6af0d85e48ed2430d8ed6dfb487ae9714991e6f0770243a94c727e25"
+    },
+    {
+      "path": "dashboard-claude-code.html",
+      "bytes": 39122,
+      "sha256": "a40a3bbbe2f7ed9891684568b7b19b268279c0f54b807fbc3eeb210031fff7dc"
+    },
+    {
+      "path": "dashboard.html",
+      "bytes": 39125,
+      "sha256": "095639fcdce3b57215b43cb11084e1429d37d36ede52da89c8e32eccd14d388f"
+    },
+    {
+      "path": "data/unified-model-evidence.csv",
+      "bytes": 2160868,
+      "sha256": "c5d79a1fcb40e45621afffd1553d38c6e93dfeb07bbb66f9c2381a8e42429be6"
+    },
+    {
+      "path": "docs/methodology.md",
+      "bytes": 12564,
+      "sha256": "072a5b5c2cd4acd03f7ca9100f3d827427ddcbb9e64b142c0ba54c895708780b"
+    },
+    {
+      "path": "docs/new-source-notes.md",
+      "bytes": 2200,
+      "sha256": "0d1bbac92995e0b31842ef21a137d7a0fd944dbbd9f202409a3933d7800424a2"
+    },
+    {
+      "path": "docs/validation-report.md",
+      "bytes": 8540,
+      "sha256": "10c22c1511727b48c6ff388d5422b297d24b613708801e1b2a9ce32140be0e85"
+    },
+    {
+      "path": "generated/calibration-report.json",
+      "bytes": 483586,
+      "sha256": "81250d137e40240b5496d458b751a59e0234df95240ebb8118ede7faf984d8a0"
+    },
+    {
+      "path": "generated/dashboard-data.js",
+      "bytes": 5333028,
+      "sha256": "1af6876ab014eec2112d2ebb3e3287a0c35fbc68553774cc67e6cde861627085"
+    },
+    {
+      "path": "generated/unified-evidence-csv.js",
+      "bytes": 2166728,
+      "sha256": "c945a529100c89b05d61952f4bfda9cdd2825197eef6aeba636b2c17c2142fa0"
+    },
+    {
+      "path": "schema/dashboard-view.schema.json",
+      "bytes": 2127,
+      "sha256": "9a18bc1321a6520b5fa188e3acfb05394262ad863ae9b01205b0832e2a296e39"
+    },
+    {
+      "path": "schema/unified-model-evidence.schema.json",
+      "bytes": 3227,
+      "sha256": "1945a03265f1b6b331dc94f8388f154e46d1459ffede26d68ef768342eafde76"
+    },
+    {
+      "path": "scripts/augment_cost.py",
+      "bytes": 10273,
+      "sha256": "dfed6b4b41aa4c08de2f0bfe549c63a953d983cc1488a88f7d109ee6c10940d4"
+    },
+    {
+      "path": "scripts/calibrate.py",
+      "bytes": 21485,
+      "sha256": "ad695ba5360f013dc53e31726623f9fe1d47694c35fdab60b5411d3edffe125c"
+    },
+    {
+      "path": "scripts/rebuild.py",
+      "bytes": 1927,
+      "sha256": "d4e38abe89d21329820666a2d0d8f17974ce80e49e2d3ff48a4296891a4292ba"
+    },
+    {
+      "path": "scripts/validate.py",
+      "bytes": 19006,
+      "sha256": "554a156a791d9a64c227467cd761afaccac4bf247425d14735c1dfd73ce8c174"
+    },
+    {
+      "path": "sources/Pasted text(24).txt",
+      "bytes": 113958,
+      "sha256": "c78bd6ec8915450a0452727994a91f4e65dd5ae232d540982152143a819211e1"
+    },
+    {
+      "path": "sources/attached-source-snapshots.json",
+      "bytes": 2451419,
+      "sha256": "79fe47981f66f087c10bf4874a1a4deaa426a7f96e0665cae30f0c7428b31cbe"
+    },
+    {
+      "path": "sources/index(9).html",
+      "bytes": 109495,
+      "sha256": "55222e869f99a9aea917d227f8ecf4d9b1a558bce4cf830c0f681269ef54d0a6"
+    },
+    {
+      "path": "sources/new-benchmark-snapshots.json",
+      "bytes": 51001,
+      "sha256": "483c31b26e86922cafdbd51beace68eb8cc18845d32d93b7d9af0bbe657c567d"
+    },
+    {
+      "path": "sources/prompt ot make it.md",
+      "bytes": 21504,
+      "sha256": "b1f7fe154fa558a4285179a7538825487317387d8c62858bc70123c7c63fff3f"
+    }
+  ]
+}

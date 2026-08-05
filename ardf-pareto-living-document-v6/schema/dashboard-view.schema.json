@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ardf.local/schema/dashboard-view.schema.json",
+  "title": "ARDF v6 dashboard view contract",
+  "description": "Schema for config/dashboard-views.json. It documents how canonical CSV observations become full-universe graphs, incomplete-data shelves, tables, filters, and empirical Pareto membership.",
+  "$comment": "The contract is frontend-neutral. Future Svelte, Observable, desktop, or notebook frontends can consume the same structure.",
+  "type": "object",
+  "required": ["schema_version", "data_source", "calibration_source", "views", "filters", "tables", "frontier_rule"],
+  "properties": {
+    "$comment": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "data_source": {"type": "string"},
+    "calibration_source": {"type": "string"},
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "entrypoint", "scope", "graph"],
+        "properties": {
+          "id": {"type": "string"},
+          "entrypoint": {"type": "string"},
+          "scope": {"type": "object"},
+          "graph": {"type": "object"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "required": ["id", "type"],
+            "properties": {"id": {"type": "string"}, "type": {"type": "string"}},
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "record_grain", "columns"],
+        "properties": {
+          "id": {"type": "string"},
+          "record_grain": {"type": "string"},
+          "columns": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": true
+      }
+    },
+    "cost_evidence_priority": {"type": "array", "items": {"type": "string"}},
+    "frontier_rule": {"type": "string"}
+  },
+  "additionalProperties": false
+}

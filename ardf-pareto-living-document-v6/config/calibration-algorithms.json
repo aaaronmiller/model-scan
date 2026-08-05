@@ -1,0 +1,135 @@
+{
+  "schema_version": "2.0.0",
+  "active_algorithm_by_axis": {
+    "capability": "robust-affine",
+    "cost": "robust-affine"
+  },
+  "reference_scales": {
+    "capability": {
+      "metric_name": "aa_intelligence_index",
+      "unit": "AA Intelligence Index equivalent",
+      "higher_is_better": true
+    },
+    "cost": {
+      "metric_name": "aa_cost_per_task_usd",
+      "unit": "USD per standardized task (AA-equivalent)",
+      "higher_is_better": false,
+      "transform": "log10",
+      "comment": "Every cost source is calibrated to task-level USD. Full-suite and source-specific costs remain raw evidence and are bridged through exact model overlaps."
+    }
+  },
+  "algorithms": [
+    {
+      "id": "robust-affine",
+      "label": "Robust affine (Theil-Sen)",
+      "kind": "theil_sen_affine",
+      "output_column": "cal_robust_affine",
+      "enabled": true,
+      "parameters": {
+        "minimum_anchors": 4,
+        "maximum_pairwise_slopes": 30000,
+        "clip_capability_min": 0.0,
+        "clip_capability_max": 100.0,
+        "cost_floor": 1e-09
+      },
+      "description": "Median pairwise slope plus median intercept. Robust to outlying anchor models and the default production mapping. Cost is fitted in log10 space."
+    },
+    {
+      "id": "huber-affine",
+      "label": "Huber affine IRLS",
+      "kind": "huber_irls_affine",
+      "output_column": "cal_huber_affine",
+      "enabled": true,
+      "parameters": {
+        "minimum_anchors": 4,
+        "huber_delta": 1.35,
+        "maximum_iterations": 80,
+        "convergence_tolerance": 1e-08,
+        "clip_capability_min": 0.0,
+        "clip_capability_max": 100.0,
+        "cost_floor": 1e-09
+      },
+      "description": "Weighted least squares with iterative Huber residual weights. More efficient than Theil-Sen when most anchors are clean, while limiting the leverage of outliers."
+    },
+    {
+      "id": "monotone-piecewise",
+      "label": "Monotone piecewise linear",
+      "kind": "monotone_piecewise_linear",
+      "output_column": "cal_monotone_piecewise",
+      "enabled": true,
+      "parameters": {
+        "minimum_anchors": 5,
+        "edge_slope_cap_multiplier": 2.0,
+        "clip_capability_min": 0.0,
+        "clip_capability_max": 100.0,
+        "cost_floor": 1e-09
+      },
+      "description": "Pools non-monotone anchor blocks with weighted isotonic regression, then linearly interpolates between anchor knots. Useful when benchmark scales compress or stretch nonlinearly."
+    }
+  ],
+  "manual_anchors": [],
+  "source_weight_overrides": {
+    "vals-index-v1-2-2026-07-23": 0.65,
+    "vals-vibe-code-v1-1-2026-07-23": 0.85,
+    "vals-swe-bench-2026-07-22": 0.8,
+    "vals-terminal-bench-2-1-2026-07-22": 1.0,
+    "livebench-2026-06-25": 1.0
+  },
+  "aggregation": {
+    "capability": "weighted_arithmetic_mean",
+    "cost": "best_evidence_then_weighted_geometric_mean",
+    "minimum_observations_per_axis": 1,
+    "cost_priority": [
+      "direct-task",
+      "observed-task",
+      "token-priced",
+      "standardized-estimate",
+      "other-calibrated"
+    ]
+  },
+  "identity_matching": {
+    "mode": "strict_model_key",
+    "allow_family_fallback": false,
+    "comment": "Do not silently match different effort levels. Add explicit manual anchors if a source label requires a justified crosswalk."
+  },
+  "task_cost_estimator": {
+    "enabled": true,
+    "source_id": "standard-task-price-proxy-v6",
+    "source_label": "Standardized task token-price estimator",
+    "base_input_tokens": 12000,
+    "base_output_tokens": 2500,
+    "effort_input_multipliers": {
+      "minimal": 0.85,
+      "non-reasoning": 0.9,
+      "low": 1.0,
+      "default": 1.0,
+      "medium": 1.05,
+      "high": 1.1,
+      "xhigh": 1.15,
+      "max": 1.2
+    },
+    "effort_output_multipliers": {
+      "minimal": 0.55,
+      "non-reasoning": 0.7,
+      "low": 1.0,
+      "default": 1.45,
+      "medium": 1.95,
+      "high": 3.2,
+      "xhigh": 4.75,
+      "max": 8.5
+    },
+    "base_weight": 0.35,
+    "confidence": "estimated",
+    "comment": "This is a fallback coordinate, not a measured bill. The raw estimate is input tokens \u00d7 input price + output/reasoning-equivalent tokens \u00d7 output price. Multipoint calibration then maps the proxy to AA cost per task. Direct task-cost evidence outranks it in the dashboard."
+  },
+  "token_price_proxy": {
+    "enabled": true,
+    "source_id": "aa-token-price-proxy-v6",
+    "source_label": "AA token count \u00d7 blended token price proxy",
+    "blended_price_field": "price_1m_blended_7_2_1",
+    "token_count_field": "indexTokensTotal",
+    "base_weight": 0.65,
+    "confidence": "derived",
+    "comment": "Uses model-specific AA evaluation token totals and the attached AA 7:2 blended token price. It is calibrated to task-level cost through exact overlaps with published AA cost-per-task records."
+  }
+}
