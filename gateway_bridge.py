@@ -237,9 +237,12 @@ def observe(
     try:
         reading = quota_reading_from_outcome(outcome, now=now)
         if reading is not None:
-            qm.append_observation(reading, ledger_path)
-            result["quota_recorded"] = True
-            result["remaining_fraction"] = reading.remaining_fraction
+            _, recorded = qm.append_observation_once(reading, outcome.request_id, ledger_path)
+            result["quota_recorded"] = recorded
+            if recorded:
+                result["remaining_fraction"] = reading.remaining_fraction
+            else:
+                result["quota_duplicate"] = True
     except OSError as exc:
         result["quota_error"] = f"{type(exc).__name__}: {exc}"
 
@@ -292,22 +295,22 @@ def litellm_success_callback(
         or (standard_logging_object.get("id") if isinstance(standard_logging_object, Mapping) else "")
         or ""
     )
-    missing_spend_id = cost is not None and not request_id
+    missing_observation_id = (cost is not None or bool(headers)) and not request_id
 
     outcome = RequestOutcome(
         model=model,
         started_at=start_time or _utcnow(),
-        # Cost without a stable identity is not safe under at-least-once
-        # callback delivery. Preserve quota headers but decline the spend row.
-        cost=None if missing_spend_id else cost,
-        headers=headers or None,
+        # Measured data without a stable identity is not safe under
+        # at-least-once callback delivery. Decline it rather than double-count.
+        cost=None if missing_observation_id else cost,
+        headers=None if missing_observation_id else (headers or None),
         api_base=api_base,
         slot_id=str(metadata.get("slot_id") or ""),
         request_id=request_id,
     )
     result = observe(outcome, spend_path=spend_path, ledger_path=ledger_path)
-    if missing_spend_id:
-        result["spend_error"] = "missing stable request_id; spend not recorded"
+    if missing_observation_id:
+        result["observation_error"] = "missing stable request_id; spend/quota not recorded"
     return result
 
 

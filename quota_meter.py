@@ -21,8 +21,10 @@ caller, so the module is testable entirely from redacted fixtures.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,6 +33,7 @@ from typing import Any, Iterable, Mapping
 CONFIG_DIR = Path(os.environ.get("MODEL_SCAN_CONFIG_DIR", Path.home() / ".config" / "model-scan"))
 PROVIDER_QUOTA_PATH = CONFIG_DIR / "provider_quota.json"
 LEDGER_PATH = CONFIG_DIR / "quota_ledger.jsonl"
+MAX_LEDGER_ROWS_SCANNED = 50_000
 
 # Confidence is richer than the shared contract's quotaState allows. The
 # contract is `additionalProperties: false`, so confidence and observation time
@@ -621,10 +624,22 @@ def write_provider_quota(
 
 
 def append_observation(reading: QuotaReading, path: str | os.PathLike[str] | None = None) -> Path:
-    """Append a reading to the local ledger, retaining confidence and provenance.
+    """Append a reading, retaining confidence and provenance."""
+
+    target, _ = append_observation_once(reading, "", path)
+    return target
+
+
+def append_observation_once(
+    reading: QuotaReading,
+    request_id: str,
+    path: str | os.PathLike[str] | None = None,
+) -> tuple[Path, bool]:
+    """Atomically append a reading unless its stable request ID already exists.
 
     The ledger keeps what the shared contract cannot carry, so an audit can
-    always answer where a published figure came from and how sure it was.
+    always answer where a published figure came from and how sure it was. Empty
+    request IDs remain append-only for non-gateway callers.
     """
 
     target = Path(path).expanduser() if path else LEDGER_PATH
@@ -645,10 +660,24 @@ def append_observation(reading: QuotaReading, path: str | os.PathLike[str] | Non
         "window_label": reading.window_label,
         "account_scope": reading.account_scope,
         "resource": reading.resource,
+        "request_id": request_id,
     }
-    with target.open("a", encoding="utf-8") as handle:
+    with target.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        if request_id:
+            handle.seek(0)
+            for line in deque(handle, maxlen=MAX_LEDGER_ROWS_SCANNED):
+                try:
+                    existing = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(existing, Mapping) and existing.get("request_id") == request_id:
+                    return target, False
+        handle.seek(0, os.SEEK_END)
         handle.write(json.dumps(row, sort_keys=True) + "\n")
-    return target
+        handle.flush()
+        os.fsync(handle.fileno())
+    return target, True
 
 
 def seed_estimated_windows(now: datetime | None = None) -> list[QuotaReading]:

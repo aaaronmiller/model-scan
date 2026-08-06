@@ -275,6 +275,18 @@ def test_ledger_retains_confidence_the_contract_cannot_carry(tmp_path):
     assert row["remaining_fraction"] is None
 
 
+def test_ledger_deduplicates_stable_request_id(tmp_path):
+    ledger = tmp_path / "quota_ledger.jsonl"
+    reading = qm.unknown_reading("kilo", now=NOW, reason="no-source")
+
+    first = qm.append_observation_once(reading, "req-1", ledger)
+    second = qm.append_observation_once(reading, "req-1", ledger)
+
+    assert first == (ledger, True)
+    assert second == (ledger, False)
+    assert len(ledger.read_text().splitlines()) == 1
+
+
 def test_write_is_atomic_and_leaves_no_temp_file(tmp_path):
     target = tmp_path / "provider_quota.json"
     qm.write_provider_quota({"groq": {"remaining_fraction": 0.5}}, target)

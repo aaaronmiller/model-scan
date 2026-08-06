@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TUI `_ensure_extractors_path()`** — deduplicated `sys.path.insert(0, ...)` across capability functions
 
 ### Fixed
-- **LiteLLM spend callback idempotency** - deduplicates stable request IDs under a process-safe file lock, declines unidentified spend events, and preserves quota observations during at-least-once callback delivery.
+- **LiteLLM callback idempotency** - independently deduplicates spend and quota observations by stable request ID under process-safe file locks, and declines unidentified measured events during at-least-once delivery.
 - **Slot fitness calculation** — replaced static 5% arch bonus with slot-specific `get_slot_arch_bonus()`
 - **Color constants** — replaced removed `C.UNDERLINE` references with `C.ACCENT`
 - **check_provider_health() SQL target** — corrected query from `scans` (no provider/scan_time columns) to `models` table with COALESCE for NULL safety

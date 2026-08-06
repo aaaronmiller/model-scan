@@ -131,16 +131,33 @@ def test_litellm_callback_reads_standard_logging_object(tmp_path):
 
 
 def test_litellm_callback_deduplicates_stable_call_id(tmp_path):
-    path = tmp_path / "s.jsonl"
-    payload = {"model": "groq/x", "response_cost": 0.4, "litellm_call_id": "call-1"}
+    spend_path = tmp_path / "s.jsonl"
+    quota_path = tmp_path / "q.jsonl"
+    payload = {
+        "model": "groq/x",
+        "response_cost": 0.4,
+        "litellm_call_id": "call-1",
+        "additional_headers": {
+            "x-ratelimit-remaining": "3",
+            "x-ratelimit-limit": "12",
+        },
+    }
 
-    first = gb.litellm_success_callback(payload, None, NOW, NOW, spend_path=path)
-    second = gb.litellm_success_callback(payload, None, NOW, NOW, spend_path=path)
+    first = gb.litellm_success_callback(
+        payload, None, NOW, NOW, spend_path=spend_path, ledger_path=quota_path
+    )
+    second = gb.litellm_success_callback(
+        payload, None, NOW, NOW, spend_path=spend_path, ledger_path=quota_path
+    )
 
     assert first["spend_recorded"] is True
+    assert first["quota_recorded"] is True
     assert second["spend_recorded"] is False
+    assert second["quota_recorded"] is False
     assert second["spend_duplicate"] is True
-    assert len(list(sl.iter_events(path))) == 1
+    assert second["quota_duplicate"] is True
+    assert len(list(sl.iter_events(spend_path))) == 1
+    assert len(quota_path.read_text().splitlines()) == 1
 
 
 def test_litellm_callback_declines_spend_without_stable_id(tmp_path):
@@ -155,7 +172,29 @@ def test_litellm_callback_declines_spend_without_stable_id(tmp_path):
     )
 
     assert result["spend_recorded"] is False
-    assert "missing stable request_id" in result["spend_error"]
+    assert "missing stable request_id" in result["observation_error"]
+    assert not path.exists()
+
+
+def test_litellm_callback_declines_quota_without_stable_id(tmp_path):
+    path = tmp_path / "q.jsonl"
+
+    result = gb.litellm_success_callback(
+        {
+            "model": "groq/x",
+            "additional_headers": {
+                "x-ratelimit-remaining": "3",
+                "x-ratelimit-limit": "12",
+            },
+        },
+        None,
+        NOW,
+        NOW,
+        ledger_path=path,
+    )
+
+    assert result["quota_recorded"] is False
+    assert "missing stable request_id" in result["observation_error"]
     assert not path.exists()
 
 
