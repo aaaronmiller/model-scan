@@ -14,13 +14,15 @@ ccusage kind are telemetry, never authoritative quota, because that source
 documents severe undercount. Nothing here infers spend from token counts. A
 caller records the cost it actually incurred, or records nothing.
 
-Append-only JSONL so a crash mid-write loses at most one line. No network access.
+Append-only JSONL with a process-safe lock and fsync. No network access.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -79,15 +81,44 @@ def record_spend(
     event: SpendEvent,
     path: str | os.PathLike[str] | None = None,
 ) -> Path:
-    """Append one spend event. Rejects negative amounts rather than storing them."""
+    """Record one spend event, deduplicating non-empty stable request IDs."""
+
+    target, _ = record_spend_once(event, path)
+    return target
+
+
+def record_spend_once(
+    event: SpendEvent,
+    path: str | os.PathLike[str] | None = None,
+) -> tuple[Path, bool]:
+    """Atomically append an event unless its stable request ID already exists.
+
+    Returns ``(path, recorded)``. Empty request IDs remain append-only because
+    there is no safe identity on which to deduplicate. The exclusive file lock
+    covers both the bounded duplicate check and append, so concurrent callback
+    workers cannot count the same request twice.
+    """
 
     if event.amount < 0:
         raise ValueError("spend amount must not be negative")
     target = Path(path).expanduser() if path else SPEND_LOG_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("a", encoding="utf-8") as handle:
+    with target.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        if event.request_id:
+            handle.seek(0)
+            for line in deque(handle, maxlen=MAX_ROWS_SCANNED):
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(row, Mapping) and row.get("request_id") == event.request_id:
+                    return target, False
+        handle.seek(0, os.SEEK_END)
         handle.write(json.dumps(event.to_row(), sort_keys=True) + "\n")
-    return target
+        handle.flush()
+        os.fsync(handle.fileno())
+    return target, True
 
 
 def iter_events(path: str | os.PathLike[str] | None = None) -> Iterator[SpendEvent]:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -29,6 +30,29 @@ def test_record_and_read_round_trip(tmp_path):
 def test_negative_spend_is_rejected(tmp_path):
     with pytest.raises(ValueError):
         sl.record_spend(ev(-1.0, NOW), tmp_path / "spend.jsonl")
+
+
+def test_stable_request_id_is_recorded_once(tmp_path):
+    path = tmp_path / "spend.jsonl"
+    event = sl.SpendEvent("opencode-go", 1.5, "usd", NOW, request_id="req-1")
+
+    first = sl.record_spend_once(event, path)
+    second = sl.record_spend_once(event, path)
+
+    assert first == (path, True)
+    assert second == (path, False)
+    assert [row.request_id for row in sl.iter_events(path)] == ["req-1"]
+
+
+def test_concurrent_duplicate_callbacks_cannot_double_count(tmp_path):
+    path = tmp_path / "spend.jsonl"
+    event = sl.SpendEvent("opencode-go", 1.5, "usd", NOW, request_id="req-race")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: sl.record_spend_once(event, path), range(16)))
+
+    assert sum(recorded for _, recorded in results) == 1
+    assert [row.request_id for row in sl.iter_events(path)] == ["req-race"]
 
 
 def test_corrupt_and_truncated_lines_are_skipped_not_fatal(tmp_path):

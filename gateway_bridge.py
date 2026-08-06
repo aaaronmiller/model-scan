@@ -225,9 +225,12 @@ def observe(
     try:
         event = spend_event_from_outcome(outcome)
         if event is not None:
-            sl.record_spend(event, spend_path)
-            result["spend_recorded"] = True
-            result["amount"] = event.amount
+            _, recorded = sl.record_spend_once(event, spend_path)
+            result["spend_recorded"] = recorded
+            if recorded:
+                result["amount"] = event.amount
+            else:
+                result["spend_duplicate"] = True
     except (OSError, ValueError) as exc:
         result["spend_error"] = f"{type(exc).__name__}: {exc}"
 
@@ -264,9 +267,10 @@ def litellm_success_callback(
     metadata = litellm_params.get("metadata") if isinstance(litellm_params, Mapping) else {}
     metadata = metadata if isinstance(metadata, Mapping) else {}
 
+    standard_logging_object = kwargs.get("standard_logging_object")
     cost = kwargs.get("response_cost")
-    if cost is None and isinstance(kwargs.get("standard_logging_object"), Mapping):
-        cost = kwargs["standard_logging_object"].get("response_cost")
+    if cost is None and isinstance(standard_logging_object, Mapping):
+        cost = standard_logging_object.get("response_cost")
 
     headers: dict[str, Any] = {}
     for source in (
@@ -282,16 +286,29 @@ def litellm_success_callback(
     if isinstance(litellm_params, Mapping):
         api_base = str(litellm_params.get("api_base") or "")
 
+    request_id = str(
+        metadata.get("request_id")
+        or kwargs.get("litellm_call_id")
+        or (standard_logging_object.get("id") if isinstance(standard_logging_object, Mapping) else "")
+        or ""
+    )
+    missing_spend_id = cost is not None and not request_id
+
     outcome = RequestOutcome(
         model=model,
         started_at=start_time or _utcnow(),
-        cost=cost,
+        # Cost without a stable identity is not safe under at-least-once
+        # callback delivery. Preserve quota headers but decline the spend row.
+        cost=None if missing_spend_id else cost,
         headers=headers or None,
         api_base=api_base,
         slot_id=str(metadata.get("slot_id") or ""),
-        request_id=str(metadata.get("request_id") or kwargs.get("litellm_call_id") or ""),
+        request_id=request_id,
     )
-    return observe(outcome, spend_path=spend_path, ledger_path=ledger_path)
+    result = observe(outcome, spend_path=spend_path, ledger_path=ledger_path)
+    if missing_spend_id:
+        result["spend_error"] = "missing stable request_id; spend not recorded"
+    return result
 
 
 def refresh_quota(

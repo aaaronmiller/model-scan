@@ -117,13 +117,46 @@ def test_litellm_callback_survives_a_minimal_payload(tmp_path):
 
 def test_litellm_callback_reads_standard_logging_object(tmp_path):
     result = gb.litellm_success_callback(
-        {"model": "groq/x", "standard_logging_object": {"response_cost": 0.4}},
+        {
+            "model": "groq/x",
+            "litellm_call_id": "call-standard-1",
+            "standard_logging_object": {"response_cost": 0.4},
+        },
         None,
         NOW,
         NOW,
         spend_path=tmp_path / "s.jsonl",
     )
     assert result["spend_recorded"] and result["amount"] == 0.4
+
+
+def test_litellm_callback_deduplicates_stable_call_id(tmp_path):
+    path = tmp_path / "s.jsonl"
+    payload = {"model": "groq/x", "response_cost": 0.4, "litellm_call_id": "call-1"}
+
+    first = gb.litellm_success_callback(payload, None, NOW, NOW, spend_path=path)
+    second = gb.litellm_success_callback(payload, None, NOW, NOW, spend_path=path)
+
+    assert first["spend_recorded"] is True
+    assert second["spend_recorded"] is False
+    assert second["spend_duplicate"] is True
+    assert len(list(sl.iter_events(path))) == 1
+
+
+def test_litellm_callback_declines_spend_without_stable_id(tmp_path):
+    path = tmp_path / "s.jsonl"
+
+    result = gb.litellm_success_callback(
+        {"model": "groq/x", "response_cost": 0.4},
+        None,
+        NOW,
+        NOW,
+        spend_path=path,
+    )
+
+    assert result["spend_recorded"] is False
+    assert "missing stable request_id" in result["spend_error"]
+    assert not path.exists()
 
 
 # ------------------------------------------------------------- refresh
@@ -296,6 +329,7 @@ def test_api_base_makes_the_same_request_recordable():
 def test_litellm_callback_reads_api_base_from_params(tmp_path):
     gb.litellm_success_callback(
         {"model": "openai/nvidia/nemotron", "response_cost": 0.3,
+         "litellm_call_id": "call-api-base-1",
          "litellm_params": {"api_base": "https://integrate.api.nvidia.com/v1"}},
         None, NOW, NOW, spend_path=tmp_path / "s.jsonl",
     )
