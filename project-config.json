@@ -1,0 +1,3832 @@
+{
+  "_meta": {
+    "title": "ARDF consolidated project policy, calibration, analysis, dashboard, and source manifest",
+    "version": "7.3-refined",
+    "architecture": "one canonical evidence ledger + one policy file + one calibration/build script + one dashboard + four human-facing documents",
+    "canonical_ledger": "data/unified-model-evidence.csv",
+    "build_script": "calibrate.py",
+    "dashboard": "dashboard.html",
+    "note": "This file consolidates the former calibration-algorithms.json, analysis-policy.json, dashboard-views.json, source-acquisition-manifest.json, and source-ledger.json.",
+    "refined_from": "7.3-consolidated",
+    "refined_date": "2026-08-09",
+    "refinements": [
+      "policy top_end diagnostic corrected to direct task cost",
+      "pareto cheatsheet generator typo fixed",
+      "source_version normalized to 7.3-refined for standardized proxy",
+      "empty models.dev fields documented as unavailable (not silently missing)",
+      "thin-evidence models (<8 pts) flagged with augmentation scaffold",
+      "validation added for embedded dashboard (no external generated/ dependency)"
+    ]
+  },
+  "calibration": {
+    "schema_version": "3.0.0",
+    "active_algorithm_by_axis": {
+      "capability": "robust-affine",
+      "cost": "robust-affine"
+    },
+    "reference_scales": {
+      "capability": {
+        "metric_name": "aa_intelligence_index",
+        "unit": "AA Intelligence Index equivalent",
+        "higher_is_better": true
+      },
+      "cost": {
+        "metric_name": "aa_cost_per_task_usd",
+        "unit": "USD per standardized task (AA-equivalent)",
+        "higher_is_better": false,
+        "transform": "log10",
+        "comment": "Every cost source is calibrated to task-level USD. Full-suite and source-specific costs remain raw evidence and are bridged through exact model overlaps."
+      }
+    },
+    "algorithms": [
+      {
+        "id": "robust-affine",
+        "label": "Robust affine (Theil-Sen)",
+        "kind": "theil_sen_affine",
+        "output_column": "cal_robust_affine",
+        "enabled": true,
+        "parameters": {
+          "minimum_anchors": 4,
+          "maximum_pairwise_slopes": 30000,
+          "clip_capability_min": 0.0,
+          "clip_capability_max": 100.0,
+          "cost_floor": 1e-09
+        },
+        "description": "Median pairwise slope plus median intercept. Robust to outlying anchor models and the default production mapping. Cost is fitted in log10 space."
+      },
+      {
+        "id": "huber-affine",
+        "label": "Huber affine IRLS",
+        "kind": "huber_irls_affine",
+        "output_column": "cal_huber_affine",
+        "enabled": true,
+        "parameters": {
+          "minimum_anchors": 4,
+          "huber_delta": 1.35,
+          "maximum_iterations": 80,
+          "convergence_tolerance": 1e-08,
+          "clip_capability_min": 0.0,
+          "clip_capability_max": 100.0,
+          "cost_floor": 1e-09
+        },
+        "description": "Weighted least squares with iterative Huber residual weights. More efficient than Theil-Sen when most anchors are clean, while limiting the leverage of outliers."
+      },
+      {
+        "id": "monotone-piecewise",
+        "label": "Monotone piecewise linear",
+        "kind": "monotone_piecewise_linear",
+        "output_column": "cal_monotone_piecewise",
+        "enabled": true,
+        "parameters": {
+          "minimum_anchors": 5,
+          "edge_slope_cap_multiplier": 2.0,
+          "clip_capability_min": 0.0,
+          "clip_capability_max": 100.0,
+          "cost_floor": 1e-09
+        },
+        "description": "Pools non-monotone anchor blocks with weighted isotonic regression, then linearly interpolates between anchor knots. Useful when benchmark scales compress or stretch nonlinearly."
+      },
+      {
+        "id": "auto-best-rmse",
+        "label": "Auto-best per-group (lowest RMSE)",
+        "kind": "auto_best_rmse",
+        "output_column": "cal_auto_best",
+        "enabled": true,
+        "parameters": {
+          "minimum_anchors": 4,
+          "clip_capability_min": 0.0,
+          "clip_capability_max": 100.0,
+          "cost_floor": 1e-09
+        },
+        "description": "Per calibration group picks the fitted mapping (robust, huber, or monotone) with lowest in-sample RMSE. Frontier from this column is the optimistic envelope; robust remains the conservative default."
+      }
+    ],
+    "manual_anchors": [],
+    "source_weight_overrides": {
+      "vals-index-v1-2-2026-07-23": 0.65,
+      "vals-vibe-code-v1-1-2026-07-23": 0.85,
+      "vals-swe-bench-2026-07-22": 0.8,
+      "vals-terminal-bench-2-1-2026-07-22": 1.0,
+      "livebench-2026-06-25": 1.0,
+      "artificial-analysis-current-2026-08-04": 1.0,
+      "benchlm-current-frontier-2026-08-04": 0.75,
+      "openai-gpt-5-6-current-2026-07-30": 0.55,
+      "deepseek-v4-flash-0731-model-card-2026-07-31": 0.45,
+      "qwen3-8-max-stable-scorecard-2026-08-03": 0.35,
+      "qwencloud-pricing-2026-08-03": 0.4,
+      "aa-token-price-proxy-v7": 0.65,
+      "standard-task-price-proxy-v7": 0.35
+    },
+    "aggregation": {
+      "capability": "weighted_arithmetic_mean",
+      "cost": "best_evidence_then_weighted_geometric_mean",
+      "minimum_observations_per_axis": 1,
+      "cost_priority": [
+        "direct-task",
+        "observed-task",
+        "token-priced",
+        "standardized-estimate",
+        "other-calibrated"
+      ]
+    },
+    "identity_matching": {
+      "mode": "strict_model_key",
+      "allow_family_fallback": false,
+      "comment": "Exact model_key matching is required. calibration_group permits the same benchmark/version to share anchors across publishers while preserving source provenance."
+    },
+    "task_cost_estimator": {
+      "enabled": true,
+      "source_id": "standard-task-price-proxy-v7",
+      "source_label": "Standardized task token-price estimator v7",
+      "base_input_tokens": 12000,
+      "base_output_tokens": 2500,
+      "effort_input_multipliers": {
+        "minimal": 0.85,
+        "non-reasoning": 0.9,
+        "low": 1.0,
+        "default": 1.0,
+        "medium": 1.05,
+        "high": 1.1,
+        "xhigh": 1.15,
+        "max": 1.2
+      },
+      "effort_output_multipliers": {
+        "minimal": 0.55,
+        "non-reasoning": 0.7,
+        "low": 1.0,
+        "default": 1.45,
+        "medium": 1.95,
+        "high": 3.2,
+        "xhigh": 4.75,
+        "max": 8.5
+      },
+      "base_weight": 0.35,
+      "confidence": "estimated",
+      "comment": "This is a fallback coordinate, not a measured bill. The raw estimate is input tokens \u00d7 input price + output/reasoning-equivalent tokens \u00d7 output price. Multipoint calibration then maps the proxy to AA cost per task. Direct task-cost evidence outranks it in the dashboard."
+    },
+    "token_price_proxy": {
+      "enabled": true,
+      "source_id": "aa-token-price-proxy-v7",
+      "source_label": "AA token count \u00d7 current blended token price proxy v7",
+      "blended_price_field": "price_1m_blended_7_2_1",
+      "token_count_field": "indexTokensTotal",
+      "base_weight": 0.65,
+      "confidence": "derived",
+      "comment": "Uses model-specific AA evaluation token totals and the attached AA 7:2 blended token price. It is calibrated to task-level cost through exact overlaps with published AA cost-per-task records."
+    },
+    "_meta": {
+      "title": "ARDF v7 calibration algorithms",
+      "version": "7.0.0",
+      "updated": "2026-08-04",
+      "model": "GPT-5.6 Thinking",
+      "reasoning_level": "high"
+    }
+  },
+  "analysis": {
+    "version": "7.3.0",
+    "generated_for": "2026-08-08 identity/cost-frontier forensic refresh",
+    "capability_tiers": [
+      {
+        "id": "T1",
+        "min": 60.0,
+        "label": "Frontier ceiling",
+        "legacy": "S+",
+        "note": "Only ceiling: Opus 5 xhigh/max, Sol max"
+      },
+      {
+        "id": "T2",
+        "min": 56.0,
+        "label": "Frontier",
+        "legacy": "S",
+        "note": "Muse 1.2 xhigh + 5 companions"
+      },
+      {
+        "id": "T3",
+        "min": 47.0,
+        "label": "Executor",
+        "legacy": "A+/A",
+        "note": "Strong executor 47-56, GLM-5.2 51.39 anchor; differentiated within tier by context/reasoning/tool/cache/provider"
+      },
+      {
+        "id": "T4",
+        "min": 0.0,
+        "label": "Utility — bottom-4 interchangeable",
+        "legacy": "B/C/D",
+        "note": "glm / deepseek / luna / muse variants within 0.5-2 cap for 2-4× cost are interchangeable on plane; choose by use-case matrix (context, reasoning, tool-call, cache)"
+      }
+    ],
+    "near_frontier": {
+      "razor_capability_gap_max": 0.75,
+      "razor_cost_premium_max_pct": 25.0,
+      "near_capability_gap_max": 2.0,
+      "near_cost_premium_max_pct": 50.0,
+      "major_model_keys": [
+        "qwen3-8-max-xhigh",
+        "claude-fable-5-max",
+        "gpt-5-6-sol-max",
+        "kimi-k3-max",
+        "claude-sonnet-5-max",
+        "deepseek-v4-flash-0731-max",
+        "gpt-5-6-luna-xhigh",
+        "grok-4-3-high",
+        "gemini-3-1-pro-preview-customtools",
+        "mimo-v2-5-pro"
+      ]
+    },
+    "executor": {
+      "minimum_aggregate_capability": null,
+      "ranking_metric": "cost_per_calibrated_capability",
+      "score_formula": "calibrated_task_cost / calibrated_capability",
+      "lower_is_better": true,
+      "secondary_metric": "calibrated_task_cost / aa_reference_capability",
+      "top_n": 5,
+      "luna_preferred_effort": "high",
+      "rationale": "Rank every current priced configuration with positive calibrated capability by task cost divided by calibrated capability. Lower is better. Also report capability per dollar and cost per exact AA point when available. No global capability floor, capability subtraction, exponent, or hand-inserted candidate is applied. A named role or user question may apply its own visible capability gate outside this global value ranking.",
+      "collapse_duplicate_model_family": true
+    },
+    "current_release_cutoff": "2025-08-08",
+    "top_end": {
+      "families": [
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "GPT-5.6 Sol",
+        "Qwen3.8 Max",
+        "Kimi K3"
+      ],
+      "model_key_prefixes": [
+        "claude-opus-5-",
+        "claude-fable-5-",
+        "gpt-5-6-sol-",
+        "qwen3-8-max-",
+        "kimi-k3-"
+      ],
+      "primary_plane": "multi-source calibrated capability vs operational task cost",
+      "same_source_diagnostic": "Artificial Analysis Intelligence Index vs direct Cost per Intelligence Index Task (full-evaluation cost as fallback when direct not published)",
+      "same_source_reason": "Direct AA cost/task is primary; full-evaluation cost only fallback. This matches build-analysis.py and README v7.3. Previous value incorrectly said full cost only.",
+      "prune_rule": "A configuration is sub-optimal on a plane if another configuration has <= cost and >= capability, with at least one strict inequality."
+    },
+    "external_frontiers": [
+      {
+        "id": "artificial_analysis",
+        "x": "AA cost per Intelligence Index task",
+        "y": "AA Intelligence Index",
+        "role": "closest independent analogue to ARDF primary plane"
+      },
+      {
+        "id": "kilo",
+        "x": "Kilo cost per attempt",
+        "y": "Kilo completion rate",
+        "role": "coding-agent cost/performance cross-check"
+      },
+      {
+        "id": "vals",
+        "x": "Vals Cost/Test",
+        "y": "Vals Index accuracy",
+        "role": "economic-work benchmark cost/performance cross-check"
+      }
+    ]
+  },
+  "dashboard": {
+    "_meta": {
+      "title": "ARDF v7.3 dashboard view contract",
+      "version": "7.3.0",
+      "updated": "2026-08-08",
+      "model": "GPT-5.6 Sol",
+      "reasoning_level": "high"
+    },
+    "$comment": "One entry is retained for every cataloged model/reasoning configuration. Paired points use precomputed calibration fields; incomplete configurations are rendered on labeled shelves rather than deleted by an inner join.",
+    "schema_version": "3.0.0",
+    "data_source": "data/unified-model-evidence.csv",
+    "calibration_source": "project-config.json",
+    "views": [
+      {
+        "id": "all-models",
+        "entrypoint": "dashboard.html",
+        "scope": {
+          "type": "all"
+        },
+        "graph": {
+          "type": "all_configuration_scatter_with_empirical_pareto_overlay",
+          "default_point_mode": "model-configurations",
+          "default_labels": "all",
+          "default_x_scale": "log",
+          "default_y_scale": "linear",
+          "available_x_scales": [
+            "log",
+            "linear"
+          ],
+          "available_y_scales": [
+            "linear",
+            "log"
+          ],
+          "default_plot_width": 3400,
+          "x": "USD per standardized task, token use multiplied by token price and calibrated",
+          "y": "AA-equivalent completion/intelligence index",
+          "incomplete_policy": "display in labeled unpriced and unscored shelves",
+          "frontier_input": "visible paired configuration points only",
+          "calibration_location": "calibrate.py; dashboard selects among precomputed calibration algorithms but never fits mappings"
+        }
+      },
+      {
+        "id": "claude-code",
+        "entrypoint": "dashboard.html#claude-code-filter-preset",
+        "scope": {
+          "provider": "Anthropic",
+          "family_pattern": "^Claude (Haiku|Sonnet|Opus|Fable)",
+          "include_claude_code_harness": true
+        },
+        "graph": {
+          "inherits": "all-models.graph"
+        }
+      }
+    ],
+    "filters": [
+      "capability_algorithm",
+      "cost_algorithm",
+      "capability_source_ids",
+      "cost_source_ids",
+      "provider",
+      "effort",
+      "harness",
+      "release_date_range",
+      "lifecycle_status",
+      "open_weights",
+      "evidence_date",
+      "quality",
+      "completeness_state",
+      "cost_provenance",
+      "point_mode",
+      "frontier_overlay",
+      "x_scale",
+      "y_scale",
+      "label_mode",
+      "label_style",
+      "color_mode",
+      "plot_size",
+      "search",
+      "models_dev_lab",
+      "models_dev_family",
+      "models_dev_status",
+      "models_dev_match_status",
+      "models_dev_reasoning",
+      "models_dev_tool_call",
+      "models_dev_structured_output",
+      "models_dev_attachment",
+      "models_dev_input_modality",
+      "models_dev_license",
+      "models_dev_min_context_tokens",
+      "models_dev_min_output_tokens",
+      "models_dev_min_provider_count",
+      "models_dev_last_updated_window"
+    ],
+    "tables": [
+      {
+        "id": "newest-models",
+        "record_grain": "one card per exact release-dated models.dev canonical model",
+        "default_sort": "models_dev_release_date_descending",
+        "columns": [
+          "models_dev_name",
+          "models_dev_model_id",
+          "models_dev_lab",
+          "models_dev_family",
+          "models_dev_release_date",
+          "configuration_count",
+          "observation_count",
+          "source_count",
+          "models_dev_context_tokens",
+          "models_dev_provider_count"
+        ]
+      },
+      {
+        "id": "configuration-table",
+        "record_grain": "one row per canonical model_key after current filters",
+        "default_sort": "task_cost_ascending",
+        "columns": [
+          "display_name",
+          "model_key",
+          "provider",
+          "models_dev_lab",
+          "models_dev_model_id",
+          "family",
+          "effort",
+          "harness",
+          "models_dev_release_date",
+          "lifecycle",
+          "models_dev_context_tokens",
+          "models_dev_output_limit_tokens",
+          "models_dev_provider_count",
+          "models_dev_reasoning",
+          "models_dev_tool_call",
+          "models_dev_structured_output",
+          "models_dev_attachment",
+          "models_dev_open_weights",
+          "models_dev_license",
+          "capability",
+          "task_cost",
+          "cost_method",
+          "capability_observations",
+          "cost_observations",
+          "source_count",
+          "frontier_status",
+          "dominated_by"
+        ]
+      },
+      {
+        "id": "pinned-evidence-inspector",
+        "record_grain": "all currently selected atomic observations for one model_key",
+        "columns": [
+          "metric_axis",
+          "source_label",
+          "source_date",
+          "source_refresh_status",
+          "metric_name",
+          "raw_value",
+          "raw_unit",
+          "selected_calibrated_value",
+          "calibration_algorithm",
+          "calibration_group",
+          "anchor_count",
+          "rmse",
+          "quality",
+          "confidence",
+          "source_url",
+          "notes"
+        ]
+      }
+    ],
+    "cost_evidence_priority": [
+      "direct AA task cost",
+      "observed benchmark task cost",
+      "AA model-specific token-price proxy",
+      "standardized task token-price estimate",
+      "other calibrated cost evidence"
+    ],
+    "frontier_rule": "Among currently visible paired configuration points, sort by ascending task cost and retain a point only when its capability is strictly greater than every cheaper retained point. No fitted or smoothed curve is used."
+  },
+  "source_acquisition": {
+    "_meta": {
+      "title": "ARDF source acquisition and supplementation manifest",
+      "version": "7.3.0",
+      "created": "2026-08-08",
+      "model": "GPT-5.6 Sol",
+      "reasoning_level": "high",
+      "purpose": "Machine-readable companion to ardf-research-paper.md and ardf-research-paper.md"
+    },
+    "canonical_csv": "data/unified-model-evidence.csv",
+    "canonical_csv_columns": [
+      "record_type",
+      "observation_id",
+      "model_key",
+      "display_name",
+      "provider",
+      "family",
+      "effort",
+      "harness",
+      "release_date",
+      "availability",
+      "is_open_weights",
+      "context_window_tokens",
+      "input_price_per_m",
+      "output_price_per_m",
+      "official_model_id",
+      "source_id",
+      "source_label",
+      "source_publisher",
+      "source_version",
+      "source_date",
+      "source_url",
+      "source_mirror_url",
+      "retrieved_at",
+      "metric_axis",
+      "metric_name",
+      "raw_value",
+      "raw_unit",
+      "raw_direction",
+      "is_reference_scale",
+      "quality",
+      "confidence",
+      "base_weight",
+      "use_in_aggregate",
+      "is_historical",
+      "identity_mapping",
+      "notes",
+      "cal_robust_affine",
+      "cal_robust_affine_status",
+      "cal_robust_affine_anchor_count",
+      "cal_robust_affine_rmse",
+      "cal_robust_affine_group_key",
+      "cal_huber_affine",
+      "cal_huber_affine_status",
+      "cal_huber_affine_anchor_count",
+      "cal_huber_affine_rmse",
+      "cal_huber_affine_group_key",
+      "cal_monotone_piecewise",
+      "cal_monotone_piecewise_status",
+      "cal_monotone_piecewise_anchor_count",
+      "cal_monotone_piecewise_rmse",
+      "cal_monotone_piecewise_group_key",
+      "calibrated_score",
+      "calibrated_score_unit",
+      "calibrated_score_algorithm",
+      "calibration_group",
+      "source_refresh_status",
+      "source_original_id",
+      "benchmark_domain",
+      "benchmark_harness",
+      "benchmark_version_exact",
+      "is_vendor_reported",
+      "is_independent_source",
+      "data_freshness_class",
+      "models_dev_model_id",
+      "models_dev_name",
+      "models_dev_lab",
+      "models_dev_family",
+      "models_dev_description",
+      "models_dev_release_date",
+      "models_dev_last_updated",
+      "models_dev_knowledge_cutoff",
+      "models_dev_attachment",
+      "models_dev_reasoning",
+      "models_dev_reasoning_options_json",
+      "models_dev_tool_call",
+      "models_dev_structured_output",
+      "models_dev_temperature",
+      "models_dev_open_weights",
+      "models_dev_license",
+      "models_dev_status",
+      "models_dev_experimental",
+      "models_dev_context_tokens",
+      "models_dev_input_limit_tokens",
+      "models_dev_output_limit_tokens",
+      "models_dev_input_modalities_json",
+      "models_dev_output_modalities_json",
+      "models_dev_interleaved",
+      "models_dev_interleaved_field",
+      "models_dev_provider_count",
+      "models_dev_provider_names_json",
+      "models_dev_first_party_input_price_per_m",
+      "models_dev_first_party_output_price_per_m",
+      "models_dev_reasoning_price_per_m",
+      "models_dev_cache_read_price_per_m",
+      "models_dev_cache_write_price_per_m",
+      "models_dev_input_audio_price_per_m",
+      "models_dev_output_audio_price_per_m",
+      "models_dev_min_provider_input_price_per_m",
+      "models_dev_max_provider_input_price_per_m",
+      "models_dev_min_provider_output_price_per_m",
+      "models_dev_max_provider_output_price_per_m",
+      "models_dev_total_parameters",
+      "models_dev_active_parameters",
+      "models_dev_weights_json",
+      "models_dev_links_json",
+      "models_dev_benchmarks_json",
+      "models_dev_provider_rows_json",
+      "models_dev_match_status",
+      "models_dev_match_method",
+      "models_dev_candidate_id",
+      "models_dev_source_url",
+      "models_dev_retrieved_at",
+      "models_dev_sync_notes"
+    ],
+    "current_sources": [
+      {
+        "source_id": "models-dev-current",
+        "name": "models.dev model catalog",
+        "category": "static metadata",
+        "current_role": "Primary provider-independent metadata backbone. It must never be treated as benchmark evidence.",
+        "acquisition_used": "JSON catalog synchronization through scripts/sync_models_dev.py, with an offline snapshot accepted when live download fails.",
+        "preferred_acquisition": "Use the documented https://models.dev/api.json endpoint. Retain https://models.dev/catalog.json only as a compatibility fallback. For audit-grade provenance, clone the official repository and preserve the provider/model TOML files used for the build.",
+        "entry_points": [
+          {
+            "label": "Official JSON API",
+            "url": "https://models.dev/api.json"
+          },
+          {
+            "label": "Compatibility catalog JSON",
+            "url": "https://models.dev/catalog.json"
+          },
+          {
+            "label": "Official repository and schema",
+            "url": "https://github.com/anomalyco/models.dev"
+          },
+          {
+            "label": "Per-model web catalog",
+            "url": "https://models.dev/"
+          }
+        ],
+        "current_metrics": [],
+        "available_data": "Provider IDs and docs; canonical model IDs; names; release/update dates; lifecycle status; context/input/output limits; input/output/cache/reasoning/audio prices; input/output modalities; attachment, reasoning, tool-call, structured-output and temperature support; open-weight status; knowledge cutoff; provider variants and logos.",
+        "unused_data": "Provider-level npm package, environment-variable names, provider API base URL, provider documentation link, wrapper/base-model relationships, provider logos, and any model/provider fields left inside models_dev_provider_rows_json or the raw API object. The current CSV flattens 50 fields but preserves raw provider rows for later expansion.",
+        "post_schema": [
+          "models_dev_* fields on every catalog and observation row",
+          "model_key",
+          "official_model_id",
+          "provider",
+          "family",
+          "effort",
+          "release_date",
+          "availability"
+        ],
+        "identity_keys": [
+          "models_dev_model_id",
+          "official_model_id",
+          "normalized model name + lab",
+          "base model without effort as cautious fallback"
+        ],
+        "caveats": "The current package has only 42 exact live matches and 634 compatibility fallbacks. A refresh agent should run the synchronizer against the current API and review every fuzzy or fallback match before accepting it.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "API JSON",
+        "ledger": {
+          "rows": 0,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "artificial-analysis-current",
+        "name": "Artificial Analysis current consolidated language-model data",
+        "category": "independent capability + cost + runtime",
+        "current_role": "Primary reference scale for the Y-axis AA Intelligence Index equivalent and the preferred source for exact task/full-suite cost evidence.",
+        "acquisition_used": "Current consolidated slice refreshed through model pages/API-derived structured data; prior dated AA identities are retained only in source_original_id, never as extra votes.",
+        "preferred_acquisition": "Use the official Artificial Analysis Data API/model pages for structured current records. Cross-check the public Intelligence Index vs Cost per Task Pareto explorer; do not scrape chart pixels when numeric model records are available.",
+        "entry_points": [
+          {
+            "label": "AA model explorer + Cost per Task Pareto",
+            "url": "https://artificialanalysis.ai/"
+          },
+          {
+            "label": "AA model directory",
+            "url": "https://artificialanalysis.ai/models"
+          },
+          {
+            "label": "AA Data API docs",
+            "url": "https://artificialanalysis.ai/data-api/docs"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "aa_intelligence_index",
+            "unit": "AA Intelligence Index",
+            "rows": 570
+          },
+          {
+            "axis": "cost",
+            "metric": "aa_full_suite_cost_usd",
+            "unit": "USD full AA suite",
+            "rows": 54
+          },
+          {
+            "axis": "cost",
+            "metric": "aa_cost_per_task_usd",
+            "unit": "USD per Intelligence Index task",
+            "rows": 24
+          },
+          {
+            "axis": "metadata",
+            "metric": "aa_output_tokens_full_suite",
+            "unit": "output tokens",
+            "rows": 22
+          },
+          {
+            "axis": "cost",
+            "metric": "aa_full_suite_cost_usd",
+            "unit": "USD full AA Intelligence Index evaluation",
+            "rows": 21
+          },
+          {
+            "axis": "metadata",
+            "metric": "aa_output_speed_tokens_s",
+            "unit": "tokens/s",
+            "rows": 21
+          },
+          {
+            "axis": "cost",
+            "metric": "aa_cost_per_task_usd",
+            "unit": "USD per AA task",
+            "rows": 9
+          },
+          {
+            "axis": "cost",
+            "metric": "aa_full_eval_cost_usd",
+            "unit": "USD full evaluation",
+            "rows": 2
+          },
+          {
+            "axis": "metadata",
+            "metric": "aa_index_output_tokens_m",
+            "unit": "million output tokens",
+            "rows": 2
+          },
+          {
+            "axis": "metadata",
+            "metric": "aa_output_speed_tps",
+            "unit": "tokens/sec",
+            "rows": 2
+          },
+          {
+            "axis": "metadata",
+            "metric": "aa_ttft_seconds",
+            "unit": "seconds",
+            "rows": 2
+          },
+          {
+            "axis": "cost",
+            "metric": "input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          }
+        ],
+        "available_data": "Headline and component evaluations, Intelligence Index and version, cost to run the index, cost per task, input/output and blended pricing, median throughput and latency, release/model-creator metadata, context, parameters, modalities, licensing and open-weight links. Detail endpoints add evaluation token counts and openness/omniscience breakdowns.",
+        "unused_data": "AA additionally exposes Cost per Task, Time per Task, Output Tokens per Task, provider speed/latency, token-use breakdowns, and its own Pareto line. Future adapters should ingest structured numeric rows for these views rather than treating the rendered graph as a second vote.",
+        "post_schema": [
+          "metric_axis",
+          "metric_name",
+          "raw_value",
+          "raw_unit",
+          "is_reference_scale",
+          "source_id",
+          "source_date",
+          "retrieved_at",
+          "quality",
+          "confidence",
+          "benchmark_domain",
+          "benchmark_version_exact"
+        ],
+        "identity_keys": [
+          "AA slug",
+          "AA model ID",
+          "model creator + model name + reasoning mode"
+        ],
+        "caveats": "Do not mix multiple dated AA snapshots as independent votes. Refresh in place, preserve source_original_id, record the Intelligence Index version, and keep model/reasoning variants distinct.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "critical",
+        "automation": "Authenticated API preferred; HTML only as fallback",
+        "ledger": {
+          "source_id": "artificial-analysis-current-2026-08-04",
+          "label": "Artificial Analysis current consolidated model evidence",
+          "publisher": "Artificial Analysis",
+          "version": "current model pages checked 2026-08-04",
+          "source_date": "",
+          "url": "https://artificialanalysis.ai/models/apertus-70b-instruct",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "consolidated-current",
+          "freshness_class": "current-consolidated",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 731,
+          "capability_rows": 586,
+          "cost_rows": 88,
+          "model_count": 565,
+          "metric_count": 7,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "meta-muse-pricing-current",
+        "name": "Meta Muse Spark 1.2 dual pricing",
+        "category": "official static pricing",
+        "current_role": "Preserves both Muse price tiers. Contributor/data-sharing is the primary economic tier; Standard/no-sharing is secondary metadata.",
+        "acquisition_used": "Official Meta/models.dev provider rows checked on 2026-08-08.",
+        "preferred_acquisition": "Fetch models.dev meta/muse-spark-1.2 plus Meta Model API pricing documentation; preserve both SKU IDs and data-use semantics.",
+        "entry_points": [
+          {
+            "label": "models.dev Muse Spark 1.2",
+            "url": "https://models.dev/models/meta/muse-spark-1.2"
+          },
+          {
+            "label": "Meta Muse Spark model page",
+            "url": "https://developer.meta.com/ai/models/muse-spark/"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "contributor_cache_read_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "contributor_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "contributor_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_cache_read_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          }
+        ],
+        "available_data": "Contributor SKU $0.10/M input, $0.002/M cache read, $0.20/M output; Standard SKU $1.25/M input, $0.15/M cache read, $4.25/M output; 1M context, 131k output, tools/reasoning/structured-output flags.",
+        "unused_data": "Future provider-specific throughput/latency and any additional caching/input modality pricing published by Meta.",
+        "post_schema": [
+          "input_price_per_m",
+          "output_price_per_m",
+          "models_dev_provider_rows_json",
+          "official_model_id"
+        ],
+        "identity_keys": [
+          "meta/muse-spark-1.2",
+          "muse-spark-1.2-contributor",
+          "muse-spark-1.2"
+        ],
+        "caveats": "Never average the two price tiers. Contributor is primary only because the user explicitly accepts data sharing.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "API/structured metadata preferred; HTML fallback",
+        "ledger": {
+          "rows": 6,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "meta-muse-contributor-repricing-current",
+        "name": "Muse Spark 1.2 Contributor-equivalent AA task cost",
+        "category": "derived task-cost repricing",
+        "current_role": "Primary Muse task-price coordinate for the user-selected data-sharing tier.",
+        "acquisition_used": "Repriced AA Standard workload to Contributor pricing using the published 7:2:1 cache/input/output mix.",
+        "preferred_acquisition": "If AA begins measuring Contributor directly, replace this derived row with the direct task cost. Until then preserve the derivation and both base price tiers.",
+        "entry_points": [
+          {
+            "label": "AA Muse Spark 1.2",
+            "url": "https://artificialanalysis.ai/models/muse-spark-1-2"
+          },
+          {
+            "label": "models.dev Muse pricing",
+            "url": "https://models.dev/models/meta/muse-spark-1.2"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "aa_cost_per_task_usd",
+            "unit": "USD per Intelligence Index task",
+            "rows": 1
+          }
+        ],
+        "available_data": "Contributor-equivalent task cost derived from the same AA workload: approximately $0.02123/task versus AA Standard $0.40/task.",
+        "unused_data": "Exact per-evaluation cache/input/output token breakdown would allow workload-specific repricing instead of blended 7:2:1 repricing.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=aa_cost_per_task_usd",
+          "quality=derived-repriced-exact-workload"
+        ],
+        "identity_keys": [
+          "muse-spark-1-2-xhigh"
+        ],
+        "caveats": "Derived dollar value, not a direct AA billing observation. It is intentionally given direct-task priority because workload evidence is exact and only the published price tier changes.",
+        "coverage": {
+          "metadata": false,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "local deterministic derivation",
+        "ledger": {
+          "rows": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "artificial-analysis-muse-1-2-components-2026-08-05",
+        "name": "Artificial Analysis Muse Spark 1.2 launch/component evaluation",
+        "category": "independent capability components",
+        "current_role": "Adds component evidence around the current AA composite; composite 57 from the current page supersedes the launch article composite.",
+        "acquisition_used": "Artificial Analysis launch/model article table extraction.",
+        "preferred_acquisition": "Use current AA Data API/model detail for the composite and retain dated article component metrics only when the API does not expose them.",
+        "entry_points": [
+          {
+            "label": "AA current Muse page",
+            "url": "https://artificialanalysis.ai/models/muse-spark-1-2"
+          },
+          {
+            "label": "AA model directory",
+            "url": "https://artificialanalysis.ai/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "aa_omniscience_accuracy_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "aa_omniscience_index",
+            "unit": "index",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "aa_omniscience_non_hallucination_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "critpt_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "gdpval_aa_v2_elo",
+            "unit": "Elo",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "humanitys_last_exam_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "scicode_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "tau3_banking_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent",
+            "rows": 1
+          }
+        ],
+        "available_data": "GDPval-AA v2, Terminal-Bench, tau3 Banking, SciCode, HLE, CritPt, Omniscience components.",
+        "unused_data": "Provider performance/latency when AA publishes it.",
+        "post_schema": [
+          "metric_axis=capability",
+          "benchmark_domain",
+          "source_date=2026-08-05"
+        ],
+        "identity_keys": [
+          "muse-spark-1-2-xhigh"
+        ],
+        "caveats": "Do not use an older launch-day composite when the current AA index has been revised.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "medium",
+        "automation": "API/article structured extraction",
+        "ledger": {
+          "rows": 9,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "meta-muse-1-2-model-card-current",
+        "name": "Meta Muse Spark 1.2 official benchmark card",
+        "category": "vendor capability",
+        "current_role": "First-party coding/agent benchmark evidence, retained at lower vendor weight.",
+        "acquisition_used": "Official Meta model-card/launch benchmark table.",
+        "preferred_acquisition": "Fetch complete current model-card table rather than copying one headline score.",
+        "entry_points": [
+          {
+            "label": "Meta Muse Spark model page",
+            "url": "https://developer.meta.com/ai/models/muse-spark/"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent",
+            "rows": 1
+          }
+        ],
+        "available_data": "Terminal-Bench 2.1 and deepSWE results plus model/spec information.",
+        "unused_data": "Any future expanded benchmark table, eval harness notes and ablations.",
+        "post_schema": [
+          "is_vendor_reported=1",
+          "base_weight=0.55",
+          "metric_axis=capability"
+        ],
+        "identity_keys": [
+          "muse-spark-1-2-xhigh"
+        ],
+        "caveats": "If BenchLM mirrors the same Meta score, the mirror must be display-only to prevent duplicate voting.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "medium",
+        "automation": "official HTML/model-card table",
+        "ledger": {
+          "rows": 2,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "inclusionai-ling-3-0-tiny-promotional-current",
+        "name": "Ling 3.0 Tiny promotional API pricing",
+        "category": "official/promotional pricing",
+        "current_role": "Records current free API pricing without allowing a temporary $0 denominator to create a degenerate Pareto point.",
+        "acquisition_used": "Artificial Analysis provider/model pages cross-checked against current InclusionAI/Novita availability.",
+        "preferred_acquisition": "Refresh provider price/latency from current provider pages; set use_in_aggregate=0 while pricing is promotional zero.",
+        "entry_points": [
+          {
+            "label": "AA Ling 3.0 Tiny",
+            "url": "https://artificialanalysis.ai/models/ling-3-0-tiny"
+          },
+          {
+            "label": "AA Ling providers",
+            "url": "https://artificialanalysis.ai/models/ling-3-0-tiny/providers"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "promotional_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "promotional_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          }
+        ],
+        "available_data": "AA Intelligence Index 25, 262k context, provider output speed/latency, two API providers and current $0 promotional pricing.",
+        "unused_data": "Future non-promotional list price and richer benchmark components.",
+        "post_schema": [
+          "metric_axis=cost",
+          "use_in_aggregate=0",
+          "data_freshness_class=current"
+        ],
+        "identity_keys": [
+          "ling-3-0-tiny-reasoning"
+        ],
+        "caveats": "Zero promotional price is real current availability but excluded from logarithmic/Pareto cost calculations until a durable nonzero price exists.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "high",
+        "automation": "AA API/provider page",
+        "ledger": {
+          "rows": 2,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "openrouter-current-pricing",
+        "name": "OpenRouter current provider pricing",
+        "category": "provider marketplace pricing",
+        "current_role": "Secondary provider-price evidence for discounted or alternate hosted routes; never silently replaces the project-selected first-party economic tier.",
+        "acquisition_used": "Current OpenRouter model pages/API pricing checked during the August 8 refresh.",
+        "preferred_acquisition": "Use the OpenRouter models/provider API where available; preserve exact provider/model identity, promotion state and retrieval date.",
+        "entry_points": [
+          {
+            "label": "OpenRouter models API",
+            "url": "https://openrouter.ai/api/v1/models"
+          },
+          {
+            "label": "OpenRouter Ling 3.0 Flash",
+            "url": "https://openrouter.ai/inclusionai/ling-3.0-flash"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "promotional_input_output_price",
+            "unit": "USD per 1M input tokens (output $0.063/M)",
+            "rows": 1
+          }
+        ],
+        "available_data": "Provider-specific input/output prices, context limits, model IDs and availability; some routes are temporary promotional discounts.",
+        "unused_data": "Provider routing order, throughput/latency and per-provider availability can be added when exposed in structured current endpoints.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name",
+          "raw_value",
+          "raw_unit",
+          "quality=promotional-provider-price when applicable"
+        ],
+        "identity_keys": [
+          "provider model id",
+          "canonical model key"
+        ],
+        "caveats": "Promotional or marketplace rates must be labeled and must not overwrite a user-selected first-party pricing policy without an explicit rule.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "structured API preferred; model-page fallback",
+        "ledger": {
+          "rows": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "aa-token-price-proxy-v7",
+        "name": "AA evaluation-token \u00d7 blended-price proxy",
+        "category": "internal derived cost evidence",
+        "current_role": "Extends task-cost coverage where AA exposes model-specific evaluation-token totals and pricing but an exact per-task observation is absent.",
+        "acquisition_used": "Derived locally from structured AA fields already imported into the package.",
+        "preferred_acquisition": "Fetch evaluation_token_counts and pricing from the AA detail API, calculate the full-suite proxy, and recalibrate it to the reference task-cost scale through exact model/configuration overlaps.",
+        "entry_points": [
+          {
+            "label": "AA detail endpoint pattern",
+            "url": "https://artificialanalysis.ai/api/v2/language/models/{slug}"
+          },
+          {
+            "label": "Derivation methodology",
+            "url": "ardf-research-paper.md#52-model-specific-token-count--price-proxy"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "aa_token_price_full_suite_proxy_usd",
+            "unit": "USD token-price proxy for complete AA evaluation",
+            "rows": 284
+          }
+        ],
+        "available_data": "Full evaluation token totals and blended token price, producing an evaluation-wide USD burden before calibration.",
+        "unused_data": "Separate input/output/cache token counts, per-evaluation token counts, and uncertainty bands could support multiple workload profiles rather than one blended proxy.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=aa_token_price_full_suite_proxy_usd",
+          "raw_value",
+          "raw_unit",
+          "notes=formula",
+          "cal_* fields"
+        ],
+        "identity_keys": [
+          "exact AA model/reasoning configuration"
+        ],
+        "caveats": "This is not an invoice for one task. It is a full-suite burden that only becomes comparable after log-space multipoint calibration.",
+        "coverage": {
+          "metadata": false,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "Local derivation from AA API data",
+        "ledger": {
+          "source_id": "aa-token-price-proxy-v7",
+          "label": "AA token count \u00d7 current blended token price proxy v7",
+          "publisher": "ARDF derived from structured upstream fields",
+          "version": "6.0.0",
+          "source_date": "2026-07-20",
+          "url": "https://artificialanalysis.ai/models/claude-3-5-haiku",
+          "mirror_url": "sources/attached-source-snapshots.json",
+          "retrieved_at": "2026-07-28T00:00:00-07:00",
+          "refresh_status": "carried-forward-model-specific-token-count",
+          "freshness_class": "current",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 284,
+          "capability_rows": 0,
+          "cost_rows": 284,
+          "model_count": 284,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "benchlm-current",
+        "name": "BenchLM current benchmark/model pages",
+        "category": "independent aggregation + benchmark mirror",
+        "current_role": "Adds broad recent benchmark coverage for frontier models and a sourced composite/category lens.",
+        "acquisition_used": "Server-rendered HTML extraction from the main leaderboard, model pages and benchmark pages. The v7 package imported 59 observations for seven frontier configurations.",
+        "preferred_acquisition": "Use the benchmark directory and individual benchmark/model pages. Prefer BenchLM\u2019s download-data surface when available, and preserve each row\u2019s evidence citation, support/estimate label and review date.",
+        "entry_points": [
+          {
+            "label": "Main leaderboard",
+            "url": "https://benchlm.ai/"
+          },
+          {
+            "label": "Methodology",
+            "url": "https://benchlm.ai/methodology"
+          },
+          {
+            "label": "Benchmark directory",
+            "url": "https://benchlm.ai/benchmarks"
+          },
+          {
+            "label": "Model directory",
+            "url": "https://benchlm.ai/models"
+          },
+          {
+            "label": "Provider pages",
+            "url": "https://benchlm.ai/providers"
+          },
+          {
+            "label": "Download data",
+            "url": "https://benchlm.ai/download"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent/score",
+            "rows": 6
+          },
+          {
+            "axis": "capability",
+            "metric": "benchalign_overall",
+            "unit": "percent/score",
+            "rows": 5
+          },
+          {
+            "axis": "capability",
+            "metric": "agentic_category_score",
+            "unit": "percent/score",
+            "rows": 4
+          },
+          {
+            "axis": "capability",
+            "metric": "coding_category_score",
+            "unit": "percent/score",
+            "rows": 4
+          },
+          {
+            "axis": "capability",
+            "metric": "knowledge_category_score",
+            "unit": "percent/score",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "multimodal_category_score",
+            "unit": "percent/score",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "automation_bench_pct",
+            "unit": "percent/score",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent/score",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "bfcl_v4_pct",
+            "unit": "percent",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "ifbench_pct",
+            "unit": "percent",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "kind_bench_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "humanitys_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_bench_pro_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "browsecomp_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "gpqa_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "hle_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "hmmt_feb_2026_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "imoanswerbench_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "mcp_atlas_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_bench_pro_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_multilingual_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "agents_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "gpqa_diamond_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "instruction_category_score",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "frontier_swe_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "mathvision_python_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "mls_lite_pct",
+            "unit": "percent/score",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "pinchbench_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "tau3_bench_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "scicode_pct",
+            "unit": "percent",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "benchalign_overall",
+            "unit": "BenchAlign score /100",
+            "rows": 2
+          },
+          {
+            "axis": "capability",
+            "metric": "cybergym_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "dsbench_fullstack_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "dsbench_hard_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "hle_tools_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "nl2repo_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_0_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "toolathlon_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "toolathlon_verified_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_bench_verified_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "design_arena_elo",
+            "unit": "Elo",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "aime_2025_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "claw_eval_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "livecodebench_v6_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "arcprize_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "gpqa_diamond_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "aime26_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "livecodebench_v5_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "skillsbench_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "wideresearch_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "benchlm_agentic_category",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "benchlm_coding_category",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "benchlm_agentic_category",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mcp_atlas_claim_coverage_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mrcr_v2_pct",
+            "unit": "percent",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "charxiv_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "cowork_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "job_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mathvision_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mmmu_pro_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "osworld_verified_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "paper_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "reasoning_category_score",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "skills_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          }
+        ],
+        "available_data": "BenchAlign overall/category scores, hundreds of benchmark rows, price/context/runtime columns, open/closed and lifecycle metadata, evidence citations, freshness state, and Supported versus Estimated confidence labels.",
+        "unused_data": "The full 378-model \u00d7 381-benchmark evidence directory, provider rollups, evidence-path URLs, uncertainty/support labels, price and speed dashboards, release history, leaderboard history and many non-frontier models. The current package uses only a small frontier slice.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<normalized benchmark slug>",
+          "raw_value",
+          "raw_unit",
+          "benchmark_domain",
+          "is_independent_source",
+          "quality",
+          "confidence",
+          "source_url"
+        ],
+        "identity_keys": [
+          "BenchLM model slug",
+          "displayed provider + model + reasoning mode"
+        ],
+        "caveats": "BenchAlign is itself a calibrated composite. Keep raw benchmark rows separate from the composite to avoid double counting. Do not ingest BenchLM mirrors of a vendor scorecard and the vendor scorecard as two independent votes.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "critical",
+        "automation": "HTML extraction or official data download",
+        "ledger": {
+          "source_id": "benchlm-current-frontier-2026-08-04",
+          "label": "BenchLM current frontier model pages",
+          "publisher": "BenchLM",
+          "version": "current 2026-08-04",
+          "source_date": "2026-08-04",
+          "url": "https://benchlm.ai/",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "0",
+          "independent": "1",
+          "rows": 115,
+          "capability_rows": 59,
+          "cost_rows": 0,
+          "model_count": 7,
+          "metric_count": 28,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "openai-gpt-5-6-current",
+        "name": "OpenAI GPT-5.6 current comparative evaluation table",
+        "category": "vendor comparative capability scorecard",
+        "current_role": "Supplies ten comparison metrics across seven frontier configurations, including OpenAI and competitor models.",
+        "acquisition_used": "Direct extraction of complete comparison tables from the official launch page.",
+        "preferred_acquisition": "Parse every model row and every benchmark column from the current launch/system-card tables. Store table title and footnote text in notes or a raw snapshot so harness differences survive normalization.",
+        "entry_points": [
+          {
+            "label": "GPT-5.6 launch/current benchmark table",
+            "url": "https://openai.com/index/gpt-5-6/"
+          },
+          {
+            "label": "July 30 price-performance update",
+            "url": "https://openai.com/index/advancing-the-price-performance-frontier-with-gpt-5-6/"
+          },
+          {
+            "label": "API pricing",
+            "url": "https://developers.openai.com/api/docs/pricing"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "aa_intelligence_index_vendor_table",
+            "unit": "percent/score",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "agents_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "gdpval_aa_elo",
+            "unit": "Elo",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "management_bench_pct",
+            "unit": "percent/score",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_bench_pro_pct",
+            "unit": "percent/score",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent/score",
+            "rows": 7
+          },
+          {
+            "axis": "capability",
+            "metric": "aa_coding_agent_index",
+            "unit": "percent/score",
+            "rows": 6
+          },
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent/score",
+            "rows": 6
+          },
+          {
+            "axis": "capability",
+            "metric": "browsecomp_pct",
+            "unit": "percent/score",
+            "rows": 3
+          },
+          {
+            "axis": "capability",
+            "metric": "osworld_2_0_pct",
+            "unit": "percent/score",
+            "rows": 3
+          }
+        ],
+        "available_data": "AA-style vendor table, agentic, coding, browsing, management, OS and economic-work scores across the GPT-5.6 family and selected competitors.",
+        "unused_data": "System-card safety/evaluation tables, model latency tiers, context/output limits, API feature support, batch/cache pricing and any per-domain or confidence details in footnotes.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<benchmark slug>",
+          "raw_value",
+          "raw_unit",
+          "is_vendor_reported=1",
+          "benchmark_harness",
+          "notes=<table footnote>"
+        ],
+        "identity_keys": [
+          "exact table row name + effort tier"
+        ],
+        "caveats": "Do not treat vendor comparisons as independent reruns. Competitor values copied into an OpenAI table remain vendor-reported and may use a vendor-selected harness.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "medium",
+        "automation": "Official HTML table scrape",
+        "ledger": {
+          "source_id": "openai-gpt-5-6-current-2026-07-30",
+          "label": "OpenAI GPT-5.6 current launch benchmark table",
+          "publisher": "OpenAI",
+          "version": "current 2026-07-30",
+          "source_date": "2026-07-30",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "1",
+          "independent": "0",
+          "rows": 60,
+          "capability_rows": 60,
+          "cost_rows": 0,
+          "model_count": 7,
+          "metric_count": 10,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "official-token-pricing-current",
+        "name": "Official provider token pricing \u00b7 current consolidated slice",
+        "category": "first-party price metadata",
+        "current_role": "Provides direct input/output token prices for seven frontier models.",
+        "acquisition_used": "Manual extraction from official launch, model and API documentation pages.",
+        "preferred_acquisition": "Refresh from provider pricing/model docs, then compare against models.dev and OpenRouter. Store every price dimension separately rather than collapsing immediately.",
+        "entry_points": [
+          {
+            "label": "Anthropic Opus 5 launch/pricing",
+            "url": "https://www.anthropic.com/news/claude-opus-5"
+          },
+          {
+            "label": "OpenAI GPT-5.6 launch/pricing",
+            "url": "https://openai.com/index/gpt-5-6/"
+          },
+          {
+            "label": "Google Gemini model docs",
+            "url": "https://ai.google.dev/gemini-api/docs/latest-model"
+          },
+          {
+            "label": "Kimi K3 quickstart",
+            "url": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "input_token_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 7
+          },
+          {
+            "axis": "cost",
+            "metric": "output_token_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 7
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_long_cache_write_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_long_cached_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_long_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_long_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_short_cache_write_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_short_cached_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_short_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "batch_short_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "cache_read_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "cache_write_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_long_cache_write_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_long_cached_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_long_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_long_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_short_cache_write_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_short_cached_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_short_input_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          },
+          {
+            "axis": "cost",
+            "metric": "standard_short_output_price_per_m",
+            "unit": "USD per 1M tokens",
+            "rows": 1
+          }
+        ],
+        "available_data": "Input and output USD per million tokens for the current package\u2019s selected frontier models.",
+        "unused_data": "Cache read/write prices, reasoning-token prices, batch discounts, long-context tiers, regional pricing, image/audio/video pricing, free-tier limits and version-specific retirement dates.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=input_token_price_per_m or output_token_price_per_m",
+          "raw_value",
+          "raw_unit",
+          "use_in_aggregate=0 unless converted into a task profile"
+        ],
+        "identity_keys": [
+          "official provider model ID + pricing effective date"
+        ],
+        "caveats": "Token price alone is not cost per task. Keep raw price observations outside the Pareto task-cost axis until combined with a documented token-use profile.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "Official docs scrape/API where offered",
+        "ledger": {
+          "source_id": "official-token-pricing-2026-07",
+          "label": "Official provider token pricing",
+          "publisher": "Official",
+          "version": "",
+          "source_date": "",
+          "url": "https://www.anthropic.com/news/claude-opus-5",
+          "mirror_url": "",
+          "retrieved_at": "2026-07-27T23:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 34,
+          "capability_rows": 0,
+          "cost_rows": 14,
+          "model_count": 7,
+          "metric_count": 2,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "vals-index-current-2026-08-06",
+        "name": "Vals Index current accuracy + Cost/Test",
+        "category": "independent capability + task cost",
+        "current_role": "Current independent economic-work aggregate used both as calibrated evidence and as a source-native Pareto cross-check.",
+        "acquisition_used": "Current Vals model/benchmark pages checked 2026-08-08; one current slice replaces the Jul. 23 Vals Index aggregate.",
+        "preferred_acquisition": "Fetch the current Vals Index/model pages or structured page payload. Preserve accuracy and Cost/Test as paired native metrics for each exact model identity.",
+        "entry_points": [
+          {
+            "label": "Vals home / current Index",
+            "url": "https://www.vals.ai/home"
+          },
+          {
+            "label": "Vals benchmark directory",
+            "url": "https://www.vals.ai/benchmarks"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "vals_index_accuracy_pct",
+            "unit": "percent",
+            "rows": 16
+          },
+          {
+            "axis": "cost",
+            "metric": "vals_index_cost_per_test_usd",
+            "unit": "USD per Vals Index test",
+            "rows": 15
+          }
+        ],
+        "available_data": "Vals Index accuracy, Cost/Test, and per-benchmark/model pages; many benchmark pages also expose latency, category breakdowns and task-difficulty slices.",
+        "unused_data": "Ingest current latency plus additional Vals sub-benchmarks as independent source groups only when they add non-duplicative task evidence.",
+        "post_schema": [
+          "metric_axis=capability or cost",
+          "metric_name=vals_index_accuracy / vals_cost_per_test_usd",
+          "raw_unit=percent / USD per test"
+        ],
+        "identity_keys": [
+          "exact model",
+          "reasoning/effort where published"
+        ],
+        "caveats": "Vals Cost/Test is a source-native workload cost, not the same unit/workload as AA Cost per Intelligence Index Task. It is calibrated through overlaps for ARDF and also displayed raw in a separate source-native graph.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "critical",
+        "automation": "structured page/API payload preferred",
+        "ledger": {
+          "rows": 31,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "kilo-leaderboard-current-2026-08-08",
+        "name": "KiloBench current coding-agent completion + cost/attempt",
+        "category": "independent coding-agent capability + task cost",
+        "current_role": "Source-native coding-agent Pareto cross-check for frontier models; useful because it directly pairs completion rate with real agent cost per attempt.",
+        "acquisition_used": "Current Kilo leaderboard table checked 2026-08-08.",
+        "preferred_acquisition": "Fetch the complete current leaderboard table, not only top headlines. Preserve completion, cost/attempt, rank, harness/version and retrieval date.",
+        "entry_points": [
+          {
+            "label": "Kilo live model leaderboard",
+            "url": "https://kilo.ai/leaderboard"
+          },
+          {
+            "label": "KiloBench",
+            "url": "https://kilo.ai/kilobench"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "kilo_completion_pct",
+            "unit": "percent",
+            "rows": 10
+          },
+          {
+            "axis": "cost",
+            "metric": "kilo_cost_per_attempt_usd",
+            "unit": "USD per attempt",
+            "rows": 10
+          }
+        ],
+        "available_data": "Completion rate and cost per attempt across current coding models, with additional model/catalog pages.",
+        "unused_data": "If Kilo exposes run counts, confidence intervals, task classes, token use, latency or failure categories, ingest those fields as diagnostics rather than folding them into completion.",
+        "post_schema": [
+          "metric_axis=capability or cost",
+          "metric_name=kilo_completion_pct / kilo_cost_per_attempt_usd"
+        ],
+        "identity_keys": [
+          "exact model family/version"
+        ],
+        "caveats": "Coding-agent workload only. Keep raw source-native Pareto separate from the general AA-equivalent task-cost plane.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "HTML/structured table extraction",
+        "ledger": {
+          "rows": 20,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "claw-eval-attached",
+        "name": "Claw-Eval attached snapshot",
+        "category": "agentic capability snapshot",
+        "current_role": "Adds a Pass^3-style autonomous-agent completion signal and preserves an older attached token-efficiency table.",
+        "acquisition_used": "Manual attached table import. No reproducible fetch adapter is included in v7.",
+        "preferred_acquisition": "Refresh from the official leaderboard at claw-eval.github.io and cross-check against the official GitHub repository. For task data use the Hugging Face dataset; for token-efficiency claims inspect the separate AIgenteur/ClawEval repository and do not merge it with official Claw-Eval without explicit source IDs.",
+        "entry_points": [
+          {
+            "label": "Official leaderboard",
+            "url": "https://claw-eval.github.io/"
+          },
+          {
+            "label": "Official repository",
+            "url": "https://github.com/claw-eval/claw-eval"
+          },
+          {
+            "label": "Task dataset",
+            "url": "https://huggingface.co/datasets/claw-eval/Claw-Eval"
+          },
+          {
+            "label": "Separate token-efficiency project",
+            "url": "https://github.com/AIgenteur/ClawEval"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "claw_eval_pass3_pct",
+            "unit": "percent Pass@3",
+            "rows": 22
+          }
+        ],
+        "available_data": "Official benchmark: Pass^3, completion, safety and robustness over 300 human-verified tasks, 2,159 rubrics and three trials. The attached table additionally mentions tokens per trajectory/point.",
+        "unused_data": "Average score, Pass@k, per-category completion/safety/robustness, task-level traces, audit logs, environment snapshots, language/category fields, failures and trajectory token counts.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=claw_eval_pass3_pct",
+          "raw_value",
+          "raw_unit",
+          "benchmark_harness",
+          "quality",
+          "use_in_aggregate"
+        ],
+        "identity_keys": [
+          "official leaderboard model label + exact harness/config"
+        ],
+        "caveats": "The attached snapshot contains repeated identical values and is historical. Preserve duplicate rows for provenance but exclude identical repeats from aggregate weighting. The package\u2019s referenced attached-source mirror is absent and should be repaired.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "Official HTML leaderboard + repository/HF cross-check",
+        "ledger": {
+          "source_id": "claw-eval-attached",
+          "label": "Claw-Eval attached token-efficiency table",
+          "publisher": "Claw-Eval",
+          "version": "",
+          "source_date": "",
+          "url": "https://claw-eval.github.io/",
+          "mirror_url": "",
+          "retrieved_at": "2026-07-27T23:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 22,
+          "capability_rows": 22,
+          "cost_rows": 0,
+          "model_count": 22,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "deepseek-v4-flash-0731-model-card-2026-07-31",
+        "name": "DeepSeek V4 Flash 0731 release/model-card table",
+        "category": "vendor capability scorecard",
+        "current_role": "Adds seven current agentic/coding benchmark values for the dated DeepSeek V4 Flash 0731 configuration.",
+        "acquisition_used": "Direct HTML table extraction from the official DeepSeek release note.",
+        "preferred_acquisition": "Scrape the benchmark table from the dated release page, preserve benchmark names exactly, then separately fetch current official API pricing and model specifications from DeepSeek documentation.",
+        "entry_points": [
+          {
+            "label": "Official 0731 release note",
+            "url": "https://api-docs.deepseek.com/news/news250731"
+          },
+          {
+            "label": "Official pricing",
+            "url": "https://api-docs.deepseek.com/quick_start/pricing"
+          },
+          {
+            "label": "API documentation",
+            "url": "https://api-docs.deepseek.com/"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "agents_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "automation_bench_public_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "cybergym_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "nl2repo_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "toolathlon_verified_pct",
+            "unit": "percent/score",
+            "rows": 1
+          }
+        ],
+        "available_data": "Vendor-reported scores for Agents Last Exam, Automation Bench, CyberGym, DeepSWE, NL2Repo, Terminal-Bench 2.1 and Toolathlon Verified.",
+        "unused_data": "Pricing, cache-hit pricing, context limits, multimodal/API capabilities, token throughput, system card details and any downloadable/open-weight artifacts linked from official documentation.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<benchmark slug>",
+          "raw_value",
+          "raw_unit",
+          "is_vendor_reported=1",
+          "base_weight=vendor weight",
+          "source_version=0731"
+        ],
+        "identity_keys": [
+          "deepseek-v4-flash-0731 + exact effort/reasoning mode"
+        ],
+        "caveats": "Vendor scorecards are useful coverage but should be lower-weight than independent reruns. Never merge 0731 with an earlier V4 Flash identity.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "medium",
+        "automation": "Official HTML table scrape + official pricing page",
+        "ledger": {
+          "source_id": "deepseek-v4-flash-0731-model-card-2026-07-31",
+          "label": "DeepSeek V4 Flash 0731 model-card benchmark table",
+          "publisher": "DeepSeek",
+          "version": "0731",
+          "source_date": "2026-07-31",
+          "url": "https://api-docs.deepseek.com/news/news250731",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "1",
+          "independent": "0",
+          "rows": 7,
+          "capability_rows": 7,
+          "cost_rows": 0,
+          "model_count": 1,
+          "metric_count": 7,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "livebench-2026-06-25",
+        "name": "LiveBench release 2026-06-25",
+        "category": "independent objective capability benchmark",
+        "current_role": "Supplies an objective overall capability score across seven categories for 45 configurations.",
+        "acquisition_used": "Official release CSV mirrored from the LiveBench repository/site; v7 keeps only the overall score.",
+        "preferred_acquisition": "Pin a LiveBench release. Pull generated all_groups.csv and all_tasks.csv from the official repository/output, or reproduce them with show_livebench_result.py. Record the release option and question source.",
+        "entry_points": [
+          {
+            "label": "Official leaderboard",
+            "url": "https://livebench.ai/"
+          },
+          {
+            "label": "Official repository",
+            "url": "https://github.com/livebench/livebench"
+          },
+          {
+            "label": "Paper",
+            "url": "https://arxiv.org/abs/2406.19314"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "livebench_overall_pct",
+            "unit": "percent",
+            "rows": 45
+          }
+        ],
+        "available_data": "Overall score, seven category scores, 23 task scores, release version, task/question source, model errors and website-displayed run cost.",
+        "unused_data": "All seven category columns, all task-level columns, per-model run cost, failure/error counts, older releases and release-to-release regression analysis. The official tooling explicitly emits all_groups.csv and all_tasks.csv.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=livebench_overall_pct or livebench_<category/task>",
+          "benchmark_version_exact=<release>",
+          "raw_value",
+          "raw_unit",
+          "source_date"
+        ],
+        "identity_keys": [
+          "LiveBench model ID + prompt/reasoning configuration"
+        ],
+        "caveats": "Never combine different LiveBench releases in one source slice. Use separate source IDs if historical comparisons are intentionally retained.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "medium",
+        "automation": "Repository CSV preferred; HTML fallback",
+        "ledger": {
+          "source_id": "livebench-2026-06-25",
+          "label": "LiveBench 2026-06-25",
+          "publisher": "LiveBench",
+          "version": "2026-06-25",
+          "source_date": "2026-06-25",
+          "url": "https://livebench.ai/",
+          "mirror_url": "https://benchlm.ai/benchmarks/liveBench",
+          "retrieved_at": "2026-07-28T02:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 45,
+          "capability_rows": 45,
+          "cost_rows": 0,
+          "model_count": 45,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "qwen3-8-max-stable-scorecard-2026-08-03",
+        "name": "Qwen3.8 Max stable-release scorecard",
+        "category": "vendor capability scorecard",
+        "current_role": "Adds fifteen benchmark values for Qwen3.8 Max.",
+        "acquisition_used": "Official Qwen blog table extraction, with BenchLM used as a mirror/cross-check.",
+        "preferred_acquisition": "Parse the official release blog/model card and preserve every row, model mode and footnote. Use the BenchLM model page only as a verification mirror, not a second independent source.",
+        "entry_points": [
+          {
+            "label": "Official Qwen release blog",
+            "url": "https://qwen.ai/blog?id=qwen3.8"
+          },
+          {
+            "label": "BenchLM cross-check",
+            "url": "https://benchlm.ai/models/qwen-3-8-max"
+          },
+          {
+            "label": "Alibaba Model Studio catalog/pricing",
+            "url": "https://help.aliyun.com/zh/model-studio/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "agents_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "automation_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "cowork_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "deep_swe_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "frontier_swe_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "gpqa_diamond_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "humanitys_last_exam_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mathvision_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mathvision_python_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "mmmu_pro_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "osworld_verified_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "paper_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "skills_bench_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "swe_bench_pro_pct",
+            "unit": "percent/score",
+            "rows": 1
+          },
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent/score",
+            "rows": 1
+          }
+        ],
+        "available_data": "Fifteen vendor-reported benchmark scores spanning agents, coding, math, multimodal, research and computer use.",
+        "unused_data": "Architecture/parameter details, active parameters, context/output limits, modalities, open-weight/model-card links, inference recommendations, pricing tiers and benchmark harness footnotes.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<benchmark slug>",
+          "raw_value",
+          "raw_unit",
+          "is_vendor_reported=1",
+          "use_in_aggregate=0 when duplicate of mirror"
+        ],
+        "identity_keys": [
+          "qwen3.8-max + exact reasoning mode"
+        ],
+        "caveats": "The current rows are marked duplicate of the BenchLM mirror and excluded from weighting. A future refresh should choose the official scorecard as canonical and mark the mirror as verification-only.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "Official HTML/model-card table scrape",
+        "ledger": {
+          "source_id": "qwen3-8-max-stable-scorecard-2026-08-03",
+          "label": "Qwen3.8 Max stable-release scorecard",
+          "publisher": "Alibaba Qwen",
+          "version": "stable 2026-08-03",
+          "source_date": "2026-08-03",
+          "url": "https://qwen.ai/blog?id=qwen3.8-max",
+          "mirror_url": "https://benchlm.ai/models/qwen-3-8-max",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "1",
+          "independent": "0",
+          "rows": 15,
+          "capability_rows": 15,
+          "cost_rows": 0,
+          "model_count": 1,
+          "metric_count": 15,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "qwencloud-pricing-2026-08-03",
+        "name": "Alibaba Cloud Qwen3.8 Max pricing",
+        "category": "first-party price metadata",
+        "current_role": "Adds a blended token-price observation for the stable Qwen3.8 Max release.",
+        "acquisition_used": "Manual extraction from the Alibaba Model Studio model catalog.",
+        "preferred_acquisition": "Parse the exact model row and all context-tier/cache/batch price columns. Preserve region/currency and effective date.",
+        "entry_points": [
+          {
+            "label": "Alibaba Model Studio models/pricing",
+            "url": "https://help.aliyun.com/zh/model-studio/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "blended_token_price_per_m",
+            "unit": "USD per 1M blended tokens",
+            "rows": 1
+          }
+        ],
+        "available_data": "Current package: one blended USD-per-million-token value.",
+        "unused_data": "Separate input/output rates, context-length tiers, cache pricing, batch/discount plans, regional availability and model retirement/version notes.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=blended_token_price_per_m",
+          "raw_value",
+          "raw_unit",
+          "source_date",
+          "notes=<pricing tier>"
+        ],
+        "identity_keys": [
+          "Alibaba Cloud deployment/model ID + region + effective date"
+        ],
+        "caveats": "A blended rate hides workload mix. Prefer separate input/output/cache rows and derive scenario-specific task cost later.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "Official documentation table scrape",
+        "ledger": {
+          "source_id": "qwencloud-pricing-2026-08-03",
+          "label": "QwenCloud stable Qwen3.8 Max token pricing",
+          "publisher": "Alibaba Cloud",
+          "version": "stable 2026-08-03",
+          "source_date": "2026-08-03",
+          "url": "https://help.aliyun.com/zh/model-studio/models",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "1",
+          "independent": "0",
+          "rows": 1,
+          "capability_rows": 0,
+          "cost_rows": 1,
+          "model_count": 1,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "skatebench-official-attached",
+        "name": "SkateBench official attached table",
+        "category": "task-specific capability + observed cost",
+        "current_role": "Provides success rate and cost per successful run for 24 models.",
+        "acquisition_used": "Manual attached CSV/table import; no packaged live refresh adapter.",
+        "preferred_acquisition": "Inspect the open-source repository first for generated JSON/CSV or embedded visualizer data. If no stable file exists, scrape all four server-rendered views from the public site and save a dated raw snapshot.",
+        "entry_points": [
+          {
+            "label": "Live dashboard",
+            "url": "https://skatebench.t3.gg/"
+          },
+          {
+            "label": "Open-source repository",
+            "url": "https://github.com/t3-content/skatebench"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "skatebench_cost_per_success_usd",
+            "unit": "USD per successful run",
+            "rows": 24
+          },
+          {
+            "axis": "capability",
+            "metric": "skatebench_success_rate_pct",
+            "unit": "percent success",
+            "rows": 24
+          }
+        ],
+        "available_data": "Accuracy/success, cost per success, average cost, token use, duration, throughput and errors are represented in the original attached table.",
+        "unused_data": "The live site exposes Accuracy, Cost, Speed and Matrix views; the repository may expose raw run data or the visualizer data bundle. Current v7 retains only success and cost-per-success rows.",
+        "post_schema": [
+          "capability row + cost row per model/configuration",
+          "benchmark_version_exact=official",
+          "raw_value",
+          "raw_unit",
+          "notes=<correct/tests or token-cost detail>"
+        ],
+        "identity_keys": [
+          "exact site model ID including reasoning level"
+        ],
+        "caveats": "Skateboarding knowledge is a narrow domain and should receive modest capability weight. Keep official and v2 versions separate. The referenced packaged attached-source snapshot is currently missing.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "high",
+        "automation": "Repository data extraction preferred; HTML tabs fallback",
+        "ledger": {
+          "source_id": "skatebench-official-attached",
+          "label": "SkateBench official attached all-model table",
+          "publisher": "SkateBench",
+          "version": "",
+          "source_date": "",
+          "url": "https://skatebench.dev/",
+          "mirror_url": "",
+          "retrieved_at": "2026-07-27T23:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 48,
+          "capability_rows": 24,
+          "cost_rows": 24,
+          "model_count": 24,
+          "metric_count": 2,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "skatebench-v2-attached",
+        "name": "SkateBench visible v2 attached table",
+        "category": "task-specific capability + observed cost",
+        "current_role": "Provides separate v2 accuracy and cost-per-success rows for 15 models.",
+        "acquisition_used": "Manual attached CSV/table import; no packaged live refresh adapter.",
+        "preferred_acquisition": "Inspect the open-source repository first for generated JSON/CSV or embedded visualizer data. If no stable file exists, scrape all four server-rendered views from the public site and save a dated raw snapshot.",
+        "entry_points": [
+          {
+            "label": "Live dashboard",
+            "url": "https://skatebench.t3.gg/"
+          },
+          {
+            "label": "Open-source repository",
+            "url": "https://github.com/t3-content/skatebench"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "skatebench_v2_accuracy_pct",
+            "unit": "percent accuracy",
+            "rows": 15
+          },
+          {
+            "axis": "cost",
+            "metric": "skatebench_v2_cost_per_success_usd",
+            "unit": "USD per successful run",
+            "rows": 15
+          }
+        ],
+        "available_data": "Accuracy and cost-per-success for the v2 view.",
+        "unused_data": "Speed, matrix-level results, per-question outcomes, token totals, duration/TPS and the full current 28-model table are not imported.",
+        "post_schema": [
+          "capability row + cost row per model/configuration",
+          "benchmark_version_exact=v2",
+          "raw_value",
+          "raw_unit",
+          "notes=<correct/tests or token-cost detail>"
+        ],
+        "identity_keys": [
+          "exact site model ID including reasoning level"
+        ],
+        "caveats": "Skateboarding knowledge is a narrow domain and should receive modest capability weight. Keep official and v2 versions separate. The referenced packaged attached-source snapshot is currently missing.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "refresh_priority": "high",
+        "automation": "Repository data extraction preferred; HTML tabs fallback",
+        "ledger": {
+          "source_id": "skatebench-v2-attached",
+          "label": "SkateBench visible v2 attached table",
+          "publisher": "SkateBench",
+          "version": "",
+          "source_date": "",
+          "url": "https://skatebench.dev/",
+          "mirror_url": "",
+          "retrieved_at": "2026-07-27T23:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 30,
+          "capability_rows": 15,
+          "cost_rows": 15,
+          "model_count": 15,
+          "metric_count": 2,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "standard-task-price-proxy-v7",
+        "name": "Standardized task token-price estimator",
+        "category": "internal derived cost evidence",
+        "current_role": "Gives a transparent fallback X coordinate to priced configurations that lack measured task usage.",
+        "acquisition_used": "Local derivation from catalog input/output prices and effort-specific standard token profiles.",
+        "preferred_acquisition": "Recompute after every models.dev/official price refresh. Version the task profile and keep each scenario as a distinct metric rather than silently changing constants.",
+        "entry_points": [
+          {
+            "label": "Current methodology",
+            "url": "ardf-research-paper.md#53-standardized-task-token-price-estimate"
+          },
+          {
+            "label": "Calibration configuration",
+            "url": "project-config.json"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "standardized_task_price_proxy_usd",
+            "unit": "estimated USD per standardized task",
+            "rows": 413
+          }
+        ],
+        "available_data": "Estimated standardized-task USD using 12k input tokens plus effort-adjusted output/reasoning-equivalent tokens.",
+        "unused_data": "Multiple task profiles, uncertainty ranges, cached-input scenarios, long-context surcharge tiers, batch discounts, provider-specific routing prices and empirically learned token profiles by task class.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=standardized_task_price_proxy_usd",
+          "quality=estimated",
+          "base_weight=low",
+          "notes=formula/profile version",
+          "cal_* fields"
+        ],
+        "identity_keys": [
+          "catalog model_key + effort + task profile version"
+        ],
+        "caveats": "This is a modelled coordinate, not observed cost. Keep the quality flag visible and let users filter it out.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "high",
+        "automation": "Local deterministic derivation",
+        "ledger": {
+          "source_id": "standard-task-price-proxy-v7",
+          "label": "Standardized task token-price estimator v7",
+          "publisher": "ARDF",
+          "version": "2026-08-04",
+          "source_date": "2026-08-04",
+          "url": "ardf-research-paper.md",
+          "mirror_url": "",
+          "retrieved_at": "2026-08-04T11:52:00-07:00",
+          "refresh_status": "refreshed-current",
+          "freshness_class": "current-2026-08",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 413,
+          "capability_rows": 0,
+          "cost_rows": 587,
+          "model_count": 587,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "user-best-cost-attached",
+        "name": "User-supplied best-cost table",
+        "category": "manual cost snapshot",
+        "current_role": "Supplies source-specific cost values for 47 configurations.",
+        "acquisition_used": "Manual CSV upload.",
+        "preferred_acquisition": "Require a companion provenance manifest for every row: upstream source URL, metric definition, currency, benchmark/task scope, retrieval date and calculation formula. Preserve the original file hash.",
+        "entry_points": [
+          {
+            "label": "Expected packaged mirror",
+            "url": "sources/attached-source-snapshots.json"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "cost",
+            "metric": "user_best_cost_usd",
+            "unit": "USD source-specific cost",
+            "rows": 47
+          }
+        ],
+        "available_data": "One source-specific cost value per imported model.",
+        "unused_data": "The original upstream URL, benchmark scope, token counts, calculation method and uncertainty are missing from the current package.",
+        "post_schema": [
+          "metric_axis=cost",
+          "metric_name=user_best_cost_usd",
+          "source_url=<real upstream URL>",
+          "notes=<formula/scope>",
+          "quality=<verified or unknown>"
+        ],
+        "identity_keys": [
+          "uploaded model label crosswalked to exact model_key"
+        ],
+        "caveats": "The referenced packaged mirror does not exist in v7. Treat these rows as low-confidence until the original CSV and provenance are restored.",
+        "coverage": {
+          "metadata": false,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "Manual import with mandatory provenance manifest",
+        "ledger": {
+          "source_id": "user-best-cost-attached",
+          "label": "User-supplied best cost table",
+          "publisher": "User-supplied",
+          "version": "",
+          "source_date": "",
+          "url": "sources/attached-source-snapshots.json",
+          "mirror_url": "sources/attached-source-snapshots.json",
+          "retrieved_at": "2026-07-27T23:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "historical-snapshot",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 47,
+          "capability_rows": 0,
+          "cost_rows": 47,
+          "model_count": 47,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "vals-swe-bench-2026-07-22",
+        "name": "Vals SWE-bench mirror",
+        "category": "independent/proprietary capability benchmark",
+        "current_role": "Vals-hosted SWE-bench score.",
+        "acquisition_used": "Server-rendered benchmark-table extraction, with BenchLM mirror pages used during the original v5 import.",
+        "preferred_acquisition": "Start at the live Vals benchmark directory, open the exact benchmark detail page, extract every displayed model row, rank, score, update date and mode/harness label, and save the page/JSON payload as a dated raw snapshot.",
+        "entry_points": [
+          {
+            "label": "Exact benchmark page",
+            "url": "https://www.vals.ai/benchmarks/swebench"
+          },
+          {
+            "label": "Full Vals benchmark directory",
+            "url": "https://www.vals.ai/benchmarks"
+          },
+          {
+            "label": "Vals model directory",
+            "url": "https://www.vals.ai/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "vals_swe_bench_pct",
+            "unit": "percent",
+            "rows": 74
+          }
+        ],
+        "available_data": "Model score, rank, benchmark update date, model count and benchmark description. The directory exposes many additional current benchmarks.",
+        "unused_data": "Current model count, harness/model-mode details, ranks, and newer benchmark versions should be refreshed; compare with the official SWE-bench leaderboard to avoid treating a mirror as canonical.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<vals benchmark slug>",
+          "raw_value",
+          "raw_unit=percent",
+          "source_date=<page updated date>",
+          "benchmark_version_exact",
+          "notes=<rank/model count>"
+        ],
+        "identity_keys": [
+          "Vals displayed model + mode/reasoning label"
+        ],
+        "caveats": "The v7 snapshots are dated July 22\u201323 while the live Vals directory now shows August updates. Refresh them. Do not double-count Vals mirrors of official benchmarks alongside the official leaderboard without a correlation/down-weighting rule.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "HTML table extraction; inspect network payload if stable",
+        "ledger": {
+          "source_id": "vals-swe-bench-2026-07-22",
+          "label": "Vals SWE-bench mirror",
+          "publisher": "Vals AI",
+          "version": "2026-07-22",
+          "source_date": "2026-07-22",
+          "url": "https://www.vals.ai/benchmarks/swebench",
+          "mirror_url": "https://benchlm.ai/benchmarks/valsSweBench",
+          "retrieved_at": "2026-07-28T02:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "current",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 74,
+          "capability_rows": 74,
+          "cost_rows": 0,
+          "model_count": 74,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "vals-terminal-bench-2-1-2026-07-22",
+        "name": "Vals Terminal-Bench 2.1",
+        "category": "independent/proprietary capability benchmark",
+        "current_role": "Terminal-agent task accuracy.",
+        "acquisition_used": "Server-rendered benchmark-table extraction, with BenchLM mirror pages used during the original v5 import.",
+        "preferred_acquisition": "Start at the live Vals benchmark directory, open the exact benchmark detail page, extract every displayed model row, rank, score, update date and mode/harness label, and save the page/JSON payload as a dated raw snapshot.",
+        "entry_points": [
+          {
+            "label": "Exact benchmark page",
+            "url": "https://www.vals.ai/benchmarks/terminal-bench-2-1"
+          },
+          {
+            "label": "Full Vals benchmark directory",
+            "url": "https://www.vals.ai/benchmarks"
+          },
+          {
+            "label": "Vals model directory",
+            "url": "https://www.vals.ai/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "terminal_bench_2_1_pct",
+            "unit": "percent",
+            "rows": 44
+          }
+        ],
+        "available_data": "Model score, rank, benchmark update date, model count and benchmark description. The directory exposes many additional current benchmarks.",
+        "unused_data": "Current rows, model modes, harness details and the official Terminal-Bench results/registry are not imported.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<vals benchmark slug>",
+          "raw_value",
+          "raw_unit=percent",
+          "source_date=<page updated date>",
+          "benchmark_version_exact",
+          "notes=<rank/model count>"
+        ],
+        "identity_keys": [
+          "Vals displayed model + mode/reasoning label"
+        ],
+        "caveats": "The v7 snapshots are dated July 22\u201323 while the live Vals directory now shows August updates. Refresh them. Do not double-count Vals mirrors of official benchmarks alongside the official leaderboard without a correlation/down-weighting rule.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "HTML table extraction; inspect network payload if stable",
+        "ledger": {
+          "source_id": "vals-terminal-bench-2-1-2026-07-22",
+          "label": "Vals Terminal-Bench 2.1",
+          "publisher": "Vals AI",
+          "version": "2.1",
+          "source_date": "2026-07-22",
+          "url": "https://www.vals.ai/benchmarks/terminal-bench-2-1",
+          "mirror_url": "https://benchlm.ai/benchmarks/valsTerminalBench21",
+          "retrieved_at": "2026-07-28T02:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "current",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 44,
+          "capability_rows": 44,
+          "cost_rows": 0,
+          "model_count": 44,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      },
+      {
+        "source_id": "vals-vibe-code-v1-1-2026-07-23",
+        "name": "Vals Vibe Code Bench v1.1",
+        "category": "independent/proprietary capability benchmark",
+        "current_role": "End-to-end web-application implementation score.",
+        "acquisition_used": "Server-rendered benchmark-table extraction, with BenchLM mirror pages used during the original v5 import.",
+        "preferred_acquisition": "Start at the live Vals benchmark directory, open the exact benchmark detail page, extract every displayed model row, rank, score, update date and mode/harness label, and save the page/JSON payload as a dated raw snapshot.",
+        "entry_points": [
+          {
+            "label": "Exact benchmark page",
+            "url": "https://www.vals.ai/benchmarks/vibe-code"
+          },
+          {
+            "label": "Full Vals benchmark directory",
+            "url": "https://www.vals.ai/benchmarks"
+          },
+          {
+            "label": "Vals model directory",
+            "url": "https://www.vals.ai/models"
+          }
+        ],
+        "current_metrics": [
+          {
+            "axis": "capability",
+            "metric": "vibe_code_bench_pct",
+            "unit": "percent",
+            "rows": 73
+          }
+        ],
+        "available_data": "Model score, rank, benchmark update date, model count and benchmark description. The directory exposes many additional current benchmarks.",
+        "unused_data": "The current live page has more models and recent releases. Per-dimension app quality, task details, artifacts or rubric breakdowns may be available on the detail page/platform.",
+        "post_schema": [
+          "metric_axis=capability",
+          "metric_name=<vals benchmark slug>",
+          "raw_value",
+          "raw_unit=percent",
+          "source_date=<page updated date>",
+          "benchmark_version_exact",
+          "notes=<rank/model count>"
+        ],
+        "identity_keys": [
+          "Vals displayed model + mode/reasoning label"
+        ],
+        "caveats": "The v7 snapshots are dated July 22\u201323 while the live Vals directory now shows August updates. Refresh them. Do not double-count Vals mirrors of official benchmarks alongside the official leaderboard without a correlation/down-weighting rule.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "refresh_priority": "critical",
+        "automation": "HTML table extraction; inspect network payload if stable",
+        "ledger": {
+          "source_id": "vals-vibe-code-v1-1-2026-07-23",
+          "label": "Vibe Code Bench v1.1",
+          "publisher": "Vals AI",
+          "version": "1.1",
+          "source_date": "2026-07-23",
+          "url": "https://www.vals.ai/benchmarks/vibe-code",
+          "mirror_url": "https://benchlm.ai/benchmarks/vibeCodeBench",
+          "retrieved_at": "2026-07-28T02:30:00-07:00",
+          "refresh_status": "retained-source-snapshot",
+          "freshness_class": "current",
+          "vendor_reported": "0",
+          "independent": "0",
+          "rows": 73,
+          "capability_rows": 73,
+          "cost_rows": 0,
+          "model_count": 73,
+          "metric_count": 1,
+          "refreshed": "2026-08-08"
+        }
+      }
+    ],
+    "future_sources": [
+      {
+        "name": "SWE-bench official leaderboards and experiment records",
+        "priority": "critical",
+        "entry_points": [
+          "https://www.swebench.com/",
+          "https://github.com/swe-bench/swe-bench.github.io",
+          "https://github.com/swe-bench/experiments"
+        ],
+        "acquisition": "Read data/leaderboards.json for the rendered leaderboard and ingest submission directories from the experiments repository for predictions, results, logs and trajectories.",
+        "likely_findings": "Verified/Lite/Multimodal scores, exact agent scaffold and submission date, trajectories, execution logs, model/provider labels and reproducibility metadata.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "value": "Canonical coding-agent source; resolves ambiguity introduced by Vals/BenchLM mirrors and lets the project distinguish model from scaffold."
+      },
+      {
+        "name": "Terminal-Bench official leaderboard and registry",
+        "priority": "critical",
+        "entry_points": [
+          "https://www.tbench.ai/",
+          "https://www.tbench.ai/registry",
+          "https://www.tbench.ai/benchmarks/terminal-bench-2"
+        ],
+        "acquisition": "Use the official leaderboard/registry data or scrape the versioned benchmark page. Record benchmark version, agent harness, environment image and task registry commit.",
+        "likely_findings": "Terminal-Bench 2.1/2.0 success, task-level results, model-agent combinations, registry metadata and challenge-specific evidence.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "value": "Independent source for one of the most influential agentic metrics already appearing in vendor tables."
+      },
+      {
+        "name": "Berkeley Function Calling Leaderboard (BFCL V4)",
+        "priority": "critical",
+        "entry_points": [
+          "https://gorilla.cs.berkeley.edu/leaderboard.html",
+          "https://github.com/ShishirPatil/gorilla"
+        ],
+        "acquisition": "Parse the official leaderboard or repository result artifacts at the pinned evaluation commit/package version.",
+        "likely_findings": "Overall and subcategory tool-use accuracy, agentic/multi-turn/live/non-live/hallucination scores, estimated total benchmark cost, latency, function-calling mode and format sensitivity.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": false,
+          "latency_or_speed": true
+        },
+        "value": "Rare source that provides capability, benchmark-wide USD cost and latency together, ideal for direct Pareto evidence."
+      },
+      {
+        "name": "Aider Polyglot coding leaderboard",
+        "priority": "high",
+        "entry_points": [
+          "https://aider.chat/docs/leaderboards/",
+          "https://aider.chat/docs/leaderboards/notes.html"
+        ],
+        "acquisition": "Scrape the official leaderboard table and preserve command/model string, effort, edit format and benchmark version.",
+        "likely_findings": "Percent correct, total benchmark cost, correct-edit-format rate, edit format and exact invocation command.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "value": "Another direct capability-plus-cost source, with transparent coding workflow configuration."
+      },
+      {
+        "name": "LiveCodeBench official leaderboard",
+        "priority": "high",
+        "entry_points": [
+          "https://livecodebench.github.io/leaderboard.html",
+          "https://github.com/livecodebench/livecodebench"
+        ],
+        "acquisition": "Use official repository result files or the rendered leaderboard. Pin release_v1/release_v2, date window, scenario and fast/full setting.",
+        "likely_findings": "Pass@1 by difficulty, code generation, self-repair, execution and output-prediction scenarios, time-window freshness and model configuration.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "value": "Contamination-limited coding evidence that complements SWE-bench\u2019s repository repair focus."
+      },
+      {
+        "name": "Epoch AI Benchmarking database",
+        "priority": "high",
+        "entry_points": [
+          "https://epoch.ai/benchmarks",
+          "https://epoch.ai/benchmarks/use-this-data",
+          "https://epoch.ai/data/ai-models"
+        ],
+        "acquisition": "Download the official CSV or use the epochai Python client/Airtable API. Preserve whether each value was evaluated by Epoch or collected from an external official source.",
+        "likely_findings": "Many benchmark/model pairs, evaluation setup, repeats, source provenance, model release metadata and confidence/strict-scoring context.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "value": "High-quality normalization layer with explicit provenance and downloadable structured data."
+      },
+      {
+        "name": "Arena / LMArena leaderboard dataset",
+        "priority": "high",
+        "entry_points": [
+          "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+          "https://huggingface.co/spaces/lmarena-ai/arena-leaderboard",
+          "https://arena.ai/blog/arena-leaderboard-dataset"
+        ],
+        "acquisition": "Load the official Hugging Face Parquet dataset rather than scraping the UI. Pin methodology/changelog version and arena type.",
+        "likely_findings": "Human-preference ratings, confidence intervals, sample counts, category/style controls, text/vision/agent arenas and historical snapshots.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": false
+        },
+        "value": "Adds human preference and confidence intervals, a useful orthogonal signal to automatic task benchmarks."
+      },
+      {
+        "name": "OpenRouter Models and provider-performance API",
+        "priority": "high",
+        "entry_points": [
+          "https://openrouter.ai/docs/api/api-reference/models/get-models",
+          "https://openrouter.ai/api/v1/models"
+        ],
+        "acquisition": "Call the public models API; optionally query provider/model performance and generation records with authenticated access.",
+        "likely_findings": "Model/provider availability, exact routing IDs, pricing structures, context, architecture, supported parameters, creation date, recent throughput/latency and popularity/token-volume sorting.",
+        "coverage": {
+          "metadata": true,
+          "capability": false,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "value": "Best provider-routing and live-market complement to models.dev. Avoid using its AA-derived intelligence field as a new independent benchmark."
+      },
+      {
+        "name": "Stanford HELM Capabilities",
+        "priority": "medium",
+        "entry_points": [
+          "https://crfm.stanford.edu/helm/index.html",
+          "https://crfm.stanford.edu/helm/capabilities/"
+        ],
+        "acquisition": "Use HELM result artifacts/framework outputs for a pinned leaderboard version, not screenshots.",
+        "likely_findings": "Scenario-level accuracy, calibration, robustness, fairness, efficiency and full prompt-level transparency under reproducible settings.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": true,
+          "latency_or_speed": true
+        },
+        "value": "Broad reproducible academic evidence and detailed prompt-level auditability."
+      },
+      {
+        "name": "OSWorld / OSWorld 2.0 official results",
+        "priority": "high",
+        "entry_points": [
+          "https://osworld-v1.xlang.ai/",
+          "https://github.com/xlang-ai/OSWorld"
+        ],
+        "acquisition": "Ingest official team-verified result tables and trajectory links. Record OSWorld version, agent scaffold, step budget and tool mode.",
+        "likely_findings": "Computer-use completion, partial score, model-agent configuration, verified trajectories, step/tool-call counts and safety reports.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "value": "Adds genuine GUI/computer-use evidence for models whose marketing tables currently dominate that domain."
+      },
+      {
+        "name": "BigCodeBench official leaderboard",
+        "priority": "medium",
+        "entry_points": [
+          "https://bigcode-bench.github.io/",
+          "https://github.com/bigcode-project/bigcodebench"
+        ],
+        "acquisition": "Use official leaderboard data or evaluation-harness outputs, pin Full/Hard, Complete/Instruct and version.",
+        "likely_findings": "Pass@1 for practical multi-library code generation, hard/full subsets, instruction variants, model size and evaluation timing metadata.",
+        "coverage": {
+          "metadata": true,
+          "capability": true,
+          "cost_or_price": false,
+          "token_usage": false,
+          "latency_or_speed": true
+        },
+        "value": "Broadens coding beyond repository patching into complex API/library use."
+      },
+      {
+        "name": "METR time-horizon evaluations",
+        "priority": "medium",
+        "entry_points": [
+          "https://metr.org/research/",
+          "https://github.com/METR"
+        ],
+        "acquisition": "Use published result datasets/appendices and model-run metadata from the official research release. Preserve task suite, elicitation and scaffold.",
+        "likely_findings": "50%-success task time horizon, long-horizon autonomy curves, task duration, run cost/token use where disclosed, and scaffold sensitivity.",
+        "coverage": {
+          "metadata": false,
+          "capability": true,
+          "cost_or_price": true,
+          "token_usage": true,
+          "latency_or_speed": false
+        },
+        "value": "Adds a different notion of capability: how long a task an agent can reliably complete, rather than one-shot benchmark accuracy."
+      }
+    ]
+  },
+  "source_ledger": {
+    "_meta": {
+      "title": "ARDF v7.3 source ledger",
+      "version": "7.3.0",
+      "updated": "2026-08-08",
+      "model": "GPT-5.6 Sol",
+      "reasoning_level": "high",
+      "source_methodology": "ardf-research-paper.md",
+      "source_acquisition_manifest": "project-config.json"
+    },
+    "models_dev": {
+      "source_id": "models-dev-current",
+      "url": "https://models.dev/api.json",
+      "site": "https://models.dev/",
+      "role": "static metadata only; never benchmark evidence",
+      "exact_current_catalog_rows": 44,
+      "compatible_fallback_catalog_rows": 639,
+      "live_sync_script": "scripts/sync_models_dev.py"
+    },
+    "observation_sources": [
+      {
+        "source_id": "artificial-analysis-current",
+        "label": "Artificial Analysis current",
+        "publisher": "Artificial Analysis",
+        "version": "current model pages checked 2026-08-04",
+        "source_date": "",
+        "url": "https://artificialanalysis.ai/models/apertus-70b-instruct",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 731,
+        "capability_rows": 570,
+        "cost_rows": 112
+      },
+      {
+        "source_id": "standard-task-price-proxy-v7",
+        "label": "Standardized task token-price proxy",
+        "publisher": "ARDF derived",
+        "version": "7.2.0",
+        "source_date": "2026-08-08",
+        "url": "project-config.json",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 413,
+        "capability_rows": 0,
+        "cost_rows": 413
+      },
+      {
+        "source_id": "aa-token-price-proxy-v7",
+        "label": "AA token count \u00d7 current blended token price proxy v7",
+        "publisher": "ARDF derived from structured upstream fields",
+        "version": "6.0.0",
+        "source_date": "2026-07-20",
+        "url": "https://artificialanalysis.ai/models/claude-3-5-haiku",
+        "mirror_url": "sources/attached-source-snapshots.json",
+        "retrieved_at": "2026-07-28T00:00:00-07:00",
+        "rows": 284,
+        "capability_rows": 0,
+        "cost_rows": 284
+      },
+      {
+        "source_id": "benchlm-current",
+        "label": "BenchLM current",
+        "publisher": "BenchLM",
+        "version": "current 2026-08-04",
+        "source_date": "2026-08-04",
+        "url": "https://benchlm.ai/",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 115,
+        "capability_rows": 115,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "vals-swe-bench-2026-07-22",
+        "label": "Vals SWE-bench mirror",
+        "publisher": "Vals AI",
+        "version": "2026-07-22",
+        "source_date": "2026-07-22",
+        "url": "https://www.vals.ai/benchmarks/swebench",
+        "mirror_url": "https://benchlm.ai/benchmarks/valsSweBench",
+        "retrieved_at": "2026-07-28T02:30:00-07:00",
+        "rows": 74,
+        "capability_rows": 74,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "vals-vibe-code-v1-1-2026-07-23",
+        "label": "Vibe Code Bench v1.1",
+        "publisher": "Vals AI",
+        "version": "1.1",
+        "source_date": "2026-07-23",
+        "url": "https://www.vals.ai/benchmarks/vibe-code",
+        "mirror_url": "https://benchlm.ai/benchmarks/vibeCodeBench",
+        "retrieved_at": "2026-07-28T02:30:00-07:00",
+        "rows": 73,
+        "capability_rows": 73,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "openai-gpt-5-6-current",
+        "label": "OpenAI GPT-5.6 current launch benchmark table",
+        "publisher": "OpenAI",
+        "version": "current 2026-07-30",
+        "source_date": "2026-07-30",
+        "url": "https://openai.com/index/gpt-5-6/",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 60,
+        "capability_rows": 60,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "skatebench-official-attached",
+        "label": "SkateBench official attached all-model table",
+        "publisher": "SkateBench",
+        "version": "",
+        "source_date": "",
+        "url": "https://skatebench.dev/",
+        "mirror_url": "",
+        "retrieved_at": "2026-07-27T23:30:00-07:00",
+        "rows": 48,
+        "capability_rows": 24,
+        "cost_rows": 24
+      },
+      {
+        "source_id": "user-best-cost-attached",
+        "label": "User-supplied best cost table",
+        "publisher": "User-supplied",
+        "version": "",
+        "source_date": "",
+        "url": "sources/attached-source-snapshots.json",
+        "mirror_url": "sources/attached-source-snapshots.json",
+        "retrieved_at": "2026-07-27T23:30:00-07:00",
+        "rows": 47,
+        "capability_rows": 0,
+        "cost_rows": 47
+      },
+      {
+        "source_id": "livebench-2026-06-25",
+        "label": "LiveBench 2026-06-25",
+        "publisher": "LiveBench",
+        "version": "2026-06-25",
+        "source_date": "2026-06-25",
+        "url": "https://livebench.ai/",
+        "mirror_url": "https://benchlm.ai/benchmarks/liveBench",
+        "retrieved_at": "2026-07-28T02:30:00-07:00",
+        "rows": 45,
+        "capability_rows": 45,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "vals-terminal-bench-2-1-2026-07-22",
+        "label": "Vals Terminal-Bench 2.1",
+        "publisher": "Vals AI",
+        "version": "2.1",
+        "source_date": "2026-07-22",
+        "url": "https://www.vals.ai/benchmarks/terminal-bench-2-1",
+        "mirror_url": "https://benchlm.ai/benchmarks/valsTerminalBench21",
+        "retrieved_at": "2026-07-28T02:30:00-07:00",
+        "rows": 44,
+        "capability_rows": 44,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "official-token-pricing-current",
+        "label": "Official provider token pricing",
+        "publisher": "Official",
+        "version": "",
+        "source_date": "",
+        "url": "https://www.anthropic.com/news/claude-opus-5",
+        "mirror_url": "",
+        "retrieved_at": "2026-07-27T23:30:00-07:00",
+        "rows": 34,
+        "capability_rows": 0,
+        "cost_rows": 34
+      },
+      {
+        "source_id": "vals-index-current-2026-08-06",
+        "label": "Vals Index current",
+        "publisher": "Vals AI",
+        "version": "Vals Index public leaderboard checked 2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://www.vals.ai/home",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T13:29:00-07:00",
+        "rows": 31,
+        "capability_rows": 16,
+        "cost_rows": 15
+      },
+      {
+        "source_id": "skatebench-v2-attached",
+        "label": "SkateBench visible v2 attached table",
+        "publisher": "SkateBench",
+        "version": "",
+        "source_date": "",
+        "url": "https://skatebench.dev/",
+        "mirror_url": "",
+        "retrieved_at": "2026-07-27T23:30:00-07:00",
+        "rows": 30,
+        "capability_rows": 15,
+        "cost_rows": 15
+      },
+      {
+        "source_id": "claw-eval-attached",
+        "label": "Claw-Eval attached token-efficiency table",
+        "publisher": "Claw-Eval",
+        "version": "",
+        "source_date": "",
+        "url": "https://claw-eval.github.io/",
+        "mirror_url": "",
+        "retrieved_at": "2026-07-27T23:30:00-07:00",
+        "rows": 22,
+        "capability_rows": 22,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "kilo-leaderboard-current-2026-08-08",
+        "label": "Kilo AI coding leaderboard current",
+        "publisher": "Kilo",
+        "version": "Kilo Benchmark live leaderboard checked 2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://kilo.ai/leaderboard",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T13:29:00-07:00",
+        "rows": 20,
+        "capability_rows": 10,
+        "cost_rows": 10
+      },
+      {
+        "source_id": "qwen3-8-max-stable-scorecard-2026-08-03",
+        "label": "Qwen3.8 Max stable-release scorecard",
+        "publisher": "Alibaba Qwen",
+        "version": "stable 2026-08-03",
+        "source_date": "2026-08-03",
+        "url": "https://qwen.ai/blog?id=qwen3.8-max",
+        "mirror_url": "https://benchlm.ai/models/qwen-3-8-max",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 15,
+        "capability_rows": 15,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "artificial-analysis-muse-1-2-components-2026-08-05",
+        "label": "Artificial Analysis Muse 1.2 component breakdown",
+        "publisher": "Artificial Analysis",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://artificialanalysis.ai/articles/muse-spark-1-2",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 9,
+        "capability_rows": 9,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "deepseek-v4-flash-0731-model-card-2026-07-31",
+        "label": "DeepSeek V4 Flash 0731 model-card benchmark table",
+        "publisher": "DeepSeek",
+        "version": "0731",
+        "source_date": "2026-07-31",
+        "url": "https://api-docs.deepseek.com/news/news250731",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 7,
+        "capability_rows": 7,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "meta-muse-pricing-current",
+        "label": "Meta Muse Spark pricing",
+        "publisher": "Meta",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://developer.meta.com/ai/models/muse-spark/",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 6,
+        "capability_rows": 0,
+        "cost_rows": 6
+      },
+      {
+        "source_id": "inclusionai-ling-3-0-tiny-promotional-current",
+        "label": "Ling 3.0 Tiny promotional API price",
+        "publisher": "InclusionAI/AA",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://artificialanalysis.ai/models/ling-3-0-tiny",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 2,
+        "capability_rows": 0,
+        "cost_rows": 2
+      },
+      {
+        "source_id": "meta-muse-1-2-model-card-current",
+        "label": "Meta Muse Spark 1.2 model card",
+        "publisher": "Meta",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://developer.meta.com/ai/resources/blog/build-with-muse-code/",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 2,
+        "capability_rows": 2,
+        "cost_rows": 0
+      },
+      {
+        "source_id": "meta-muse-contributor-repricing-current",
+        "label": "Meta Contributor repricing of AA task workload",
+        "publisher": "ARDF derived from Meta + Artificial Analysis",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://developer.meta.com/ai/models/muse-spark/",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 1,
+        "capability_rows": 0,
+        "cost_rows": 1
+      },
+      {
+        "source_id": "openrouter-current-pricing",
+        "label": "OpenRouter current Ling 3.0 Flash promotional route",
+        "publisher": "OpenRouter",
+        "version": "current-2026-08-08",
+        "source_date": "2026-08-08",
+        "url": "https://openrouter.ai/inclusionai/ling-3.0-flash",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-08T10:46:00-07:00",
+        "rows": 1,
+        "capability_rows": 0,
+        "cost_rows": 1
+      },
+      {
+        "source_id": "qwencloud-pricing-2026-08-03",
+        "label": "QwenCloud stable Qwen3.8 Max token pricing",
+        "publisher": "Alibaba Cloud",
+        "version": "stable 2026-08-03",
+        "source_date": "2026-08-03",
+        "url": "https://help.aliyun.com/zh/model-studio/models",
+        "mirror_url": "",
+        "retrieved_at": "2026-08-04T11:52:00-07:00",
+        "rows": 1,
+        "capability_rows": 0,
+        "cost_rows": 1
+      }
+    ]
+  },
+  "models_dev_coverage_note": {
+    "total_catalog": 683,
+    "exact_matches": 44,
+    "fallback_matches": 639,
+    "fully_empty_fields": [
+      "models_dev_experimental",
+      "models_dev_input_limit_tokens",
+      "models_dev_interleaved",
+      "models_dev_interleaved_field",
+      "models_dev_reasoning_price_per_m"
+    ],
+    "reason": "models.dev api.json does not expose these keys for any model in current schema; fields retained for forward compatibility, populated only when upstream adds them. Filters for these fields are hidden rather than shown as zero.",
+    "action": "dashboard filters for these five fields set to hidden/disabled; validation excludes them from missing-field errors"
+  },
+  "coverage_audit": {
+    "requirement": "\u22658 observations per recent model (user intent)",
+    "status": "partial",
+    "thin_models": {
+      "gpt-5-6-luna-high": {
+        "observations": 4,
+        "distinct_sources": 2,
+        "capability_observations": 1,
+        "gap": "needs 6-7 additional independent capability sources (BenchLM, Vals SweBench/Vibe, LiveBench, Kilo when applicable, Skate) + 2-3 cost sources"
+      },
+      "deepseek-v4-flash-0731-max": {
+        "observations": 26,
+        "distinct_sources": 4,
+        "capability_observations": 20,
+        "gap": "distinct sources only 4, well below 12-15 family target; needs BenchLM, Vals, Kilo expansion"
+      },
+      "muse-spark-1-2-xhigh": {
+        "observations": 30,
+        "distinct_sources": 8,
+        "capability_observations": 18,
+        "gap": "meets point count but 40% of capability rows are AA composite derivatives, not independent benchmarks"
+      }
+    },
+    "next_ingestion_priority": [
+      "benchlm-current",
+      "vals-swe-bench",
+      "vals-vibe-code",
+      "livebench",
+      "kilo-leaderboard",
+      "skatebench",
+      "openai-gpt-5-6-card",
+      "deepseek-flash-card",
+      "aider-polyglot if available"
+    ]
+  },
+  "scheduling": {
+    "cron": {
+      "auto_update": "0 6 * * 1",
+      "command": "cd /home/cheta/code/ardf/ai-model-value-analysis && bash scripts/run_auto_update.sh >> logs/auto_update.log 2>&1",
+      "harness_slices": [
+        {
+          "harness": "claude-code",
+          "source_id": "benchlm-current",
+          "schedule": "0 6 * * 1"
+        },
+        {
+          "harness": "codex",
+          "source_id": "vals-swe-bench",
+          "schedule": "0 6 * * 1"
+        },
+        {
+          "harness": "pi-omp",
+          "source_id": "livebench-2026-06-25",
+          "schedule": "0 6 * * 1"
+        }
+      ],
+      "on_failure": "skip_slice_continue",
+      "models_dev_sync": "0 5 * * 1",
+      "atomic": true,
+      "raw_snapshot_dir": "data/scraped/raw"
+    }
+  },
+  "harness_contract": {
+    "output_schema": "schemas/unified_observations.schema.json",
+    "required": [
+      "model_key",
+      "effort",
+      "harness",
+      "metric_axis",
+      "raw_value"
+    ],
+    "normalize_script": "scripts/normalize_harness_output.py",
+    "models_dev_master": "https://models.dev/api.json",
+    "unmatched_policy": "ingest with models_dev_match_status=unmatched, surface in ERRATA"
+  }
+}
