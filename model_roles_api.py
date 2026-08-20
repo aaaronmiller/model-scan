@@ -68,7 +68,15 @@ CHEATSHEET = ardf_roles.CHEATSHEET
 # Paying 40x more than baseline buys 2.8 capability points. Paying 85x buys
 # 4.8. So the default is baseline, and anything above it needs a reason named
 # out loud.
-# THE USABILITY FLOOR.
+# THE USABILITY FLOOR. ADVISORY, NOT AN EXCLUSION.
+#
+# Nothing filters on this. It flags a model for a second look, because a low
+# calibrated capability usually means local-class. But ARDF's score depends on
+# how many sources rated a model, so a genuinely good model that is new, or
+# free, or thinly covered can land below the line by accident. Excluding on
+# score would quietly discard exactly the free models worth finding.
+#
+# When a free model sits below the floor, evaluate it rather than dropping it.
 #
 # DeepSeek V4 Flash 0731 (High) at calibrated capability 37.00 is the line.
 # Everything scored below it is local-class: small open weights and
@@ -80,7 +88,7 @@ CHEATSHEET = ardf_roles.CHEATSHEET
 # model when nothing else in reach reads images, or a deliberately tiny model
 # for a mechanical classification with a fixed output vocabulary. Name the
 # exception when using one.
-USABILITY_FLOOR = 37.0
+USABILITY_FLOOR = 37.0  # advisory threshold; see above, never used to filter
 
 TIERS = [
     # (name, low_exclusive, high_inclusive, what it is for)
@@ -105,12 +113,50 @@ BASELINE_STEP_DOWN_REASONS = {
     "vendor-split": "deliberate diversification away from a single provider",
 }
 
+# Operator constraints recovered 2026-08-20 from ARDF's own prompt-intent.md,
+# a hand-maintained record of 42 prompts that had never been ingested by the
+# archaeology pipeline. These are stated rules, not inferences.
+#
+#   S2  Rank by capability per task cost, never raw price.
+#   S9  No invented rules (floors, tiers, deltas) not specified by the user.
+#   R4  Do NOT inflate Gemini 3.1 Pro. The operator considers it a poor,
+#       expensive, crippled model, and its high score is a known data or
+#       methodology bug.
+#   R10 Keep only 3-4 real tiers, not 7. The bottom cluster
+#       (glm / deepseek / luna / muse) is interchangeable and differentiated by
+#       USE CASE, not by fabricated capability deltas.
+#
+# Reconciling S2 with the tier model. S2 and "cheapest that clears the floor"
+# agree across tiers and diverge inside one. R10 settles it: inside the
+# baseline cluster neither ratio nor price should decide, because the members
+# are interchangeable. So ranking applies BETWEEN tiers, and within the
+# baseline tier selection is by functional fit. See
+# BASELINE_STEP_DOWN_REASONS.
+#
+# Under S9 the advisory capability floor is operator-derived, not invented: it
+# is the line the operator drew at DeepSeek V4 Flash, and it filters nothing.
+
+# Models whose score is known to be untrustworthy, per operator ruling.
+SCORE_DISPUTED = {
+    "Gemini 3.1 Pro Preview": (
+        "R4: operator rules this a poor, expensive, crippled model whose high "
+        "calibrated score is a data or methodology bug. Do not promote it."
+    ),
+}
+
 # Configurations that cost MORE and deliver LESS than a named alternative.
 # Selecting one of these is always wrong. Keyed by the dominated config.
 DOMINATED = {
+    # Justification corrected 2026-08-20 after the calibration audit. The
+    # original cited ARDF's 61.13 versus 61.90, a 0.77 gap computed between a
+    # 15-observation mean spanning 34.8 points and a 2-observation mean. That
+    # gap is inside the noise. The conclusion survives on cleaner evidence:
+    # Artificial Analysis scores both at exactly 63.00, so this is domination
+    # on PRICE at equal capability, which needs no fragile decimal. Kilo also
+    # has Opus 5 (max) off its frontier.
     "Claude Opus 5 (max)": (
         "Claude Opus 5 (xhigh)",
-        "cap 61.13 at $2.34 versus cap 61.90 at $1.80: cheaper AND more capable",
+        "equal capability (AA scores both 63.00) at $2.34 versus $1.80",
     ),
     "Claude Fable 5 (max)": (
         "Claude Opus 5 (xhigh)",
@@ -163,6 +209,8 @@ def build_tiers() -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {t[0]: [] for t in TIERS}
     for name, (cap, price) in models.items():
         entry = {"name": name, "capability": cap, "task_price": price}
+        if name in SCORE_DISPUTED:
+            entry["disputed"] = SCORE_DISPUTED[name]
         if cap < USABILITY_FLOOR:
             entry["below_floor"] = True
         if name in DOMINATED:
@@ -327,12 +375,15 @@ def main() -> int:
             usable = [e for e in entries if not e.get("below_floor")]
             below = [e for e in entries if e.get("below_floor")]
             if below:
-                print(f"    {len(usable)} usable, {len(below)} below the "
-                      f"capability floor of {USABILITY_FLOOR:g} (local-class)")
+                print(f"    {len(usable)} above the advisory floor, {len(below)} "
+                      f"below cap {USABILITY_FLOOR:g} (usually local-class; "
+                      f"verify before discarding a free one)")
             for e in usable[:6]:
                 flag = ""
                 if "dominated_by" in e:
                     flag = f"   DOMINATED by {e['dominated_by']}"
+                if "disputed" in e:
+                    flag = "   SCORE DISPUTED (R4)"
                 print(f"      cap {e['capability']:>6.2f}  ${e['task_price']:<9.5g} "
                       f"{e['name'][:46]}{flag}")
             print()
