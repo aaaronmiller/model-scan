@@ -46,29 +46,64 @@ CHEATSHEET = ardf_roles.CHEATSHEET
 # --------------------------------------------------------------------------
 # Tier definition
 # --------------------------------------------------------------------------
-# Derived from the observed price-per-task distribution over the 48 models in
-# the ARDF cheatsheet that carry both a capability and a price, on 2026-08-20.
+# FUNCTIONAL tiers, revised 2026-08-20 (second pass).
 #
-# The proposed bands were: executor floor to $1, $1-2, $2-5, $5+. The data says
-# adjust in three places:
+# The first pass sliced purely on price and got it wrong. Below about $0.30 the
+# price differences are noise: 31 of the 48 scored models sit there, spanning
+# $0.0024 to $0.27, and on a free zen tier plus a $10 go subscription the
+# marginal cost of all of them is the same, which is nothing. Slicing that zone
+# by price also misfiled genuinely-free models into paid bands: GLM-5.3 at
+# about $0.22 is a baseline model, not a "$0.20-to-$1" model.
 #
-#   1. $5+ is EMPTY. The most expensive model on record is Claude Fable 5 (max)
-#      at $3.14. Keep the band as a guard so a future price rise is visible,
-#      but expect it to stay empty.
-#   2. "executor floor to $1" is far too wide: it holds 41 of 48 models and
-#      spans capability 39 to 60. It splits naturally at about $0.05, where
-#      the subscription-covered executors sit, and again at $0.20.
-#   3. $2-$5 holds only two models and BOTH are dominated by something cheaper.
-#      It is a trap band, not a tier. See DOMINATED below.
+# So the zone boundary is drawn where price starts to MEAN something, and
+# inside the baseline zone the discriminator is capability and features, not
+# cost.
+#
+# The economic fact that drives everything:
+#
+#   baseline ceiling   Muse Spark 1.2 (xhigh, Contributor)  cap 57.10 at $0.021
+#   judgement ceiling  Kimi K3 (max)                        cap 59.87 at $0.84
+#   frontier ceiling   Claude Opus 5 (xhigh)                cap 61.90 at $1.80
+#
+# Paying 40x more than baseline buys 2.8 capability points. Paying 85x buys
+# 4.8. So the default is baseline, and anything above it needs a reason named
+# out loud.
+# THE USABILITY FLOOR.
+#
+# DeepSeek V4 Flash 0731 (High) at calibrated capability 37.00 is the line.
+# Everything scored below it is local-class: small open weights and
+# non-reasoning or low-effort configurations of larger models. They are
+# unsuitable for almost all real work regardless of being free, so cheapness is
+# not a reason to reach for them.
+#
+# The narrow exceptions are functional, not economic: a vision-capable small
+# model when nothing else in reach reads images, or a deliberately tiny model
+# for a mechanical classification with a fixed output vocabulary. Name the
+# exception when using one.
+USABILITY_FLOOR = 37.0
+
 TIERS = [
     # (name, low_exclusive, high_inclusive, what it is for)
-    ("executor",      0.0,   0.05, "bulk execution; subscription-covered, effectively free"),
-    ("executor-plus", 0.05,  0.20, "near-frontier capability still at cents per task"),
-    ("frontier-entry", 0.20, 1.00, "the first genuinely expensive step; judgement work"),
-    ("frontier-high", 1.00,  2.00, "top capability available; reserve for hard calls"),
-    ("premium",       2.00,  5.00, "check DOMINATED before using; usually a mistake"),
-    ("ultra",         5.00,  1e9,  "empty as of 2026-08-20; guard band"),
+    ("baseline",  0.0,  0.30,
+     "effectively free. Default for everything. Pick by capability, not price"),
+    ("judgement", 0.30, 0.90,
+     "buys about 3 capability points over baseline; review, adjudication"),
+    ("frontier",  0.90, 2.00,
+     "the genuine ceiling; irreversible decisions only"),
+    ("dominated", 2.00, 1e9,
+     "never use: every member is beaten by something cheaper"),
 ]
+
+# Inside the baseline zone price carries no signal, so the only defensible
+# reason to run anything other than the highest-capability member is a
+# FUNCTIONAL requirement. If none of these applies, take the top of the tier.
+BASELINE_STEP_DOWN_REASONS = {
+    "vision":       "the task needs image input and the top model has none",
+    "context":      "the input exceeds the top model's context window",
+    "latency":      "an interactive path where time-to-first-token dominates",
+    "rate-limit":   "the top model is rate-capped and the work is high-volume",
+    "vendor-split": "deliberate diversification away from a single provider",
+}
 
 # Configurations that cost MORE and deliver LESS than a named alternative.
 # Selecting one of these is always wrong. Keyed by the dominated config.
@@ -128,6 +163,8 @@ def build_tiers() -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {t[0]: [] for t in TIERS}
     for name, (cap, price) in models.items():
         entry = {"name": name, "capability": cap, "task_price": price}
+        if cap < USABILITY_FLOOR:
+            entry["below_floor"] = True
         if name in DOMINATED:
             better, why = DOMINATED[name]
             entry["dominated_by"] = better
@@ -287,7 +324,12 @@ def main() -> int:
             print(f"    {purpose}")
             if not entries:
                 print("    EMPTY")
-            for e in entries[:6]:
+            usable = [e for e in entries if not e.get("below_floor")]
+            below = [e for e in entries if e.get("below_floor")]
+            if below:
+                print(f"    {len(usable)} usable, {len(below)} below the "
+                      f"capability floor of {USABILITY_FLOOR:g} (local-class)")
+            for e in usable[:6]:
                 flag = ""
                 if "dominated_by" in e:
                     flag = f"   DOMINATED by {e['dominated_by']}"
