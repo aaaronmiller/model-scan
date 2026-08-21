@@ -18,10 +18,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from routing_snapshot import (
+    RoutingSnapshotRejected,
     DEFAULT_SNAPSHOT_PATH,
     RELIABILITY_FEEDBACK_PATH,
     build_snapshot_from_db,
     load_latest_snapshot,
+    validate_gateway_snapshot,
     write_snapshot,
 )
 
@@ -369,6 +371,11 @@ async def gateway_quota():
 async def gateway_routing_snapshot():
     """Return the latest claude-code-proxy routing snapshot."""
     snapshot = load_latest_snapshot(DEFAULT_SNAPSHOT_PATH)
+    if snapshot is not None:
+        try:
+            validate_gateway_snapshot(snapshot)
+        except RoutingSnapshotRejected:
+            snapshot = None
     if snapshot is None:
         snapshot = build_snapshot_from_db(DATABASE_FILE)
         if snapshot is not None:

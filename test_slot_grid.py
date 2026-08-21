@@ -100,6 +100,18 @@ def test_alias_table_feeds_redirect_map_end_to_end():
     assert "claude-haiku-4-5" not in table, "unresolved slot must keep vendor default"
 
 
+def test_alias_table_omits_effort_collisions_that_litellm_cannot_represent():
+    aliases = sg.alias_table(
+        [
+            ("claude-sonnet-5", "low"),
+            ("claude-sonnet-5", "high"),
+            ("claude-haiku-4-5", None),
+        ]
+    )
+
+    assert aliases == {"claude-haiku-4-5": "S01_haiku"}
+
+
 def test_requirements_are_shaped_for_the_resolver():
     reqs = sg.requirements_for_slots()
     assert set(reqs) == {s.slot_id for s in sg.SLOTS}

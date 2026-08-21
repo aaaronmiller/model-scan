@@ -333,14 +333,22 @@ def alias_table(requests: Iterable[tuple[str, str | None]]) -> dict[str, str]:
 
     Pairs that do not resolve are omitted, so an unrecognised model is passed
     through to the vendor untouched rather than redirected somewhere arbitrary.
+    A vendor model used with more than one effort is also omitted when those
+    efforts map to different slots. LiteLLM aliases are keyed by model name
+    only, so publishing one of those slots would silently redirect every other
+    effort to the wrong target.
     """
 
-    table: dict[str, str] = {}
+    slots_by_model: dict[str, set[str]] = {}
     for model, effort in requests:
         slot = slot_for(model, effort)
         if slot is not None:
-            table[model] = slot.slot_id
-    return table
+            slots_by_model.setdefault(model, set()).add(slot.slot_id)
+    return {
+        model: next(iter(slot_ids))
+        for model, slot_ids in slots_by_model.items()
+        if len(slot_ids) == 1
+    }
 
 
 def requirements_for_slots(slots: Iterable[Slot] | None = None) -> dict[str, dict[str, object]]:

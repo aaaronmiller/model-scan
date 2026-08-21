@@ -1,6 +1,15 @@
-# model-scan v5
+# model-scan
 
-Multi-source LLM model diagnostic engine. Probes 10 providers for live performance data, fuses with Artificial Analysis, Models.dev, and PinchBench benchmarks, computes 16 derived metrics with calculus-based modifiers, and generates optimal Hermes agent config patches.
+Model Scan is a local evidence and decision-support system. It discovers exact
+provider model identities, combines published and observed evidence, evaluates
+role fixtures, and publishes immutable advisory results. Gateway owns live
+routing, fallback, and configuration changes. ARDF owns its research ledger,
+calibration policy, Pareto analysis, and dashboard.
+
+The canonical requirements and design are under
+`/home/cheta/LIVING_DOCUMENTS/projects/model-scan`. Older v5 scoring and config
+preview surfaces remain in this checkout as migration evidence. A preview is
+not authority to apply a route or configuration.
 
 ## Quick Start
 
@@ -17,7 +26,7 @@ export AA_API_KEY=aa_...                   # benchmark data (free tier)
 
 # Run
 model-scan                                # full scan
-model-scan --slot R1                      # single slot analysis
+model-scan --slot S01_haiku              # single current slot analysis
 model-scan --free-mode                    # free models only
 model-scan --emit-snapshot                # write ~/.config/model-scan/routing_snapshot.json
 model-scan --analyze                      # multi-source analysis
@@ -95,6 +104,28 @@ joined later through the Gateway's explicit identity map. The older
 `routing_snapshot.py` format remains supported for the existing default-off
 integration but is not the successor callable-identity contract.
 
+### Immutable evidence contract
+
+The current evidence boundary is split into a content object and an external
+manifest:
+
+```bash
+pytest -q test_evidence_contract.py test_ardf_export.py \
+  test_role_evaluation.py test_source_adapter.py
+```
+
+- `evidence_contract.py` validates joins, freshness, exact zero price,
+  privacy-safe task telemetry, role gates, and advisory-only output. It then
+  computes real content and schema hashes in a separate manifest.
+- `ardf_export.py` binds the current ARDF ledger, policy, schemas, executable,
+  projections, and a complete field migration map.
+- `role_evaluation.py` defines typed fixtures, per-call telemetry, Wilson
+  confidence intervals, paired comparison rules, explicit abstention, and
+  hash-pinned advisory recommendations.
+- `source_adapter.py` preserves the useful Model Scraper lineage as a neutral
+  Model Scan module. Catalog discovery, callable state, probe reachability,
+  and policy eligibility remain separate facts.
+
 ### Data Sources
 | Source | Models | Data |
 |--------|--------|------|
@@ -143,7 +174,7 @@ Sigmoid quality scores, quadratic diminishing returns, bell-curve latency penalt
 │  ├── /api/v1/popularity — HF adoption scores│
 │  ├── /api/v1/compare — multi-model radars  │
 │  ├── /api/v1/refinement/history            │
-│  └── 12 endpoints total (41/41 tests pass) │
+│  └── 12 endpoints; current S-slot contract │
 ├─────────────────────────────────────────────┤
 │  TUI (Textual)                             │
 │  ├── Keyboard navigation (↑↓/s/f/t/p)     │
@@ -214,12 +245,17 @@ model-scan/
 ## Tests
 
 ```bash
-# API integration tests
-python3 test_api.py
+# Complete offline suite
+pytest -q --ignore=test_api.py
 
-# Requires API running:
-cd api && uvicorn main:app --port 8123
+# Read-only local API integration gate
+python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8123
+python3 test_api.py
 ```
+
+The API always exposes the code-owned 15-slot `S*` namespace. If its database
+contains legacy or incomplete slot IDs, config preview returns an explicit
+abstention instead of presenting stale recommendations as current.
 
 ## License
 

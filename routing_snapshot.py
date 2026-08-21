@@ -13,7 +13,7 @@ import re
 import sqlite3
 import tempfile
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -26,6 +26,38 @@ CONFIG_DIR = Path.home() / ".config" / "model-scan"
 DEFAULT_SNAPSHOT_PATH = CONFIG_DIR / "routing_snapshot.json"
 RELIABILITY_FEEDBACK_PATH = CONFIG_DIR / "reliability_feedback.jsonl"
 SCHEMA_VERSION = "1.0.0"
+MAX_SNAPSHOT_AGE_SECONDS = 86_400
+MAX_FUTURE_SKEW_SECONDS = 300
+
+# These are routing policies, not stable model identities. A capability rank
+# cannot be bound to them because the provider may select a different backing
+# model for every request. Keep them out of both newly emitted snapshots and
+# previously written snapshots accepted by the Gateway.
+NON_IDENTITY_ROUTER_ALIASES = frozenset({"openrouter/free"})
+
+
+class RoutingSnapshotRejected(ValueError):
+    """Raised when a snapshot cannot safely enter the Gateway contract."""
+
+
+def gateway_slot_definitions() -> dict[str, dict[str, Any]]:
+    """Return the current Gateway S-slot namespace for fresh scan emission.
+
+    The Gateway grid is code-owned in ``slot_grid``.  Reading legacy local
+    ``slot_definitions.yaml`` here would let an old Hermes R-role scan produce
+    a syntactically valid but semantically unusable snapshot.
+    """
+    from slot_grid import SLOTS
+
+    return {
+        slot.slot_id: {
+            "label": slot.label,
+            "eval_mode": slot.eval_mode,
+            "needs_tools": slot.require_tools,
+            "needs_vision": slot.require_vision,
+        }
+        for slot in SLOTS
+    }
 
 
 @dataclass(frozen=True)
@@ -43,6 +75,53 @@ class SnapshotCandidate:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_utc(value: Any, *, field: str, require_z: bool = False) -> datetime:
+    if not isinstance(value, str) or (require_z and not value.endswith("Z")):
+        raise RoutingSnapshotRejected(f"{field} must be a UTC timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RoutingSnapshotRejected(f"{field} must be a UTC timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise RoutingSnapshotRejected(f"{field} must be a UTC timestamp")
+    return parsed
+
+
+def validate_gateway_snapshot(
+    snapshot: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+    max_age_seconds: int = MAX_SNAPSHOT_AGE_SECONDS,
+) -> None:
+    """Reject stale snapshots or snapshots outside the current S-slot grid."""
+    slots = snapshot.get("slots")
+    expected = set(gateway_slot_definitions())
+    if not isinstance(slots, Mapping) or set(slots) != expected:
+        raise RoutingSnapshotRejected("snapshot must contain exactly the 15 current Gateway S slots")
+    for selection in slots.values():
+        if not isinstance(selection, Mapping):
+            raise RoutingSnapshotRejected("snapshot selection is invalid")
+        candidates = selection.get("candidates")
+        if not isinstance(candidates, list):
+            raise RoutingSnapshotRejected("snapshot candidates are required")
+        for candidate in candidates:
+            api_model = candidate.get("api_model") if isinstance(candidate, Mapping) else None
+            if not isinstance(api_model, str) or not api_model:
+                raise RoutingSnapshotRejected("snapshot candidate api_model is required")
+            if api_model.lower() in NON_IDENTITY_ROUTER_ALIASES:
+                raise RoutingSnapshotRejected(
+                    f"snapshot candidate {api_model} is a dynamic router, not a model identity"
+                )
+    generated_at = _parse_utc(
+        snapshot.get("generated_at"), field="snapshot generated_at", require_z=True
+    )
+    current = now or datetime.now(timezone.utc)
+    if (current - generated_at).total_seconds() > max_age_seconds:
+        raise RoutingSnapshotRejected("snapshot is stale")
+    if (generated_at - current).total_seconds() > MAX_FUTURE_SKEW_SECONDS:
+        raise RoutingSnapshotRejected("snapshot timestamp is implausibly future-dated")
 
 
 def _obj_get(obj: Any, key: str, default: Any = None) -> Any:
@@ -158,6 +237,8 @@ def _candidate_from_dossier(dossier: Any, slot_id: str, blocklist: Iterable[str]
     api_model = str(_obj_get(dossier, "api_model", "") or f"{provider}/{model_id}")
     fitness = float((_obj_get(dossier, "slot_fitness", {}) or {}).get(slot_id, 0) or 0)
     if not _obj_get(dossier, "accessible", False) or fitness <= 0:
+        return None
+    if api_model.lower() in NON_IDENTITY_ROUTER_ALIASES:
         return None
     if _matches_blocklist(provider, model_id, api_model, blocklist):
         return None
@@ -291,20 +372,42 @@ def build_snapshot_from_db(
     *,
     slot_defs_path: str | os.PathLike[str] | None = None,
     blocklist_path: str | os.PathLike[str] | None = None,
+    now: datetime | None = None,
+    max_scan_age_seconds: int = MAX_SNAPSHOT_AGE_SECONDS,
 ) -> dict[str, Any] | None:
-    """Rebuild the latest routing snapshot from SQLite for gateway fallback."""
+    """Rebuild a fresh S-slot snapshot without laundering old database data."""
     db = Path(db_path) if db_path else CONFIG_DIR / "model_scan.db"
     if not db.exists():
         return None
-    slot_defs = _load_slot_defs(slot_defs_path)
-    if not slot_defs:
+    slot_defs = gateway_slot_definitions()
+    if slot_defs_path is not None and _load_slot_defs(slot_defs_path) != slot_defs:
         return None
     conn = sqlite3.connect(str(db))
     conn.row_factory = sqlite3.Row
     try:
-        row = conn.execute("SELECT MAX(scan_id) AS scan_id FROM scans").fetchone()
+        row = conn.execute(
+            "SELECT scan_id, scanned_at FROM scans ORDER BY scan_id DESC LIMIT 1"
+        ).fetchone()
         scan_id = int(row["scan_id"]) if row and row["scan_id"] is not None else 0
         if not scan_id:
+            return None
+        try:
+            scanned_at = _parse_utc(row["scanned_at"], field="scan scanned_at")
+        except RoutingSnapshotRejected:
+            return None
+        current = now or datetime.now(timezone.utc)
+        if (current - scanned_at).total_seconds() > max_scan_age_seconds:
+            return None
+        if (scanned_at - current).total_seconds() > MAX_FUTURE_SKEW_SECONDS:
+            return None
+        recorded_slots = {
+            str(item["slot_id"])
+            for item in conn.execute(
+                "SELECT DISTINCT slot_id FROM slot_fitness WHERE scan_id = ?",
+                (scan_id,),
+            ).fetchall()
+        }
+        if recorded_slots != set(slot_defs):
             return None
         rows = conn.execute(
             """
@@ -342,6 +445,7 @@ def build_snapshot_from_db(
             blocklist=load_blocklist_values(blocklist_path),
             provider_quota=load_provider_quota(),
             reliability_feedback=load_reliability_feedback(),
+            generated_at=scanned_at.isoformat().replace("+00:00", "Z"),
         )
     finally:
         conn.close()

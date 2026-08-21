@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 from datetime import datetime, timedelta, timezone
+
+import pytest
 
 import gateway_bridge as gb
 import quota_meter as qm
@@ -128,6 +132,29 @@ def test_litellm_callback_reads_standard_logging_object(tmp_path):
         spend_path=tmp_path / "s.jsonl",
     )
     assert result["spend_recorded"] and result["amount"] == 0.4
+
+
+def test_litellm_async_callback_is_a_coroutine_and_records(tmp_path, monkeypatch):
+    spend_path = tmp_path / "s.jsonl"
+    monkeypatch.setattr(sl, "SPEND_LOG_PATH", spend_path)
+
+    assert inspect.iscoroutinefunction(gb.litellm_async_success_callback)
+    result = asyncio.run(
+        gb.litellm_async_success_callback(
+            {
+                "model": "groq/x",
+                "response_cost": 0.0,
+                "litellm_call_id": "async-call-1",
+            },
+            None,
+            NOW,
+            NOW,
+        )
+    )
+
+    assert result["spend_recorded"] is True
+    assert result["amount"] == 0.0
+    assert len(list(sl.iter_events(spend_path))) == 1
 
 
 def test_litellm_callback_deduplicates_stable_call_id(tmp_path):
@@ -294,11 +321,14 @@ def test_slots_below_floor_are_absent_so_vendor_default_holds():
 
 
 def test_litellm_aliases_are_shaped_for_model_list_and_carry_no_secrets():
-    entries = gb.litellm_model_aliases({"claude-opus-5": "go/deepseek"})
+    entries = gb.litellm_model_aliases(
+        {"claude-opus-5": "poolside/laguna-xs-2.1:free"},
+        {"claude-opus-5": "openrouter"},
+    )
     assert entries == [
         {
             "model_name": "claude-opus-5",
-            "litellm_params": {"model": "go/deepseek"},
+            "litellm_params": {"model": "openrouter/poolside/laguna-xs-2.1:free"},
             "model_info": {"managed_by": "model-scan", "redirect_of": "claude-opus-5"},
         }
     ]
@@ -307,10 +337,23 @@ def test_litellm_aliases_are_shaped_for_model_list_and_carry_no_secrets():
 
 def test_overrides_are_written_atomically(tmp_path):
     target = tmp_path / "overrides.json"
-    gb.write_litellm_overrides({"claude-opus-5": "go/deepseek"}, target)
+    gb.write_litellm_overrides(
+        {"claude-opus-5": "poolside/laguna-xs-2.1:free"},
+        target,
+        provider_by_alias={"claude-opus-5": "openrouter"},
+    )
     payload = json.loads(target.read_text())
     assert payload["model_list"][0]["model_name"] == "claude-opus-5"
+    assert payload["model_list"][0]["litellm_params"]["model"].startswith("openrouter/")
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_litellm_projection_rejects_unknown_provider_adapter():
+    with pytest.raises(ValueError, match="no credential-free adapter"):
+        gb.litellm_model_aliases(
+            {"claude-opus-5": "laguna-s-2.1-free"},
+            {"claude-opus-5": "opencode-zen"},
+        )
 
 
 def test_utilization_report_ranks_the_most_wasted_window_first(tmp_path):

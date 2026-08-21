@@ -48,7 +48,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
-from routing_snapshot import DEFAULT_SNAPSHOT_PATH, build_snapshot_from_dossiers, load_blocklist_values, load_provider_quota, write_snapshot
+from routing_snapshot import DEFAULT_SNAPSHOT_PATH, build_snapshot_from_dossiers, gateway_slot_definitions, load_blocklist_values, load_provider_quota, write_snapshot
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DEPS
@@ -3297,9 +3297,21 @@ async def run_scan(args) -> int:
         permanent_skips,
     )
     if args.emit_snapshot:
+        # Snapshot consumers use the current Gateway S namespace, not the
+        # legacy Hermes R roles in a machine-local slot definitions file.
+        gateway_slots = gateway_slot_definitions()
+        for dossier in dossiers:
+            dossier.slot_fitness = {
+                slot_id: slot_fitness(
+                    dossier, definition,
+                    use_scoring_engine=args.score_engine,
+                    free_mode=args.free_mode,
+                )[0]
+                for slot_id, definition in gateway_slots.items()
+            }
         snapshot = build_snapshot_from_dossiers(
             dossiers,
-            slot_defs,
+            gateway_slots,
             scan_id=int(scan_id or 0),
             blocklist=load_blocklist_values(BLOCKLIST_FILE),
             provider_quota=load_provider_quota(),

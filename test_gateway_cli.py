@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
 import gateway_cli as cli
-import quota_meter as qm
+from gateway_rank_map import build_rank_map
 import slot_grid as sg
 import spend_ledger as sl
 
@@ -20,6 +21,37 @@ def _paths(tmp_path) -> list[str]:
         "--ledger", str(tmp_path / "ledger.jsonl"),
         "--limits", str(tmp_path / "limits.json"),
     ]
+
+
+def _snapshot() -> dict:
+    def cand(api, prov, fit):
+        return {"model_id": api, "provider": prov, "api_model": api, "fitness": fit,
+                "price_blended": 0.0, "has_tools": True, "has_vision": False}
+
+    return {
+        "schema_version": "1.0.0", "scan_id": 1, "blocklist": [],
+        "generated_at": cli._utcnow().isoformat().replace("+00:00", "Z"),
+        "slots": {
+            s.slot_id: {"label": s.label, "eval_mode": s.eval_mode, "best": None,
+                        "candidates": [cand("free/m", "openrouter", 60)]}
+            for s in sg.SLOTS
+        },
+    }
+
+
+def _write_contract_inputs(tmp_path) -> tuple[str, str]:
+    snapshot = _snapshot()
+    snap_path = tmp_path / "snap.json"
+    snap_path.write_text(json.dumps(snapshot))
+    ranks = build_rank_map(
+        {"free/m": 12}, snapshot,
+        generated_at=cli._utcnow().isoformat().replace("+00:00", "Z"),
+        evidence_ref="fixture:gateway-ladder",
+        evidence_sha256="sha256:" + "a" * 64,
+    )
+    rank_path = tmp_path / "ranks.json"
+    rank_path.write_text(json.dumps(ranks))
+    return str(snap_path), str(rank_path)
 
 
 def test_grid_pairs_cover_every_slot_exactly_once():
@@ -63,29 +95,13 @@ def test_refresh_folds_in_adaptive_limiter_inference(tmp_path, capsys):
 def test_resolve_without_a_snapshot_reports_rather_than_crashing(tmp_path, capsys):
     code = cli.main(["resolve", *_paths(tmp_path)])
     assert code == 1
-    assert "no slots" in capsys.readouterr().out
+    assert "input rejected" in capsys.readouterr().out
 
 
 def test_resolve_prints_every_slot_and_its_mode(tmp_path, capsys):
-    def cand(api, prov, fit):
-        return {"model_id": api, "provider": prov, "api_model": api, "fitness": fit,
-                "price_blended": 0.0, "has_tools": True, "has_vision": False}
+    snap_path, ranks = _write_contract_inputs(tmp_path)
 
-    snapshot = {
-        "schema_version": "1.0.0", "scan_id": "t", "blocklist": [],
-        "generated_at": NOW.isoformat().replace("+00:00", "Z"),
-        "slots": {
-            s.slot_id: {"label": s.label, "eval_mode": s.eval_mode, "best": None,
-                        "candidates": [cand("free/m", "kilo", 60)]}
-            for s in sg.SLOTS
-        },
-    }
-    snap_path = tmp_path / "snap.json"
-    snap_path.write_text(json.dumps(snapshot))
-    ranks = tmp_path / "ranks.json"
-    ranks.write_text(json.dumps({"free/m": 12}))
-
-    code = cli.main(["resolve", "--snapshot", str(snap_path), "--ranks", str(ranks), *_paths(tmp_path)])
+    code = cli.main(["resolve", "--snapshot", snap_path, "--ranks", ranks, *_paths(tmp_path)])
     out = capsys.readouterr().out
     assert code == 0
     for slot in sg.SLOTS:
@@ -96,29 +112,68 @@ def test_resolve_prints_every_slot_and_its_mode(tmp_path, capsys):
 
 
 def test_publish_writes_overrides_without_applying_them(tmp_path, capsys):
-    def cand(api, prov, fit):
-        return {"model_id": api, "provider": prov, "api_model": api, "fitness": fit,
-                "price_blended": 0.0, "has_tools": True, "has_vision": False}
-
-    snapshot = {
-        "schema_version": "1.0.0", "scan_id": "t", "blocklist": [],
-        "generated_at": NOW.isoformat().replace("+00:00", "Z"),
-        "slots": {
-            "S01_haiku": {"label": "Haiku", "eval_mode": "free", "best": None,
-                          "candidates": [cand("free/m", "kilo", 60)]}
-        },
-    }
-    snap_path = tmp_path / "snap.json"
-    snap_path.write_text(json.dumps(snapshot))
+    snap_path, ranks = _write_contract_inputs(tmp_path)
     out_path = tmp_path / "overrides.json"
 
     code = cli.main([
-        "publish", "--snapshot", str(snap_path), "--out", str(out_path), *_paths(tmp_path)
+        "publish", "--snapshot", snap_path, "--ranks", ranks, "--out", str(out_path), *_paths(tmp_path)
     ])
     assert code == 0
     payload = json.loads(out_path.read_text())
     assert payload["model_list"][0]["model_name"] == "claude-haiku-4-5"
+    assert payload["model_list"][0]["litellm_params"]["model"] == "openrouter/free/m"
     assert "nothing was applied" in capsys.readouterr().out
+
+
+def test_resolve_rejects_partial_or_mismatched_rank_map(tmp_path, capsys):
+    snap_path, rank_path = _write_contract_inputs(tmp_path)
+    document = json.loads(Path(rank_path).read_text())
+    document["ranks"] = {}
+    Path(rank_path).write_text(json.dumps(document))
+
+    code = cli.main(["resolve", "--snapshot", snap_path, "--ranks", rank_path, *_paths(tmp_path)])
+    assert code == 1
+    assert "partial or mismatched" in capsys.readouterr().out
+
+
+def test_resolve_rejects_stale_snapshot(tmp_path, capsys):
+    snap_path, rank_path = _write_contract_inputs(tmp_path)
+    snapshot = json.loads(Path(snap_path).read_text())
+    snapshot["generated_at"] = "2026-01-01T00:00:00Z"
+    Path(snap_path).write_text(json.dumps(snapshot))
+
+    code = cli.main(["resolve", "--snapshot", snap_path, "--ranks", rank_path, *_paths(tmp_path)])
+    assert code == 1
+    assert "snapshot is stale" in capsys.readouterr().out
+
+
+def test_resolve_rejects_stale_rank_map(tmp_path, capsys):
+    snap_path, rank_path = _write_contract_inputs(tmp_path)
+    document = json.loads(Path(rank_path).read_text())
+    document["generated_at"] = "2026-01-01T00:00:00Z"
+    Path(rank_path).write_text(json.dumps(document))
+
+    code = cli.main(["resolve", "--snapshot", snap_path, "--ranks", rank_path, *_paths(tmp_path)])
+    assert code == 1
+    assert "rank map is stale" in capsys.readouterr().out
+
+
+def test_rank_map_command_publishes_snapshot_bound_provenance(tmp_path, capsys):
+    snap_path, _ = _write_contract_inputs(tmp_path)
+    rank_input = tmp_path / "raw-ranks.json"
+    rank_input.write_text(json.dumps({"free/m": 12}))
+    rank_output = tmp_path / "published-ranks.json"
+
+    code = cli.main([
+        "rank-map", "--snapshot", snap_path, "--rank-input", str(rank_input),
+        "--ranks", str(rank_output), "--evidence-ref", "fixture:ladder",
+        "--evidence-sha256", "sha256:" + "b" * 64,
+    ])
+    assert code == 0
+    published = json.loads(rank_output.read_text())
+    assert published["ranks"] == {"free/m": 12}
+    assert published["evidence"]["ref"] == "fixture:ladder"
+    assert "provenance-bound" in capsys.readouterr().out
 
 
 def test_utilization_quantifies_expected_waste(tmp_path, capsys):

@@ -314,6 +314,29 @@ def litellm_success_callback(
     return result
 
 
+async def litellm_async_success_callback(
+    kwargs: Mapping[str, Any],
+    response_obj: Any = None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> dict[str, Any]:
+    """Async LiteLLM proxy adapter for the synchronous ledger writer.
+
+    LiteLLM routes proxy requests through its async success callback list. A
+    synchronous callable can load successfully yet remain on the sync-only
+    callback list, so it is never invoked for proxy traffic. Keeping the ledger
+    operation synchronous preserves its process-locking contract while this
+    coroutine supplies the callback shape LiteLLM dispatches.
+    """
+
+    return litellm_success_callback(
+        kwargs,
+        response_obj,
+        start_time,
+        end_time,
+    )
+
+
 def refresh_quota(
     *,
     windows: Iterable[qm.BudgetWindow] | None = None,
@@ -417,7 +440,37 @@ def build_redirect_table(
     return sr.redirect_map(resolutions, aliases), resolutions
 
 
-def litellm_model_aliases(redirect_table: Mapping[str, str]) -> list[dict[str, Any]]:
+def redirect_provider_map(
+    resolutions: Mapping[str, sr.Resolution],
+    slot_aliases: Mapping[str, str],
+) -> dict[str, str]:
+    """Return the exact serving provider for each resolved vendor alias."""
+
+    providers: dict[str, str] = {}
+    for requested, slot_id in slot_aliases.items():
+        resolution = resolutions.get(slot_id)
+        chosen = resolution.chosen if resolution and resolution.resolved else None
+        provider = str((chosen or {}).get("provider") or "").strip().lower()
+        if provider:
+            providers[requested] = provider
+    return providers
+
+
+def _litellm_target(target: str, provider: str) -> str:
+    """Render one callable identity in LiteLLM's provider/model grammar."""
+
+    provider_id = str(provider or "").strip().lower()
+    if provider_id == "openrouter":
+        return target if target.startswith("openrouter/") else f"openrouter/{target}"
+    raise ValueError(
+        f"LiteLLM projection has no credential-free adapter for provider {provider_id or 'unknown'}"
+    )
+
+
+def litellm_model_aliases(
+    redirect_table: Mapping[str, str],
+    provider_by_alias: Mapping[str, str],
+) -> list[dict[str, Any]]:
     """Render a redirect table as LiteLLM ``model_list`` entries.
 
     Each entry maps a vendor-visible model name to the resolved target, which is
@@ -430,10 +483,11 @@ def litellm_model_aliases(redirect_table: Mapping[str, str]) -> list[dict[str, A
 
     entries: list[dict[str, Any]] = []
     for requested, target in sorted(redirect_table.items()):
+        provider = provider_by_alias.get(requested, "")
         entries.append(
             {
                 "model_name": requested,
-                "litellm_params": {"model": target},
+                "litellm_params": {"model": _litellm_target(target, provider)},
                 "model_info": {"managed_by": "model-scan", "redirect_of": requested},
             }
         )
@@ -443,6 +497,8 @@ def litellm_model_aliases(redirect_table: Mapping[str, str]) -> list[dict[str, A
 def write_litellm_overrides(
     redirect_table: Mapping[str, str],
     path: str | os.PathLike[str],
+    *,
+    provider_by_alias: Mapping[str, str],
 ) -> Path:
     """Write the alias entries as JSON for a gateway to merge.
 
@@ -455,7 +511,7 @@ def write_litellm_overrides(
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "generated_by": "model-scan.gateway_bridge",
-        "model_list": litellm_model_aliases(redirect_table),
+        "model_list": litellm_model_aliases(redirect_table, provider_by_alias),
     }
     tmp = target.with_suffix(target.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

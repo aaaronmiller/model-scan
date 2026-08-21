@@ -13,18 +13,21 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from slot_grid import SLOTS, SLOTS_BY_ID, requirements_for_slots
+
 app = FastAPI(title="model-scan API", version="5.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 DB_PATH = Path.home() / ".config" / "model-scan" / "model_scan.db"
 CACHE_PATH = Path.home() / ".config" / "model-scan" / "results.json"
+CURRENT_SLOT_IDS = tuple(slot.slot_id for slot in SLOTS)
 
 
 def get_db() -> sqlite3.Connection:
@@ -41,6 +44,21 @@ def row_to_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     return dict(row)
+
+
+def slot_contract_state(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
+    rows = conn.execute(
+        "SELECT DISTINCT slot_id FROM incumbents WHERE scan_id = ? ORDER BY slot_id",
+        (scan_id,),
+    ).fetchall()
+    observed = [row["slot_id"] for row in rows]
+    expected = list(CURRENT_SLOT_IDS)
+    return {
+        "schema": "model-scan-slots/v1",
+        "expected_slot_ids": expected,
+        "observed_slot_ids": observed,
+        "status": "current" if observed == expected else "legacy-or-incomplete",
+    }
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────
@@ -72,8 +90,9 @@ def get_latest_scan():
         """, (scan["scan_id"],))
         incumbents = [row_to_dict(r) for r in cur.fetchall()]
 
+        contract = slot_contract_state(conn, scan["scan_id"])
         conn.close()
-        return {"scan": scan, "models": models, "incumbents": incumbents}
+        return {"scan": scan, "models": models, "incumbents": incumbents, "slot_contract": contract}
     except HTTPException:
         raise
     except Exception as e:
@@ -90,7 +109,7 @@ def list_models(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     tier: str | None = Query(None),
-    sort: str = Query("composite", regex="^(composite|tps|latency_s|ai_index|tier)$"),
+    sort: str = Query("composite", pattern="^(composite|tps|latency_s|ai_index|tier)$"),
 ):
     """List all models from the latest scan with optional filters."""
     try:
@@ -161,25 +180,35 @@ def get_model(model_id: str):
 
 @app.get("/api/v1/slots")
 def list_slots():
-    """Return slot definitions with current incumbents."""
+    """Return the code-owned 15-slot contract and any exact incumbents."""
     try:
         conn = get_db()
         cur = conn.execute("SELECT MAX(scan_id) FROM scans")
         scan_id = cur.fetchone()[0]
         if not scan_id:
-            return []
-
-        cur = conn.execute(
-            "SELECT DISTINCT slot_id FROM incumbents WHERE scan_id = ?", (scan_id,))
-        slots = [r["slot_id"] for r in cur.fetchall()]
-
-        cur = conn.execute(
-            "SELECT slot_id, provider, model_id, status, tps, latency_s FROM incumbents WHERE scan_id = ?",
-            (scan_id,))
-        incumbents = {r["slot_id"]: row_to_dict(r) for r in cur.fetchall()}
-
+            incumbents = {}
+        else:
+            cur = conn.execute(
+                "SELECT slot_id, provider, model_id, status, tps, latency_s "
+                "FROM incumbents WHERE scan_id = ? AND slot_id LIKE 'S%'",
+                (scan_id,),
+            )
+            incumbents = {r["slot_id"]: row_to_dict(r) for r in cur.fetchall()}
+        requirements = requirements_for_slots()
+        result = [
+            {
+                "slot_id": slot.slot_id,
+                "label": slot.label,
+                "family": slot.family,
+                "effort": slot.effort,
+                "tier": slot.tier,
+                "requirements": requirements[slot.slot_id],
+                "incumbent": incumbents.get(slot.slot_id),
+            }
+            for slot in SLOTS
+        ]
         conn.close()
-        return [{"slot_id": s, "incumbent": incumbents.get(s)} for s in slots]
+        return result
     except Exception as e:
         return {"error": str(e)}
 
@@ -222,6 +251,9 @@ def list_providers():
 @app.get("/api/v1/slots/{slot_id}")
 def get_slot(slot_id: str):
     """Return slot detail with candidate rankings."""
+    slot = SLOTS_BY_ID.get(slot_id)
+    if slot is None:
+        raise HTTPException(404, f"Unknown current slot {slot_id}")
     try:
         conn = get_db()
         cur = conn.execute("SELECT MAX(scan_id) FROM scans")
@@ -241,7 +273,16 @@ def get_slot(slot_id: str):
         """, (scan_id, slot_id))
         candidates = [row_to_dict(r) for r in cur.fetchall()]
         conn.close()
-        return {"slot_id": slot_id, "incumbent": incumbent, "candidates": candidates}
+        return {
+            "slot_id": slot_id,
+            "label": slot.label,
+            "family": slot.family,
+            "effort": slot.effort,
+            "tier": slot.tier,
+            "requirements": requirements_for_slots([slot])[slot_id],
+            "incumbent": incumbent,
+            "candidates": candidates,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -284,7 +325,16 @@ def config_preview():
         cur = conn.execute("SELECT MAX(scan_id) FROM scans")
         scan_id = cur.fetchone()[0]
         if not scan_id:
-            return {"patch": "# No scan data available"}
+            return {"status": "abstain", "patch": "# No scan data available"}
+        contract = slot_contract_state(conn, scan_id)
+        if contract["status"] != "current":
+            conn.close()
+            return {
+                "status": "abstain",
+                "reason": "Latest scan uses legacy or incomplete slot identifiers.",
+                "slot_contract": contract,
+                "patch": "# No preview: current 15-slot S namespace is not fully covered.",
+            }
         cur = conn.execute("""
             SELECT i.slot_id, i.model_id as current, m2.model_id as recommended
             FROM incumbents i
@@ -304,9 +354,9 @@ def config_preview():
             lines.append(f"#   current:    {d['current']}")
             lines.append(f"#   recommended: {d['recommended']}")
             lines.append("")
-        return {"patch": "\n".join(lines)}
+        return {"status": "preview", "patch": "\n".join(lines), "slot_contract": contract}
     except Exception as e:
-        return {"patch": f"# Error: {e}"}
+        return {"status": "abstain", "patch": f"# Error: {e}"}
 
 
 @app.get("/api/v1/analysis")
@@ -356,7 +406,7 @@ def get_refinement_history():
                     "passes": len(data.get("passes", [])),
                 })
                 sessions.append(data)
-            except:
+            except (OSError, ValueError, json.JSONDecodeError):
                 pass
     
     return sessions

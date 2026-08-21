@@ -32,6 +32,8 @@ import gateway_bridge as gb
 import quota_meter as qm
 import slot_grid as sg
 import slot_resolver as sr
+from gateway_rank_map import RankMapRejected, build_rank_map, validate_rank_map
+from routing_snapshot import RoutingSnapshotRejected, validate_gateway_snapshot
 
 # The Claude Code grid, as vendor model plus effort pairs. Vendor ids are family
 # tokens so a version bump does not break the mapping.
@@ -73,14 +75,21 @@ def _load_snapshot(path: str | None) -> dict[str, Any]:
         return {}
 
 
-def _load_ranks(path: str | None) -> dict[str, int]:
+def _load_rank_document(path: str | None) -> dict[str, Any]:
     if not path:
         return {}
     try:
         raw = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return {str(k): int(v) for k, v in raw.items() if isinstance(v, (int, float))}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _validate_gateway_snapshot(snapshot: Mapping[str, Any], *, now: datetime) -> None:
+    try:
+        validate_gateway_snapshot(snapshot, now=now)
+    except RoutingSnapshotRejected as exc:
+        raise RankMapRejected(str(exc)) from exc
 
 
 def cmd_refresh(args: argparse.Namespace) -> int:
@@ -112,10 +121,11 @@ def cmd_refresh(args: argparse.Namespace) -> int:
 
 def _resolve(args: argparse.Namespace) -> tuple[dict[str, str], dict[str, sr.Resolution]]:
     snapshot = _load_snapshot(args.snapshot)
-    if not snapshot.get("slots"):
-        snapshot = dict(snapshot)
-        snapshot.setdefault("blocklist", [])
-        snapshot["slots"] = {}
+    now = _utcnow()
+    _validate_gateway_snapshot(snapshot, now=now)
+    ranks = validate_rank_map(
+        _load_rank_document(args.ranks), snapshot, now=now,
+    )
     if args.quota and Path(args.quota).expanduser().exists():
         from routing_snapshot import load_provider_quota
 
@@ -123,15 +133,16 @@ def _resolve(args: argparse.Namespace) -> tuple[dict[str, str], dict[str, sr.Res
     return gb.build_redirect_table(
         snapshot,
         DEFAULT_PAIRS,
-        candidate_ranks=_load_ranks(args.ranks),
-        now=_utcnow(),
+        candidate_ranks=ranks,
+        now=now,
     )
 
 
 def cmd_resolve(args: argparse.Namespace) -> int:
-    table, resolutions = _resolve(args)
-    if not resolutions:
-        print("no slots in snapshot: pass --snapshot with a routing snapshot")
+    try:
+        table, resolutions = _resolve(args)
+    except RankMapRejected as exc:
+        print(f"input rejected: {exc}")
         return 1
 
     print(f"{'SLOT':<20} {'MODE':<10} {'FLOOR':<6} RESOLVED TO")
@@ -155,13 +166,53 @@ def cmd_resolve(args: argparse.Namespace) -> int:
 
 def cmd_publish(args: argparse.Namespace) -> int:
     cmd_refresh(args)
-    table, _ = _resolve(args)
+    try:
+        table, resolutions = _resolve(args)
+    except RankMapRejected as exc:
+        print(f"input rejected: {exc}")
+        return 1
     if not table:
         print("\nno redirects to publish")
         return 0
-    target = gb.write_litellm_overrides(table, args.out)
+    providers = gb.redirect_provider_map(
+        resolutions,
+        sg.alias_table(DEFAULT_PAIRS),
+    )
+    try:
+        target = gb.write_litellm_overrides(
+            table,
+            args.out,
+            provider_by_alias=providers,
+        )
+    except ValueError as exc:
+        print(f"projection rejected: {exc}")
+        return 1
     print(f"\nwrote {len(table)} redirect(s) to {target}")
     print("this file is for a human or gateway to merge; nothing was applied")
+    return 0
+
+
+def cmd_rank_map(args: argparse.Namespace) -> int:
+    snapshot = _load_snapshot(args.snapshot)
+    try:
+        _validate_gateway_snapshot(snapshot, now=_utcnow())
+        raw = _load_rank_document(args.rank_input)
+        if not args.ranks or not args.evidence_ref or not args.evidence_sha256:
+            raise RankMapRejected("--ranks, --evidence-ref, and --evidence-sha256 are required")
+        document = build_rank_map(
+            raw,
+            snapshot,
+            generated_at=_utcnow().isoformat().replace("+00:00", "Z"),
+            evidence_ref=args.evidence_ref,
+            evidence_sha256=args.evidence_sha256,
+        )
+    except RankMapRejected as exc:
+        print(f"input rejected: {exc}")
+        return 1
+    target = Path(args.ranks).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote provenance-bound rank map to {target}")
     return 0
 
 
@@ -274,6 +325,9 @@ def _add_shared_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--limits", default=None, help="path to adaptive_limits.json")
     parser.add_argument("--snapshot", default=None, help="path to a routing snapshot json")
     parser.add_argument("--ranks", default=None, help="path to {api_model: ladder_rank} json")
+    parser.add_argument("--rank-input", default=None, help="plain {api_model: rank} evidence input for rank-map")
+    parser.add_argument("--evidence-ref", default=None, help="immutable evidence reference for rank-map")
+    parser.add_argument("--evidence-sha256", default=None, help="sha256:<digest> of rank-map evidence")
     parser.add_argument("--out", default="gateway-overrides.json", help="override output path")
 
 
@@ -292,6 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("publish", cmd_publish, "refresh, resolve, and write overrides"),
         ("utilization", cmd_utilization, "report window utilization"),
         ("preflight", cmd_preflight, "report deployment blockers"),
+        ("rank-map", cmd_rank_map, "publish a provenance-bound rank map"),
     ):
         s = sub.add_parser(name, help=help_text)
         _add_shared_options(s)

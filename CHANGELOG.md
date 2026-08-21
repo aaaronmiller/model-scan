@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - v5.0.0
 
 ### Added
+- **Gateway S-slot and provenance rank-map contract** — fresh `dink.py --emit-snapshot` output now uses the 15 current Gateway `S*` slots; `gateway_cli.py rank-map` publishes a credential-free `api_model` ladder map bound to an exact snapshot and evidence checksum. Database fallback preserves the source scan timestamp and rejects stale or legacy-role evidence instead of re-stamping it.
+- **Gateway identity and alias safety** — routing snapshots exclude dynamic router aliases such as `openrouter/free`, and LiteLLM projections omit model names whose effort-specific slots would collapse into one unsafe alias.
 - **claude-code-proxy routing snapshot producer** (`routing_snapshot.py`, `dink.py --emit-snapshot`) — Emits credential-free `routing_snapshot.json` using the shared contract in `contracts/routing_snapshot.schema.json`, with per-role ranked candidates, provider health, blocklist export, atomic writes, and contract tests.
 - **Gateway routing snapshot endpoint** (`GET /routing-snapshot`) — Serves the latest emitted snapshot and rebuilds from SQLite when the file is missing.
 - **Router reliability feedback endpoint** (`POST /reliability`) — Persists claude-code-proxy reliability summaries and feeds provider error/rate-limit rates into future snapshot provider-health status.
@@ -39,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TUI `_ensure_extractors_path()`** — deduplicated `sys.path.insert(0, ...)` across capability functions
 
 ### Fixed
+- **Live LiteLLM callback dispatch** - the configured callback now uses an
+  async adapter, so LiteLLM proxy requests reach the process-safe spend and
+  quota writer instead of remaining on LiteLLM's unused sync callback list.
+- **Valid LiteLLM provider projection** - redirect publication now retains the
+  resolved serving provider, emits OpenRouter targets in LiteLLM's required
+  `openrouter/provider/model` grammar, and rejects unsupported provider adapters
+  instead of publishing an unusable model string.
+- **Unsafe redirect-input acceptance** — `resolve` and `publish` now reject stale, legacy-role, partial, or snapshot-mismatched rank inputs before producing redirects.
 - **LiteLLM callback idempotency** - independently deduplicates spend and quota observations by stable request ID under process-safe file locks, and declines unidentified measured events during at-least-once delivery.
 - **Slot fitness calculation** — replaced static 5% arch bonus with slot-specific `get_slot_arch_bonus()`
 - **Color constants** — replaced removed `C.UNDERLINE` references with `C.ACCENT`
