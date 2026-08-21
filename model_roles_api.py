@@ -98,8 +98,8 @@ TIERS = [
      "buys about 3 capability points over baseline; review, adjudication"),
     ("frontier",  0.90, 2.00,
      "the genuine ceiling; irreversible decisions only"),
-    ("dominated", 2.00, 1e9,
-     "never use: every member is beaten by something cheaper"),
+    ("premium",   2.00, 1e9,
+     "check before using: members are beaten or matched by something cheaper"),
 ]
 
 # Inside the baseline zone price carries no signal, so the only defensible
@@ -147,20 +147,39 @@ SCORE_DISPUTED = {
 # Configurations that cost MORE and deliver LESS than a named alternative.
 # Selecting one of these is always wrong. Keyed by the dominated config.
 DOMINATED = {
-    # Justification corrected 2026-08-20 after the calibration audit. The
-    # original cited ARDF's 61.13 versus 61.90, a 0.77 gap computed between a
-    # 15-observation mean spanning 34.8 points and a 2-observation mean. That
-    # gap is inside the noise. The conclusion survives on cleaner evidence:
-    # Artificial Analysis scores both at exactly 63.00, so this is domination
-    # on PRICE at equal capability, which needs no fragile decimal. Kilo also
-    # has Opus 5 (max) off its frontier.
+    # WITHDRAWN 2026-08-20: "Claude Opus 5 (max)".
+    #
+    # This entry claimed max was dominated by xhigh. It has now been wrong
+    # twice, in opposite directions, and the second time settles the question.
+    #
+    #   first ledger   max 61.13 vs xhigh 61.90   gap -0.77
+    #   after the AA refresh (2309 new observations, 610 models)
+    #                  max 61.15 vs xhigh 60.99   gap +0.16
+    #
+    # The gap changed sign. Standard errors are 0.59 (n=10) and 1.30 (n=4), so
+    # the error on the difference is about 1.43 and BOTH gaps were far inside
+    # it. Opus 5 (max) is now on the strict frontier.
+    #
+    # The honest statement: max and xhigh are statistically indistinguishable
+    # on capability. Neither dominates. They differ only on price, $2.34
+    # against $1.80, so xhigh is the better buy at equal measured capability,
+    # and that belongs in PREFER_CHEAPER, not here.
+    #
+    # Nothing goes in this table on a capability difference smaller than the
+    # error on that difference.
+    "Claude Fable 5 (max)": (
+        "GPT-5.6 Sol (max)",
+        "60.02 at $3.14 against 60.65 at $1.23: cheaper and at least as capable",
+    ),
+}
+
+# Configurations that are statistically tied on capability but differ on price.
+# Not domination: a tie plus a price gap. Prefer the cheaper one, and say why.
+PREFER_CHEAPER = {
     "Claude Opus 5 (max)": (
         "Claude Opus 5 (xhigh)",
-        "equal capability (AA scores both 63.00) at $2.34 versus $1.80",
-    ),
-    "Claude Fable 5 (max)": (
-        "Claude Opus 5 (xhigh)",
-        "cap 60.02 at $3.14 versus cap 61.90 at $1.80",
+        "61.15 +/- 0.59 against 60.99 +/- 1.30: indistinguishable on "
+        "capability, $2.34 against $1.80",
     ),
 }
 
@@ -213,6 +232,10 @@ def build_tiers() -> dict[str, list[dict]]:
             entry["disputed"] = SCORE_DISPUTED[name]
         if cap < USABILITY_FLOOR:
             entry["below_floor"] = True
+        if name in PREFER_CHEAPER:
+            better, why = PREFER_CHEAPER[name]
+            entry["prefer_cheaper"] = better
+            entry["why_cheaper"] = why
         if name in DOMINATED:
             better, why = DOMINATED[name]
             entry["dominated_by"] = better
@@ -382,6 +405,8 @@ def main() -> int:
                 flag = ""
                 if "dominated_by" in e:
                     flag = f"   DOMINATED by {e['dominated_by']}"
+                if "prefer_cheaper" in e:
+                    flag = f"   tied with {e['prefer_cheaper']}, prefer the cheaper"
                 if "disputed" in e:
                     flag = "   SCORE DISPUTED (R4)"
                 print(f"      cap {e['capability']:>6.2f}  ${e['task_price']:<9.5g} "
