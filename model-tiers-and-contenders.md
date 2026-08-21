@@ -110,7 +110,7 @@ Canonical data: `data/unified-model-evidence.csv`. Policy: `project-config.json`
 | Qwen3.7 Plus | 42.93 | $0.055453 | no | — |
 | gpt-5-default | 42.79 | — | no | — |
 | Claude Opus 4.7 (Non-reasoning, High Effort) | 42.68 | $0.37232 | no | — |
-| GPT-5.4 mini (xhigh) | 42.55 | $0.37373 | no | — |
+| GPT-5.4 mini (xhigh) | 42.55 | $0.37373 | no | capability-close / price-heavy |
 | gpt-5.4-pro-thinking | 42.28 | — | no | — |
 | GPT-5.6 Sol (non-reasoning) | 42.00 | $0.13841 | no | — |
 | MiMo-V2.5 | 41.96 | $0.010649 | YES | — |
@@ -799,8 +799,8 @@ The lower end is contested by cost compression rather than flagship quality. Thi
 | GPT-5.5 (low) | T3 | 51.00 | $0.21075 | GLM-5.2 (max) | 0.39 | 1329.4% | capability-close / price-heavy |
 | GPT-5.6 Sol (low) | T3 | 51.00 | $0.23 | GLM-5.2 (max) | 0.39 | 1460.0% | capability-close / price-heavy |
 | Grok 4.20 0309 (Non-reasoning) | T4 | 22.48 | $0.10865 | GLM-4.7-Flash (Reasoning) | 0.41 | 1702.6% | capability-close / price-heavy |
+| GPT-5.4 mini (xhigh) | T4 | 41.43 | $0.3085 | MiMo-V2.5 | 0.53 | 2696.2% | capability-close / price-heavy |
 | Nemotron 3 Nano Omni 30B A3B Reasoning | T4 | 14.93 | $0.019647 | GLM-4.7-Flash (Non-reasoning) | 0.59 | 408.9% | capability-close / price-heavy |
-| Claude Fable 5 (max) | T1 | 60.02 | $3.14 | GPT-5.6 Sol (max) | 0.63 | 155.3% | capability-close / price-heavy |
 | NVIDIA Nemotron Nano 12B v2 VL (Non-reasoning) | T4 | 4.58 | $0.06521 | Granite 4.0 H Small | 0.66 | 1748.2% | capability-close / price-heavy |
 
 ## Named high-interest competitors
@@ -810,7 +810,7 @@ These entries come from the explicit analysis-policy watchlist and remain visibl
 | Model/configuration | Tier | Capability | Cost | Status |
 |---|---|---:|---:|---|
 | Qwen3.8 Max (xhigh) | T2 | 56.71 | $1.13 | capability-close / price-heavy |
-| Claude Fable 5 (max) | T1 | 60.02 | $3.14 | capability-close / price-heavy |
+| Claude Fable 5 (max) | T1 | 60.41 | $3.14 | capability-close / price-heavy |
 | GPT-5.6 Sol (max) | T1 | 60.65 | $1.23 | STRICT FRONTIER |
 | Kimi K3 (max) | T2 | 59.87 | $0.84 | STRICT FRONTIER |
 | Claude Sonnet 5 (max) | T3 | 53.93 | $0.58975 | economically dominated |

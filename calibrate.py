@@ -839,6 +839,81 @@ def ana_wgmean(items):
     sw=sum(w for v,w in usable)
     return math.exp(sum(math.log(v)*w for v,w in usable)/sw)
 
+def ana_dispersion(values):
+    """Spread statistics for one model's calibrated observations.
+
+    ANNOTATION ONLY. Nothing here feeds back into the capability value or into
+    the Pareto computation. Confidence must not distort the estimate: weighting
+    by inverse variance would shrink thinly-measured models toward the mean and
+    move points on the graph for reasons unrelated to the models. The estimate
+    stays where the measurements put it; this describes how well we know it.
+
+    Added 2026-08-20 after an audit found 510 of 616 models resting on a single
+    observation, with `source_count` computed and then used only as a display
+    column. Selection code may consume `std_err`; the plot must not.
+    """
+    vals = [v for v in values if v is not None]
+    n = len(vals)
+    if n == 0:
+        return {"n": 0, "std_dev": None, "std_err": None, "spread": None,
+                "provisional": True}
+    if n == 1:
+        return {"n": 1, "std_dev": None, "std_err": None, "spread": 0.0,
+                "provisional": True}
+    mean = sum(vals) / n
+    var = sum((v - mean) ** 2 for v in vals) / (n - 1)
+    sd = math.sqrt(var)
+    return {"n": n, "std_dev": sd, "std_err": sd / math.sqrt(n),
+            "spread": max(vals) - min(vals),
+            # Fewer than three observations cannot support a spread estimate
+            # worth trusting, so the point is flagged rather than excluded.
+            "provisional": n < 3}
+
+
+# A calibrated observation this many robust deviations from the model's own
+# median is treated as a scale error rather than a disagreement. Set from the
+# observed failure: kimi-k3-max carried a spread of 1346 calibrated points with
+# one value at 30.8, which can only mean a source was on a different scale
+# entirely. A robust fitter suppresses an outlier's influence on the FIT; it
+# does nothing to stop a mis-scaled value entering the AGGREGATE.
+SCALE_OUTLIER_MADS = 6.0
+
+
+def ana_scale_filter(items, model_key, problems=None):
+    """Drop observations that cannot be on the same scale as their siblings.
+
+    Uses median absolute deviation, which does not itself collapse in the
+    presence of the outlier it is looking for. Quarantined values are reported,
+    never silently discarded, because a quarantine is a data-quality finding
+    about a source and needs to be visible.
+    """
+    vals = [v for v, w, r in items if v is not None]
+    if len(vals) < 4:
+        return items, []
+    med = statistics.median(vals)
+    devs = sorted(abs(v - med) for v in vals)
+    mad = statistics.median(devs)
+    if mad <= 0:
+        return items, []
+    keep, dropped = [], []
+    for v, w, r in items:
+        if v is not None and abs(v - med) > SCALE_OUTLIER_MADS * mad:
+            dropped.append({"model": model_key, "value": v, "median": med,
+                            "source_id": r.get("source_id"),
+                            "metric": r.get("metric_name")})
+            if problems is not None:
+                problems.append({
+                    "path": f"scale:{model_key}",
+                    "reason": (f"observation {v:.4g} is more than "
+                               f"{SCALE_OUTLIER_MADS:g} MADs from the model "
+                               f"median {med:.4g}; quarantined as a probable "
+                               f"scale error from source "
+                               f"{r.get('source_id')}")})
+        else:
+            keep.append((v, w, r))
+    return keep, dropped
+
+
 def ana_cost_priority(r):
     # This order mirrors dashboard.html exactly.  If the dashboard changes,
     # update this function and the regression tests together.
@@ -864,9 +939,17 @@ def ana_aggregate(rows, policy):
         elif r.get('metric_axis')=='cost' and v>0:groups[r['model_key']]['cost'].append((v,w,r))
     out=[]
     cutoff=policy['current_release_cutoff']
+    scale_dropped_total=0
+    scale_problems=[]
     for key,meta in catalog.items():
         g=groups[key]
-        cap=ana_wmean([(v,w) for v,w,r in g['cap']])
+        # Quarantine mis-scaled observations BEFORE aggregating. This changes
+        # the estimate, and it is meant to: a value on the wrong scale is not a
+        # disagreement to average in, it is bad data.
+        cap_items, cap_dropped = ana_scale_filter(g['cap'], key, scale_problems)
+        scale_dropped_total += len(cap_dropped)
+        cap=ana_wmean([(v,w) for v,w,r in cap_items])
+        cap_disp=ana_dispersion([v for v,w,r in cap_items])
         cost=None; used=[]
         if g['cost']:
             p=max(ana_cost_priority(r) for v,w,r in g['cost'])
@@ -878,11 +961,18 @@ def ana_aggregate(rows, policy):
         item={
             'model_key':key,'display_name':meta.get('display_name') or key,'provider':meta.get('provider',''),
             'family':meta.get('family',''),'effort':meta.get('effort',''),'release_date':release,'current':current,
-            'capability':cap,'aa_reference':max(g['aa']) if g['aa'] else None,'cost':cost,'raw_standardized_cost':raw_proxy,
+            'capability':cap,
+            # Annotation only. See ana_dispersion.
+            'capability_std_err':cap_disp['std_err'],
+            'capability_std_dev':cap_disp['std_dev'],
+            'capability_spread':cap_disp['spread'],
+            'capability_provisional':cap_disp['provisional'],
+            'capability_scale_dropped':len(cap_dropped),
+            'aa_reference':max(g['aa']) if g['aa'] else None,'cost':cost,'raw_standardized_cost':raw_proxy,
             'cost_method':' + '.join(sorted({ana_cost_label(r) for v,w,r in used})) if used else 'unpriced',
             'cost_sources':sorted({r.get('source_id') for v,w,r in used}),
             'source_count':len({r.get('source_id') for r in g['all'] if r.get('source_id')}),
-            'capability_rows':len(g['cap']),'cost_rows':len(g['cost']),
+            'capability_rows':len(cap_items),'cost_rows':len(g['cost']),
             'input_price_per_m':ana_number(meta.get('input_price_per_m')),'output_price_per_m':ana_number(meta.get('output_price_per_m')),
             'context_tokens':ana_number(meta.get('models_dev_context_tokens') or meta.get('context_window_tokens')),
             'output_limit_tokens':ana_number(meta.get('models_dev_output_limit_tokens')),
