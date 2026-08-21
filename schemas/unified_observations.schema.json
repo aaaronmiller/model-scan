@@ -34,11 +34,30 @@
     },
     "effort": {
       "type": "string",
-      "enum": ["default","minimal","non-reasoning","low","medium","high","xhigh","max"]
+      "enum": [
+        "default",
+        "minimal",
+        "non-reasoning",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
     },
     "harness": {
       "type": "string",
-      "enum": ["general-api","claude-code","codex","pi-omp","opencode","kilo","vals","benchlm","livebench"]
+      "enum": [
+        "general-api",
+        "claude-code",
+        "codex",
+        "pi-omp",
+        "opencode",
+        "kilo",
+        "vals",
+        "benchlm",
+        "livebench"
+      ]
     },
     "calibrated_score_v1": {
       "type": "string"
@@ -48,7 +67,7 @@
     }
   },
   "x-grain": "model_key\u00d7effort\u00d7harness\u00d7source_id\u00d7metric_name\u00d7source_date",
-  "x-row-count": 2839,
+  "x-row-count": 5148,
   "x-columns": [
     "record_type",
     "observation_id",
@@ -168,5 +187,6 @@
     "cal_auto_best_anchor_count",
     "cal_auto_best_rmse",
     "cal_auto_best_group_key"
-  ]
+  ],
+  "x-row-count-note": "Re-pinned 2026-08-20 after the authorized Artificial Analysis v2 API refresh appended 2309 observations (2839 -> 5148). This value is a deliberate gate: ardf_export refuses to build when the ledger and this number disagree, so every ledger change must be acknowledged here."
 }
