@@ -16,20 +16,19 @@ Generated 2026-08-21. Canonical source: `data/unified-model-evidence.csv`. Gener
 
 | Tier | Model/configuration | Provider | Effort | Capability | Task price | $/capability point | $/M in/out | Released | Context | Weights | Sources |
 |---|---|---|---|---:|---:|---:|---:|---|---:|---|---:|
-| T4 | Qwen3.5 0.8B (Non-reasoning) | Alibaba | non-reasoning | 4.42 | $0.0024049 | $0.0005443 | $0.01 / $0.05 | 2026-03-02 | 262144 | open | 3 |
-| T4 | Granite 4.0 H Small | IBM | default | 5.24 | $0.0035282 | $0.00067372 | $0.06 / $0.25 | 2025-09-22 | 128000 | open | 3 |
-| T4 | GLM-4.7-Flash (Non-reasoning) | Z.ai | non-reasoning | 15.52 | $0.0038603 | $0.0002488 | $0.07 / $0.4 | 2026-01-19 | 200000 | open | 2 |
-| T4 | GLM-4.7-Flash (Reasoning) | Z.ai | default | 22.89 | $0.0060278 | $0.00026334 | $0.07 / $0.4 | 2026-01-19 | 200000 | open | 2 |
-| T4 | GPT-5.6 Luna (medium) | OpenAI | medium | 39.00 | $0.01 | $0.00025641 | $0.2 / $1.2 | 2026-07-09 | 1050000 | closed/API | 2 |
-| T4 | MiMo-V2.5 | Xiaomi | default | 41.96 | $0.011033 | $0.00026291 | $0.14 / $0.28 | 2026-04-22 | 1000000 | closed/API | 8 |
-| T3 | GLM-5.2 (max) | Z.ai | max | 51.39 | $0.014744 | $0.00028689 | $0.07 / $0.22 | 2026-06-16 | 1000000 | open | 8 |
-| T2 | Muse Spark 1.2 (xhigh, Contributor pricing) | Meta | xhigh | 57.10 | $0.021231 | $0.0003718 | $0.1 / $0.2 | 2026-08-05 | 1048576 | closed/API | 8 |
-| T2 | GPT-5.5 (high) | OpenAI | high | 58.55 | $0.70097 | $0.011972 | $5 / $30 | 2026-04-23 | 922000 | closed/API | 4 |
-| T2 | Claude Opus 5 (medium) | Anthropic | medium | 59.00 | $0.72 | $0.012203 | $5 / $25 | 2026-07-24 | 1000000 | closed/API | 2 |
-| T2 | GPT-5.6 Sol (xhigh) | OpenAI | xhigh | 59.16 | $0.81 | $0.013691 | $5 / $30 | 2026-07-09 | 1000000 | closed/API | 3 |
-| T2 | Kimi K3 (max) | Kimi | max | 59.87 | $0.84 | $0.01403 | $3 / $15 | 2026-07-16 | 1048576 | closed/API | 9 |
-| T1 | GPT-5.6 Sol (max) | OpenAI | max | 60.65 | $1.23 | $0.020279 | $5 / $30 | 2026-07-09 | 1000000 | closed/API | 11 |
-| T1 | Claude Opus 5 (xhigh) | Anthropic | xhigh | 61.90 | $1.8 | $0.029078 | $5 / $25 | 2026-07-24 | 1000000 | closed/API | 3 |
+| T4 | Gemma 4 E4B (Reasoning) | Google | default | 10.52 | $0.0014415 | $0.00013704 | $0 / $0 | 2026-04-03 | 128000 | open | 2 |
+| T4 | GLM-4.7-Flash (Non-reasoning) | Z.ai | non-reasoning | 15.56 | $0.0038603 | $0.00024812 | $0.07 / $0.4 | 2026-01-19 | 200000 | open | 3 |
+| T4 | Step 3.5 Flash 2603 | StepFun | default | 26.50 | $0.0060213 | $0.00022722 | $0.1 / $0.3 | 2026-04-02 | 256000 | closed/API | 2 |
+| T4 | GPT-5.6 Luna (medium) | OpenAI | medium | 38.53 | $0.01 | $0.00025952 | $0.2 / $1.2 | 2026-07-09 | 1050000 | closed/API | 3 |
+| T4 | MiMo-V2.5 | Xiaomi | default | 41.84 | $0.011033 | $0.0002637 | $0.14 / $0.28 | 2026-04-22 | 1000000 | closed/API | 8 |
+| T3 | GLM-5.2 (max) | Z.ai | max | 51.47 | $0.014744 | $0.00028645 | $0.07 / $0.22 | 2026-06-16 | 1000000 | open | 8 |
+| T2 | Muse Spark 1.2 (xhigh, Contributor pricing) | Meta | xhigh | 57.00 | $0.021231 | $0.00037247 | $0.1 / $0.2 | 2026-08-05 | 1048576 | closed/API | 8 |
+| T2 | Kimi K3 | Kimi | default | 58.22 | $0.22436 | $0.0038538 | $3 / $15 | 2026-07-16 | 1048576 | closed/API | 3 |
+| T2 | GPT-5.6 Sol (xhigh) | OpenAI | xhigh | 58.91 | $0.81 | $0.013749 | $5 / $30 | 2026-07-09 | 1000000 | closed/API | 4 |
+| T2 | Kimi K3 (max) | Kimi | max | 59.90 | $0.84 | $0.014024 | $3 / $15 | 2026-07-16 | 1048576 | closed/API | 9 |
+| T1 | GPT-5.6 Sol (max) | OpenAI | max | 60.65 | $1.23 | $0.02028 | $5 / $30 | 2026-07-09 | 1000000 | closed/API | 11 |
+| T1 | Claude Opus 5 (xhigh) | Anthropic | xhigh | 60.99 | $1.8 | $0.029514 | $5 / $25 | 2026-07-24 | 1000000 | closed/API | 4 |
+| T1 | Claude Opus 5 (max) | Anthropic | max | 61.15 | $2.34 | $0.038266 | $5 / $25 | 2026-07-24 | 1000000 | closed/API | 10 |
 
 ## Muse Spark 1.2 economics
 
@@ -46,16 +45,16 @@ The Contributor task coordinate is not a direct AA billing observation. It repri
 
 | Model/configuration | Tier | Capability | Task price | Dominated by | Capability gap | Price premium | Verdict |
 |---|---|---:|---:|---|---:|---:|---|
-| Qwen3.8 Max (xhigh) | T2 | 56.71 | $1.13 | GPT-5.5 (high) | 1.84 | 61.2% | capability-close / price-heavy |
-| Claude Fable 5 (max) | T1 | 60.41 | $3.14 | Claude Opus 5 (xhigh) | 1.49 | 74.4% | capability-close / price-heavy |
+| Qwen3.8 Max (xhigh) | T2 | 56.77 | $1.13 | GPT-5.6 Sol (xhigh) | 2.14 | 39.5% | price-close / capability-behind |
+| Claude Fable 5 (max) | T1 | 60.41 | $3.14 | Claude Opus 5 (max) | 0.74 | 34.2% | near-frontier |
 | GPT-5.6 Sol (max) | T1 | 60.65 | $1.23 | — | 0.00 | 0.0% | STRICT FRONTIER |
-| Kimi K3 (max) | T2 | 59.87 | $0.84 | — | 0.00 | 0.0% | STRICT FRONTIER |
-| Claude Sonnet 5 (max) | T3 | 53.93 | $0.58975 | Muse Spark 1.2 (xhigh, Contributor pricing) | 3.17 | 2677.8% | economically dominated |
-| DeepSeek V4 Flash 0731 (max) | T3 | 52.00 | $0.03 | Muse Spark 1.2 (xhigh, Contributor pricing) | 5.10 | 41.3% | price-close / capability-behind |
-| GPT-5.6 Luna (xhigh) | T3 | 48.83 | $0.03 | GLM-5.2 (max) | 2.56 | 103.5% | economically dominated |
-| Grok 4.3 (high) | T3 | 53.00 | $0.10662 | Muse Spark 1.2 (xhigh, Contributor pricing) | 4.10 | 402.2% | economically dominated |
-| Gemini 3.1 Pro Preview | T2 | 57.00 | $0.16836 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.10 | 693.0% | capability-close / price-heavy |
-| MiMo-V2.5-Pro | T4 | 43.39 | $0.034705 | GLM-5.2 (max) | 8.01 | 135.4% | economically dominated |
+| Kimi K3 (max) | T2 | 59.90 | $0.84 | — | 0.00 | 0.0% | STRICT FRONTIER |
+| Claude Sonnet 5 (max) | T3 | 54.04 | $0.58975 | Kimi K3 | 4.17 | 162.9% | economically dominated |
+| DeepSeek V4 Flash 0731 (max) | T3 | 52.00 | $0.03 | Muse Spark 1.2 (xhigh, Contributor pricing) | 5.00 | 41.3% | price-close / capability-behind |
+| GPT-5.6 Luna (xhigh) | T3 | 49.71 | $0.03 | GLM-5.2 (max) | 1.76 | 103.5% | capability-close / price-heavy |
+| Grok 4.3 (high) | T3 | 53.00 | $0.10662 | Muse Spark 1.2 (xhigh, Contributor pricing) | 4.00 | 402.2% | economically dominated |
+| Gemini 3.1 Pro Preview | T2 | 57.00 | $0.16836 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.00 | 693.0% | capability-close / price-heavy |
+| MiMo-V2.5-Pro | T4 | 43.40 | $0.034705 | GLM-5.2 (max) | 8.07 | 135.4% | economically dominated |
 
 ## Closest near-frontier misses (all families)
 
@@ -63,26 +62,26 @@ This table is algorithmic rather than hand-picked: the first 20 current non-fron
 
 | Model/configuration | Tier | Capability | Task price | Dominated by | Capability gap | Price premium | Verdict |
 |---|---|---:|---:|---|---:|---:|---|
-| Claude Opus 5 (high) | T2 | 59.97 | $1.23 | GPT-5.6 Sol (max) | 0.69 | 0.0% | razor-edge miss |
-| Qwen3.5 0.8B (Reasoning) | T4 | 4.97 | $0.0050158 | Granite 4.0 H Small | 0.27 | 42.2% | near-frontier |
-| Claude Opus 5 (max) | T1 | 61.13 | $2.34 | Claude Opus 5 (xhigh) | 0.77 | 30.0% | near-frontier |
-| GPT-5.5 (xhigh) | T2 | 57.54 | $0.99918 | GPT-5.5 (high) | 1.02 | 42.5% | near-frontier |
-| DeepSeek V4 Flash 0731 (High) | T4 | 37.00 | $0.010662 | GPT-5.6 Luna (medium) | 2.00 | 6.6% | near-frontier |
-| Muse Spark 1.2 (xhigh, Standard pricing) | T2 | 57.10 | $0.4 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.00 | 1784.1% | capability-close / price-heavy |
-| Mistral Medium 3.5 | T4 | 39.00 | $0.26612 | GPT-5.6 Luna (medium) | 0.00 | 2561.2% | capability-close / price-heavy |
-| Claude Fable 5 (xhigh) | T2 | 59.12 | $1.7571 | GPT-5.6 Sol (xhigh) | 0.04 | 116.9% | capability-close / price-heavy |
-| Gemini 3.1 Pro Preview | T2 | 57.00 | $0.16836 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.10 | 693.0% | capability-close / price-heavy |
-| GPT-5.6 Sol (high) | T2 | 57.00 | $0.55 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.10 | 2490.6% | capability-close / price-heavy |
-| Qwen3 Omni 30B A3B Instruct | T4 | 5.11 | $0.054267 | Granite 4.0 H Small | 0.12 | 1438.1% | capability-close / price-heavy |
-| Qwen3.6 Plus | T4 | 41.78 | $0.14709 | MiMo-V2.5 | 0.18 | 1233.2% | capability-close / price-heavy |
-| LFM2 24B A2B | T4 | 4.95 | $0.0068352 | Granite 4.0 H Small | 0.29 | 93.7% | capability-close / price-heavy |
-| Gemini 2.5 Flash-Lite Preview (Sep '25) (Reasoning) | T4 | 15.13 | $0.011426 | GLM-4.7-Flash (Non-reasoning) | 0.39 | 196.0% | capability-close / price-heavy |
-| GPT-5.5 (low) | T3 | 51.00 | $0.21075 | GLM-5.2 (max) | 0.39 | 1329.4% | capability-close / price-heavy |
-| GPT-5.6 Sol (low) | T3 | 51.00 | $0.23 | GLM-5.2 (max) | 0.39 | 1460.0% | capability-close / price-heavy |
-| Grok 4.20 0309 (Non-reasoning) | T4 | 22.48 | $0.10865 | GLM-4.7-Flash (Reasoning) | 0.41 | 1702.6% | capability-close / price-heavy |
-| GPT-5.4 mini (xhigh) | T4 | 41.43 | $0.3085 | MiMo-V2.5 | 0.53 | 2696.2% | capability-close / price-heavy |
-| Nemotron 3 Nano Omni 30B A3B Reasoning | T4 | 14.93 | $0.019647 | GLM-4.7-Flash (Non-reasoning) | 0.59 | 408.9% | capability-close / price-heavy |
-| NVIDIA Nemotron Nano 12B v2 VL (Non-reasoning) | T4 | 4.58 | $0.06521 | Granite 4.0 H Small | 0.66 | 1748.2% | capability-close / price-heavy |
+| Step 3.5 Flash | T4 | 26.00 | $0.0060213 | Step 3.5 Flash 2603 | 0.50 | 0.0% | razor-edge miss |
+| Claude Opus 5 (high) | T2 | 59.63 | $1.23 | Kimi K3 (max) | 0.27 | 46.4% | near-frontier |
+| Claude Fable 5 (max) | T1 | 60.41 | $3.14 | Claude Opus 5 (max) | 0.74 | 34.2% | near-frontier |
+| GPT-5.5 (xhigh) | T2 | 57.49 | $0.99918 | GPT-5.6 Sol (xhigh) | 1.42 | 23.4% | near-frontier |
+| DeepSeek V4 Flash 0731 (High) | T4 | 37.00 | $0.010662 | GPT-5.6 Luna (medium) | 1.53 | 6.6% | near-frontier |
+| Claude Fable 5 (xhigh) | T2 | 59.03 | $1.7571 | GPT-5.6 Sol (max) | 1.62 | 42.9% | near-frontier |
+| Gemma 4 E4B (Non-reasoning) | T4 | 8.81 | $0.0014415 | Gemma 4 E4B (Reasoning) | 1.71 | 0.0% | near-frontier |
+| Gemini 3.1 Pro Preview | T2 | 57.00 | $0.16836 | Muse Spark 1.2 (xhigh, Contributor pricing) | 0.00 | 693.0% | capability-close / price-heavy |
+| Ministral 3 14B | T4 | 10.39 | $0.016064 | Gemma 4 E4B (Reasoning) | 0.13 | 1014.4% | capability-close / price-heavy |
+| NVIDIA Nemotron 3 Super 120B A12B (Reasoning) | T4 | 26.37 | $0.061718 | Step 3.5 Flash 2603 | 0.13 | 925.0% | capability-close / price-heavy |
+| Hy3-preview (Non-reasoning) | T4 | 26.35 | $0.017755 | Step 3.5 Flash 2603 | 0.15 | 194.9% | capability-close / price-heavy |
+| Ling-2.6-1T | T4 | 26.33 | $0.07578 | Step 3.5 Flash 2603 | 0.17 | 1158.5% | capability-close / price-heavy |
+| GPT-5.6 Sol (low) | T3 | 51.17 | $0.23 | GLM-5.2 (max) | 0.30 | 1460.0% | capability-close / price-heavy |
+| Grok 4 Fast (Reasoning) | T4 | 26.14 | $0.018358 | Step 3.5 Flash 2603 | 0.36 | 204.9% | capability-close / price-heavy |
+| Claude Opus 5 (medium) | T2 | 57.83 | $0.72 | Kimi K3 | 0.38 | 220.9% | capability-close / price-heavy |
+| Qwen3 Next 80B A3B Instruct | T4 | 15.15 | $0.10553 | GLM-4.7-Flash (Non-reasoning) | 0.41 | 2633.7% | capability-close / price-heavy |
+| Qwen3.6 27B (Reasoning) | T4 | 38.11 | $0.25276 | GPT-5.6 Luna (medium) | 0.43 | 2427.6% | capability-close / price-heavy |
+| Gemini 3.5 Flash-Lite (high) | T4 | 41.33 | $0.060754 | MiMo-V2.5 | 0.51 | 450.7% | capability-close / price-heavy |
+| Qwen3.6 Plus | T4 | 41.32 | $0.14709 | MiMo-V2.5 | 0.52 | 1233.2% | capability-close / price-heavy |
+| Kimi K3 (low) | T3 | 50.95 | $0.18307 | GLM-5.2 (max) | 0.52 | 1141.7% | capability-close / price-heavy |
 
 ## Capability-tier interpretation
 
@@ -99,16 +98,16 @@ This table has **no executor capability floor**. It is included to make the deno
 
 | Rank | Model/configuration | Tier | Capability | Task price | $/capability | Capability/$ | Pareto? |
 |---:|---|---|---:|---:|---:|---:|---|
-| 1 | GLM-4.7-Flash (Non-reasoning) | T4 | 15.52 | $0.0038603 | $0.0002488 | 4019.4 | YES |
-| 2 | GPT-5.6 Luna (medium) | T4 | 39.00 | $0.01 | $0.00025641 | 3900.0 | YES |
-| 3 | MiMo-V2.5 | T4 | 41.96 | $0.011033 | $0.00026291 | 3803.6 | YES |
-| 4 | GLM-4.7-Flash (Reasoning) | T4 | 22.89 | $0.0060278 | $0.00026334 | 3797.3 | YES |
-| 5 | GLM-5.2 (max) | T3 | 51.39 | $0.014744 | $0.00028689 | 3485.7 | YES |
-| 6 | DeepSeek V4 Flash 0731 (High) | T4 | 37.00 | $0.010662 | $0.00028815 | 3470.4 | no |
-| 7 | GPT-5.6 Luna (low) | T4 | 34.00 | $0.01 | $0.00029412 | 3400.0 | no |
-| 8 | GPT-5.6 Luna (non-reasoning) | T4 | 27.00 | $0.01 | $0.00037037 | 2700.0 | no |
-| 9 | Muse Spark 1.2 (xhigh, Contributor pricing) | T2 | 57.10 | $0.021231 | $0.0003718 | 2689.6 | YES |
-| 10 | DeepSeek V4 Flash (Non-reasoning) | T4 | 28.65 | $0.010928 | $0.00038138 | 2622.1 | no |
+| 1 | Gemma 4 E4B (Reasoning) | T4 | 10.52 | $0.0014415 | $0.00013704 | 7297.3 | YES |
+| 2 | Gemma 4 E4B (Non-reasoning) | T4 | 8.81 | $0.0014415 | $0.00016371 | 6108.3 | no |
+| 3 | Step 3.5 Flash 2603 | T4 | 26.50 | $0.0060213 | $0.00022722 | 4401.0 | YES |
+| 4 | Step 3.5 Flash | T4 | 26.00 | $0.0060213 | $0.00023159 | 4318.0 | no |
+| 5 | GLM-4.7-Flash (Non-reasoning) | T4 | 15.56 | $0.0038603 | $0.00024812 | 4030.3 | YES |
+| 6 | GPT-5.6 Luna (medium) | T4 | 38.53 | $0.01 | $0.00025952 | 3853.3 | YES |
+| 7 | GLM-4.7-Flash (Reasoning) | T4 | 23.09 | $0.0060278 | $0.000261 | 3831.4 | no |
+| 8 | MiMo-V2.5 | T4 | 41.84 | $0.011033 | $0.0002637 | 3792.2 | YES |
+| 9 | GLM-5.2 (max) | T3 | 51.47 | $0.014744 | $0.00028645 | 3491.0 | YES |
+| 10 | DeepSeek V4 Flash 0731 (High) | T4 | 37.00 | $0.010662 | $0.00028815 | 3470.4 | no |
 
 ## Top five executor-grade price/performance candidates
 
@@ -116,11 +115,11 @@ Eligibility: current, priced, positive calibrated capability. No global capabili
 
 | Rank | Model/configuration | Provider | Multi-source capability | AA reference | Task price | $/capability ↓ | Capability/$ ↑ | $/AA point | Pareto? | Cost vs Muse |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|
-| 1 | GLM-4.7-Flash (Non-reasoning) | Z.ai | 15.52 | 15.52 | $0.0038603 | $0.0002488 | 4019.4 | $0.0002488 | YES | 1.00× |
-| 2 | GPT-5.6 Luna (medium) | OpenAI | 39.00 | 39.00 | $0.01 | $0.00025641 | 3900.0 | $0.00025641 | YES | 2.59× |
-| 3 | MiMo-V2.5 | Xiaomi | 41.96 | 38.00 | $0.011033 | $0.00026291 | 3803.6 | $0.00029033 | YES | 2.86× |
-| 4 | GLM-5.2 (max) | Z.ai | 51.39 | 51.00 | $0.014744 | $0.00028689 | 3485.7 | $0.0002891 | YES | 3.82× |
-| 5 | DeepSeek V4 Flash 0731 (High) | DeepSeek | 37.00 | 37.00 | $0.010662 | $0.00028815 | 3470.4 | $0.00028815 | no | 2.76× |
+| 1 | Gemma 4 E4B (Reasoning) | Google | 10.52 | 12.50 | $0.0014415 | $0.00013704 | 7297.3 | $0.00011535 | YES | 1.00× |
+| 2 | Step 3.5 Flash 2603 | StepFun | 26.50 | 26.50 | $0.0060213 | $0.00022722 | 4401.0 | $0.00022722 | YES | 4.18× |
+| 3 | Step 3.5 Flash | StepFun | 26.00 | 26.00 | $0.0060213 | $0.00023159 | 4318.0 | $0.00023159 | no | 4.18× |
+| 4 | GLM-4.7-Flash (Non-reasoning) | Z.ai | 15.56 | 15.60 | $0.0038603 | $0.00024812 | 4030.3 | $0.00024745 | YES | 2.68× |
+| 5 | GPT-5.6 Luna (medium) | OpenAI | 38.53 | 39.00 | $0.01 | $0.00025952 | 3853.3 | $0.00025641 | YES | 6.94× |
 
 **Important:** Muse remains #1 **within the executor-eligible set** under the corrected literal ratio. It is not necessarily #1 across the unrestricted model universe; the no-floor table above deliberately shows cheaper lower-capability configurations that can have an even lower raw `$ / capability` ratio.
 
@@ -130,11 +129,11 @@ Eligibility: current, priced, positive calibrated capability. No global capabili
 
 | Effort | Multi-source capability | AA reference | Task price | $/capability ↓ | $/AA point | Gain vs prior effort | Cost increase |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| high | 47.00 | 47.00 | $0.02 | $0.00042553 | $0.00042553 | — | — |
-| xhigh | 48.83 | 50.00 | $0.03 | $0.00061433 | $0.0006 | 3.00 | 50.0% |
-| max | 55.75 | 52.00 | $0.05 | $0.00089694 | $0.00096154 | 2.00 | 66.7% |
+| high | 47.04 | 47.00 | $0.02 | $0.00042521 | $0.00042553 | — | — |
+| xhigh | 49.71 | 50.10 | $0.03 | $0.00060348 | $0.0005988 | 3.10 | 50.0% |
+| max | 55.83 | 52.00 | $0.05 | $0.00089559 | $0.00096154 | 1.90 | 66.7% |
 
-**Literal price/performance winner for Luna: `high`.** Its `$ / calibrated-capability` ratio is $0.00042553. Xhigh remains a reasonable *capability knee* if extra quality is worth paying for, but it is not the lowest-cost-per-capability setting. Primary API economics use Standard / short-context $0.20 input and $1.20 output per million tokens; Batch remains secondary asynchronous pricing.
+**Literal price/performance winner for Luna: `high`.** Its `$ / calibrated-capability` ratio is $0.00042521. Xhigh remains a reasonable *capability knee* if extra quality is worth paying for, but it is not the lowest-cost-per-capability setting. Primary API economics use Standard / short-context $0.20 input and $1.20 output per million tokens; Batch remains secondary asynchronous pricing.
 
 ## Top-end configuration audit
 
@@ -145,25 +144,25 @@ This is the high-cost/high-capability zone the project is meant to prune aggress
 | Claude Fable 5 (low) | low | — | $0.59865 | — | — | — | — | — | — | no | no | unscored |
 | Claude Fable 5 (medium) | medium | — | $0.89757 | — | — | — | — | — | — | no | no | unscored |
 | Claude Fable 5 (high) | high | — | $1.284 | — | — | — | — | — | — | no | no | unscored |
-| Claude Fable 5 (xhigh) | xhigh | 59.12 | $1.7571 | $0.029719 | — | — | — | — | — | no | no | unscored |
-| Claude Fable 5 (max) | max | 60.41 | $3.14 | $0.051979 | 62.00 | $3.14 | $5455.2 | $0.050645 | direct AA cost/task | no | no | YES |
-| Claude Opus 5 (low) | low | 52.00 | $0.43 | $0.0082692 | 52.00 | $0.43 | $555.25 | $0.0082692 | direct AA cost/task | no | no | YES |
-| Claude Opus 5 (medium) | medium | 59.00 | $0.72 | $0.012203 | 59.00 | $0.72 | $1116.2 | $0.012203 | direct AA cost/task | YES | YES | YES |
-| Claude Opus 5 (high) | high | 59.97 | $1.23 | $0.020511 | 61.00 | $1.23 | $1974.3 | $0.020164 | direct AA cost/task | no | YES | YES |
-| Claude Opus 5 (xhigh) | xhigh | 61.90 | $1.8 | $0.029078 | 63.00 | $1.8 | $2909.3 | $0.028571 | direct AA cost/task | YES | YES | YES |
-| Claude Opus 5 (max) | max | 61.13 | $2.34 | $0.038278 | 63.00 | $2.34 | $3836.1 | $0.037143 | direct AA cost/task | no | no | dominated by Claude Opus 5 (xhigh) |
-| GPT-5.6 Sol (non-reasoning) | non-reasoning | 42.00 | $0.2637 | $0.0062787 | 42.00 | — | $239.66 | $5.7062 | full AA evaluation cost fallback | no | no | dominated by GPT-5.6 Sol (low) |
-| GPT-5.6 Sol (low) | low | 51.00 | $0.23 | $0.0045098 | 51.00 | $0.23 | $343.87 | $0.0045098 | direct AA cost/task | YES | YES | YES |
-| GPT-5.6 Sol (medium) | medium | 56.00 | $0.37 | $0.0066071 | 56.00 | $0.37 | $580.17 | $0.0066071 | direct AA cost/task | YES | YES | YES |
-| GPT-5.6 Sol (high) | high | 57.00 | $0.55 | $0.0096491 | 57.00 | $0.55 | $954.95 | $0.0096491 | direct AA cost/task | YES | YES | YES |
-| GPT-5.6 Sol (xhigh) | xhigh | 59.16 | $0.81 | $0.013691 | 59.00 | $0.81 | $1525 | $0.013729 | direct AA cost/task | YES | no | YES |
-| GPT-5.6 Sol (max) | max | 60.65 | $1.23 | $0.020279 | 61.00 | $1.23 | $2823.2 | $0.020164 | direct AA cost/task | YES | YES | YES |
-| Kimi K3 (low) | low | — | $0.18307 | — | — | — | — | — | — | no | no | unscored |
+| Claude Fable 5 (xhigh) | xhigh | 59.03 | $1.7571 | $0.029766 | — | — | — | — | — | no | no | unscored |
+| Claude Fable 5 (max) | max | 60.41 | $3.14 | $0.051977 | 62.00 | $3.14 | $5455.2 | $0.050645 | direct AA cost/task | no | no | YES |
+| Claude Opus 5 (low) | low | 51.51 | $0.43 | $0.0083475 | 52.00 | $0.43 | $555.25 | $0.0082692 | direct AA cost/task | no | no | YES |
+| Claude Opus 5 (medium) | medium | 57.83 | $0.72 | $0.012449 | 59.00 | $0.72 | $1116.2 | $0.012203 | direct AA cost/task | YES | YES | YES |
+| Claude Opus 5 (high) | high | 59.63 | $1.23 | $0.020629 | 61.00 | $1.23 | $1974.3 | $0.020164 | direct AA cost/task | no | YES | YES |
+| Claude Opus 5 (xhigh) | xhigh | 60.99 | $1.8 | $0.029514 | 63.00 | $1.8 | $2909.3 | $0.028571 | direct AA cost/task | YES | YES | YES |
+| Claude Opus 5 (max) | max | 61.15 | $2.34 | $0.038266 | 63.00 | $2.34 | $3836.1 | $0.037143 | direct AA cost/task | YES | no | dominated by Claude Opus 5 (xhigh) |
+| GPT-5.6 Sol (non-reasoning) | non-reasoning | 43.81 | $0.2637 | $0.0060187 | 42.00 | — | $239.66 | $5.7062 | full AA evaluation cost fallback | no | no | dominated by GPT-5.6 Sol (low) |
+| GPT-5.6 Sol (low) | low | 51.17 | $0.23 | $0.0044951 | 51.00 | $0.23 | $343.87 | $0.0045098 | direct AA cost/task | YES | YES | YES |
+| GPT-5.6 Sol (medium) | medium | 56.12 | $0.37 | $0.0065933 | 56.00 | $0.37 | $580.17 | $0.0066071 | direct AA cost/task | YES | YES | YES |
+| GPT-5.6 Sol (high) | high | 57.22 | $0.55 | $0.0096113 | 57.00 | $0.55 | $954.95 | $0.0096491 | direct AA cost/task | YES | YES | YES |
+| GPT-5.6 Sol (xhigh) | xhigh | 58.91 | $0.81 | $0.013749 | 59.00 | $0.81 | $1525 | $0.013729 | direct AA cost/task | YES | no | YES |
+| GPT-5.6 Sol (max) | max | 60.65 | $1.23 | $0.02028 | 61.00 | $1.23 | $2823.2 | $0.020164 | direct AA cost/task | YES | YES | YES |
+| Kimi K3 (low) | low | 50.95 | $0.18307 | $0.0035931 | — | — | — | — | — | YES | no | unscored |
 | Kimi K3 (high) | high | — | $0.39265 | — | — | — | — | — | — | no | no | unscored |
-| Kimi K3 (max) | max | 59.87 | $0.84 | $0.01403 | 60.00 | $0.84 | $2425.1 | $0.014 | direct AA cost/task | YES | YES | YES |
+| Kimi K3 (max) | max | 59.90 | $0.84 | $0.014024 | 60.00 | $0.84 | $2425.1 | $0.014 | direct AA cost/task | YES | YES | YES |
 | Qwen3.8 Max (low) | low | — | $0.098125 | — | — | — | — | — | — | no | no | unscored |
 | Qwen3.8 Max (medium) | medium | — | $0.13627 | — | — | — | — | — | — | no | no | unscored |
-| Qwen3.8 Max (xhigh) | xhigh | 56.71 | $1.13 | $0.019926 | 58.00 | $1.13 | $1741.4 | $0.019483 | direct AA cost/task | no | no | YES |
+| Qwen3.8 Max (xhigh) | xhigh | 56.77 | $1.13 | $0.019904 | 58.00 | $1.13 | $1741.4 | $0.019483 | direct AA cost/task | no | no | YES |
 
 **Key pruning rule:** an effort configuration that is dominated within its own family on exact AA score/cost should normally be eliminated from default routing unless another task-specific benchmark demonstrates a compensating specialty. Opus 5 max is the canonical example when xhigh has the same AA Intelligence Index at lower direct AA task cost.
 
