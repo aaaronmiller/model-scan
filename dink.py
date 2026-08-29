@@ -2732,6 +2732,9 @@ def render_per_slot_view(dossiers: list[Dossier], slot_defs: dict, hermes_slots:
     print()
     print(f"{C.SECONDARY}{C.HRULE * width}{C.RST}")
     print(f"{C.INFO}PER-SLOT CANDIDATES{C.RST}  {C.META}{C.HRULE} fitness-ranked top 5 {C.HRULE}{C.RST}")
+    print(f"  {C.META}IQ=AA Intelligence Index (est. if unmarked ~)  TC=tool-calling score  "
+          f"fit=slot fitness  swe=SWE-bench Verified%  bgt=OpenCode Go budget tier "
+          f"(exc/goo/mod/exp)  t/s=tokens per second  T=tools V=vision · =absent{C.RST}")
 
     accessible = [d for d in dossiers if d.accessible]
     by_full = {f"{d.provider}/{d.model}": d for d in accessible}
@@ -2778,6 +2781,8 @@ def render_per_slot_view(dossiers: list[Dossier], slot_defs: dict, hermes_slots:
 
         print(f"  {C.INFO}{slot_id}{C.RST}  {C.SECONDARY}({label}){C.RST}  "
               f"{C.META}— top {len(candidates)} candidates by fitness{C.RST}")
+        def _fit(text: str, width: int) -> str:
+            return text if len(text) <= width else text[:width - 1] + "…"
         for i, d in enumerate(candidates, 1):
             fit = d.slot_fitness.get(slot_id, 0)
             delta = fit - incumbent_fitness
@@ -2803,25 +2808,31 @@ def render_per_slot_view(dossiers: list[Dossier], slot_defs: dict, hermes_slots:
             tc_val, tc_src = _estimate_tc(d)
             tc_str = f"TC:{tc_val:.0f}" if tc_val else "TC:?"
 
-            # Benchmark + OCGo budget indicators
-            bench_str = ""
+            # Verified benchmark score: labeled field, fixed width, always
+            # present so nothing downstream shifts. (Was an optional inline
+            # '78%' prefix that moved every later column.)
             if d.benchmark_swe_verified is not None:
                 bt = _benchmark_tier(d.benchmark_swe_verified)
                 bc = {"S": C.BENCH_S, "A": C.BENCH_A, "B": C.BENCH_B, "C": C.BENCH_C}.get(bt, C.META)
-                bench_str = f" {bc}{d.benchmark_swe_verified:.0f}%{C.RST}"
-            budget_str = ""
+                swe_str = f"{bc}swe:{d.benchmark_swe_verified:>3.0f}%{C.RST}"
+            else:
+                swe_str = f"{C.META}swe: --{C.RST}"
+            # OpenCode Go budget tier: labeled too ('goo' used to appear
+            # unexplained between the model name and provider).
             if d.ocgo_budget_tier not in ("unknown", "none", ""):
                 bt_colors = {"excellent": C.BUDGET_EXCELLENT, "good": C.BUDGET_GOOD,
                              "moderate": C.BUDGET_MODERATE, "expensive": C.BUDGET_EXPENSIVE}
                 bc = bt_colors.get(d.ocgo_budget_tier, C.META)
-                budget_str = f" {bc}{d.ocgo_budget_tier[:3]}{C.RST}"
+                budget_str = f"{bc}bgt:{d.ocgo_budget_tier[:3]}{C.RST}"
+            else:
+                budget_str = f"{C.META}bgt: --{C.RST}"
 
             print(f"    {C.METRICS}{i}.{C.RST} "
-                  f"{C.PRIMARY if is_incumbent else C.SECONDARY}{d.model:<48}{C.RST}"
-                  f"{bench_str}{budget_str} "
+                  f"{C.PRIMARY if is_incumbent else C.SECONDARY}{_fit(d.model, 46):<46}{C.RST} "
                   f"{C.METRICS_D}{PROVIDERS[d.provider]['abbrev']:<5}{C.RST} "
-                  f"{C.METRICS}{iq_str} {tc_str} fit:{fit:.0f}{delta_str}{C.RST}  "
-                  f"{C.METRICS_D}{ai_str:<6} {d.tps:>3.0f}t/s {d.latency_s:.1f}s [{tools_str}{vision_str}]{C.RST}"
+                  f"{C.METRICS}{iq_str} {tc_str} fit:{fit:>3.0f}{delta_str}{C.RST}  "
+                  f"{ai_str:<6}{swe_str} {budget_str} "
+                  f"{C.METRICS_D}{d.tps:>4.0f}t/s {d.latency_s:>4.1f}s [{tools_str}{vision_str}]{C.RST}"
                   f"{'  ' + marker if marker else ''}")
 
 def render_appendix(dossiers: list[Dossier], by: str = "tier"):
@@ -2829,7 +2840,10 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
     width = term_width()
     print()
     print(f"{C.SECONDARY}{C.HRULE * width}{C.RST}")
-    print(f"{C.INFO}APPENDIX{C.RST}  {C.META}{C.HRULE} {by}-sorted, all accessible{C.RST}")
+    print(f"{C.INFO}APPENDIX{C.RST}  {C.META}{C.HRULE} {by}-sorted, all accessible {C.HRULE}{C.RST}")
+    print(f"  {C.META}IQ=AA Intelligence Index (heuristic est. when AA unmatched)  SWE=SWE-bench Verified% "
+          f"(-- = no verified score)  T=tools  V=vision  SIZE=B total/B active  $/M=blended $ per M tokens  "
+          f"SLOTS=qualified slot prefixes{C.RST}")
 
     accessible = [d for d in dossiers if d.accessible]
 
@@ -2850,7 +2864,7 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
     accessible.sort(key=sort_key)
 
     # Compact header — single line with IQ + TC
-    print(f"  {C.INFO_D}{'TIER':<4}{C.RST} {C.INFO_D}{'MODEL':<42}{C.RST} {C.INFO_D}{'PROV':<5}{C.RST} {C.INFO_D}{'IQ':>4}{C.RST} {C.INFO_D}{'TC':>4}{C.RST} {C.INFO_D}{'TPS':>4}{C.RST} {C.INFO_D}{'LAT':>5}{C.RST} {C.INFO_D}{'T':<1}{C.RST} {C.INFO_D}{'V':<1}{C.RST} {C.INFO_D}{'ARCH':<10}{C.RST} {C.INFO_D}{'SIZE':<7}{C.RST} {C.INFO_D}{'$/M':>5}{C.RST} {C.INFO_D}{'SLOTS':<18}{C.RST}")
+    print(f"  {C.INFO_D}{'TIER':<4}{C.RST} {C.INFO_D}{'MODEL':<48}{C.RST} {C.INFO_D}{'SWE':>5}{C.RST} {C.INFO_D}{'PROV':<5}{C.RST} {C.INFO_D}{'IQ':>4}{C.RST} {C.INFO_D}{'TC':>4}{C.RST} {C.INFO_D}{'TPS':>4}{C.RST} {C.INFO_D}{'LAT':>5}{C.RST} {C.INFO_D}{'T':<1}{C.RST} {C.INFO_D}{'V':<1}{C.RST} {C.INFO_D}{'ARCH':<10}{C.RST} {C.INFO_D}{'SIZE':<7}{C.RST} {C.INFO_D}{'$/M':>5}{C.RST} {C.INFO_D}{'SLOTS':<18}{C.RST}")
     print(f"  {C.META}{C.HRULE * (width - 4)}{C.RST}")
 
     for d in accessible:
@@ -2872,13 +2886,20 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
                          else C.META)
         tier_str = f"{tier_color}{d.tier:<4}{C.RST}"
 
-        # Benchmark score indicator: show SWE% in brackets if available
-        bench_suffix = ""
-        if d.benchmark_swe_verified is not None:
-            bench_suffix = f"{tier_color}[{d.benchmark_swe_verified:.0f}]{C.RST}"
+        # The verified SWE score is shown in its own SWE column below.
+        # (the old inline [78] suffix shifted every later column on rows
+        # that had it).
 
-        model_str = (f"{C.PRIMARY}{d.model[:41]:<42}{C.RST}" if d.tier in ("S", "A")
-                    else f"{C.SECONDARY}{d.model[:41]:<42}{C.RST}")
+        def _fit(text: str, width: int) -> str:
+            """Truncate with a real ellipsis instead of silent clipping."""
+            return text if len(text) <= width else text[:width - 1] + "…"
+
+        model_str = (f"{C.PRIMARY}{_fit(d.model, 48):<48}{C.RST}" if d.tier in ("S", "A")
+                    else f"{C.SECONDARY}{_fit(d.model, 48):<48}{C.RST}")
+        # SWE annotation lives in its own column (SWE) so it can never shift
+        # the columns that follow. Empty cell when unverified.
+        swe_str = f"{tier_color}{d.benchmark_swe_verified:>4.0f}%{C.RST}" \
+            if d.benchmark_swe_verified is not None else f"{C.META}{'--':>5}{C.RST}"
 
         prov_abbr = PROVIDERS[d.provider]["abbrev"]
         prov_str = f"{C.METRICS_D}{prov_abbr:<5}{C.RST}"
@@ -2926,9 +2947,14 @@ def render_appendix(dossiers: list[Dossier], by: str = "tier"):
         # Compact slots: R6,R8,R10,R11 → R6 R8 R10 R11
         slots_str = " ".join(s.split("_")[0] for s in d.qualified_slots[:6])
         slots_color = C.SUCCESS_N if d.qualified_slots else C.META
+        # Pad to width BEFORE wrapping in color codes. Padding after the reset
+        # sequence is what made the SLOTS column ragged: the escape bytes were
+        # counted toward the field width.
         slots_disp = f"{slots_color}{slots_str[:18]:<18}{C.RST}"
 
-        print(f"  {tier_str} {model_str}{bench_suffix} {prov_str} {iq_str} {tc_str} {tps_str} {lat_str} {t_str} {v_str} {arch_str} {size_str:<7} {price_str} {slots_disp}")
+        # size_str is already fixed-width from the branch above (e.g. '671/37');
+        # padding it again with :<7 counted its ANSI codes and misaligned $/M.
+        print(f"  {tier_str} {model_str} {swe_str} {prov_str} {iq_str} {tc_str} {tps_str} {lat_str} {t_str} {v_str} {arch_str} {size_str} {price_str} {slots_disp}")
 
     failed_count = len([d for d in dossiers if not d.accessible])
     if failed_count:
