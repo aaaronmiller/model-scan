@@ -16,8 +16,10 @@ def test_live_ardf_builds_a_bound_export_and_complete_field_map():
     # Tracks schemas/unified_observations.schema.json x-row-count, which is a
     # deliberate gate: the export refuses to build when the ledger disagrees
     # with the pin. Moved 2839 -> 5148 on 2026-08-20 when the authorized AA v2
-    # refresh appended 2309 observations. Update both together, never one.
-    assert export["row_count"] == 5148
+    # refresh appended 2309 observations; moved 5148 -> 5180 on 2026-08-29 when
+    # the authorized 2026-08-25 AA refresh (+32 rows) was re-pinned. Update
+    # both together, never one.
+    assert export["row_count"] == 5180
     assert export["field_count"] == len(export["field_migration"])
     assert len(export["files"]) == 11
     assert export["policy_disposition"]["global_executor_capability_floor"] == "none"
