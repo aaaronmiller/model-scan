@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://model-scan/schemas/registry.json",
+  "title": "Routing Registry",
+  "description": "Per-lane model bindings with per-field freshness. Unknown is a first-class value; absent field reports absent. Consumes agent-contracts lanes.yaml vocabulary.",
+  "type": "object",
+  "required": ["registry_version", "generated_at", "bindings"],
+  "additionalProperties": false,
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "description": "Semver of registry data, joinable to policy_version"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "description": "How this registry was built (probe, manual, imported)"
+    },
+    "bindings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/binding" }
+    }
+  },
+  "$defs": {
+    "freshness_stamp": {
+      "type": "object",
+      "required": ["observed_at", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "observed_at": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "unknown_sentinel": {
+      "type": "string",
+      "const": "unknown"
+    },
+    "binding": {
+      "type": "object",
+      "required": ["binding_id", "lane", "adapter_id", "freshness"],
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": { "type": "string", "description": "Stable binding identifier, unique within registry" },
+        "lane": {
+          "type": "string",
+          "description": "Stable lane name from agent-contracts/lanes.yaml",
+          "enum": ["adjudication", "durable", "review", "routine", "specialist"]
+        },
+        "model_id": {
+          "description": "Callable model identifier as provider advertises it, or unknown",
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "provider": {
+          "description": "Provider key (e.g. opencode-go), or unknown",
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "adapter_id": {
+          "type": "string",
+          "description": "Package that knows how to invoke this binding (gap G3)"
+        },
+        "harness_restrictions": {
+          "description": "Harness-bound restrictions; null means unrestricted, unknown means not assessed",
+          "oneOf": [
+            { "type": "array", "items": { "type": "string" } },
+            { "type": "null" },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "in_harness_eligible": {
+          "oneOf": [{ "type": "boolean" }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "exo_harness_eligible": {
+          "oneOf": [{ "type": "boolean" }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "context_limit": {
+          "description": "Max input context in tokens",
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "output_limit": {
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "modalities": {
+          "description": "Supported modalities, or unknown",
+          "oneOf": [
+            { "type": "array", "items": { "type": "string", "enum": ["text", "vision", "audio", "tool"] } },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "tool_capability": {
+          "oneOf": [{ "type": "boolean" }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "function_calling": {
+          "oneOf": [{ "type": "boolean" }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "quota_state": {
+          "description": "Quota snapshot or unknown; never fabricated",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["remaining_fraction", "reset_at"],
+              "additionalProperties": false,
+              "properties": {
+                "remaining_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+                "reset_at": { "type": "string", "format": "date-time" },
+                "unit": { "type": "string" },
+                "source": { "type": "string" }
+              }
+            },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "provider_health": {
+          "oneOf": [
+            { "type": "string", "enum": ["healthy", "degraded", "unhealthy", "down"] },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "price_class": {
+          "oneOf": [
+            { "type": "string", "enum": ["free", "allowance", "paid", "unpriced"] },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "observed_cost_per_task": {
+          "description": "Measured or proxy cost per task in USD, or unknown",
+          "oneOf": [{ "type": "number", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "measured_task_class_performance": {
+          "description": "Map of task_class -> calibrated score, or unknown",
+          "oneOf": [
+            { "type": "object", "additionalProperties": { "type": "number" } },
+            { "$ref": "#/$defs/unknown_sentinel" }
+          ]
+        },
+        "observed_latency_ms_p50": {
+          "oneOf": [{ "type": "number", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "ram_requirement_gb": {
+          "oneOf": [{ "type": "number", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "vram_requirement_gb": {
+          "oneOf": [{ "type": "number", "minimum": 0 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "capacity_slots": {
+          "description": "Multi-account fan-out: concurrent slots on this lane (C8)",
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "$ref": "#/$defs/unknown_sentinel" }]
+        },
+        "fallback_chain": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered binding_ids to try after this one"
+        },
+        "freshness": {
+          "type": "object",
+          "description": "Per-field freshness stamp. Absent key means field was absent.",
+          "additionalProperties": { "$ref": "#/$defs/freshness_stamp" }
+        }
+      }
+    }
+  }
+}

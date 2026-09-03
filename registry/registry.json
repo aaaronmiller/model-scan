@@ -1,0 +1,226 @@
+{
+  "registry_version": "0.2.0",
+  "generated_at": "2026-09-02T00:00:00Z",
+  "source": "manual-seed for Phase 2 acceptance",
+  "bindings": [
+    {
+      "binding_id": "routine-free-1",
+      "lane": "routine",
+      "model_id": "example-flash-free",
+      "provider": "opencode-zen",
+      "adapter_id": "omp",
+      "harness_restrictions": null,
+      "in_harness_eligible": true,
+      "exo_harness_eligible": false,
+      "context_limit": 1000000,
+      "output_limit": 64000,
+      "modalities": ["text", "tool"],
+      "tool_capability": true,
+      "function_calling": true,
+      "quota_state": {
+        "remaining_fraction": 0.92,
+        "reset_at": "2026-09-03T00:00:00Z",
+        "unit": "requests",
+        "source": "cpa-manager-plus"
+      },
+      "provider_health": "healthy",
+      "price_class": "free",
+      "observed_cost_per_task": 0.002,
+      "measured_task_class_performance": {
+        "coding": 44.2,
+        "summarization": 48.0
+      },
+      "observed_latency_ms_p50": 1200,
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 4,
+      "fallback_chain": ["routine-free-2", "routine-paid-1"],
+      "freshness": {
+        "lane": { "observed_at": "2026-09-02T00:00:00Z", "source": "lanes.yaml" },
+        "model_id": { "observed_at": "2026-09-02T00:00:00Z", "source": "source_adapter" },
+        "provider": { "observed_at": "2026-09-02T00:00:00Z", "source": "source_adapter" },
+        "adapter_id": { "observed_at": "2026-09-02T00:00:00Z", "source": "registry" },
+        "context_limit": { "observed_at": "2026-09-02T00:00:00Z", "source": "models.dev" },
+        "modalities": { "observed_at": "2026-09-02T00:00:00Z", "source": "models.dev" },
+        "tool_capability": { "observed_at": "2026-09-02T00:00:00Z", "source": "probe" },
+        "quota_state": { "observed_at": "2026-09-02T00:00:00Z", "source": "cpa-manager-plus" },
+        "provider_health": { "observed_at": "2026-09-02T00:00:00Z", "source": "health-runner" },
+        "price_class": { "observed_at": "2026-09-02T00:00:00Z", "source": "pricing" },
+        "observed_cost_per_task": { "observed_at": "2026-09-02T00:00:00Z", "source": "calibration" },
+        "observed_latency_ms_p50": { "observed_at": "2026-09-02T00:00:00Z", "source": "telemetry" },
+        "capacity_slots": { "observed_at": "2026-09-02T00:00:00Z", "source": "proxy-mgmt" }
+      }
+    },
+    {
+      "binding_id": "routine-free-2",
+      "lane": "routine",
+      "model_id": "example-flash-2-free",
+      "provider": "opencode-zen",
+      "adapter_id": "omp",
+      "harness_restrictions": null,
+      "in_harness_eligible": true,
+      "exo_harness_eligible": false,
+      "context_limit": 262000,
+      "output_limit": 32000,
+      "modalities": ["text", "tool"],
+      "tool_capability": true,
+      "function_calling": true,
+      "quota_state": {
+        "remaining_fraction": 0.45,
+        "reset_at": "2026-09-03T00:00:00Z",
+        "unit": "requests",
+        "source": "cpa-manager-plus"
+      },
+      "provider_health": "degraded",
+      "price_class": "free",
+      "observed_cost_per_task": 0.0015,
+      "measured_task_class_performance": {
+        "coding": 41.0
+      },
+      "observed_latency_ms_p50": 900,
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 4,
+      "fallback_chain": ["routine-paid-1"],
+      "freshness": {
+        "lane": { "observed_at": "2026-09-02T00:00:00Z", "source": "lanes.yaml" },
+        "model_id": { "observed_at": "2026-09-02T00:00:00Z", "source": "source_adapter" },
+        "provider": { "observed_at": "2026-09-02T00:00:00Z", "source": "source_adapter" },
+        "quota_state": { "observed_at": "2026-09-02T00:00:00Z", "source": "cpa-manager-plus" },
+        "provider_health": { "observed_at": "2026-09-02T00:00:00Z", "source": "health-runner" }
+      }
+    },
+    {
+      "binding_id": "routine-paid-1",
+      "lane": "routine",
+      "model_id": "example-pro-paid",
+      "provider": "opencode-go",
+      "adapter_id": "agy",
+      "harness_restrictions": null,
+      "in_harness_eligible": false,
+      "exo_harness_eligible": true,
+      "context_limit": 200000,
+      "output_limit": 64000,
+      "modalities": ["text", "vision", "tool"],
+      "tool_capability": true,
+      "function_calling": true,
+      "quota_state": {
+        "remaining_fraction": 0.88,
+        "reset_at": "2026-09-03T00:00:00Z",
+        "unit": "usd",
+        "source": "management-api"
+      },
+      "provider_health": "healthy",
+      "price_class": "allowance",
+      "observed_cost_per_task": 0.015,
+      "measured_task_class_performance": {
+        "coding": 55.0,
+        "architecture": 58.0
+      },
+      "observed_latency_ms_p50": 2400,
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 2,
+      "fallback_chain": [],
+      "freshness": {
+        "lane": { "observed_at": "2026-09-02T00:00:00Z", "source": "lanes.yaml" },
+        "model_id": { "observed_at": "2026-09-02T00:00:00Z", "source": "source_adapter" },
+        "quota_state": { "observed_at": "2026-09-02T00:00:00Z", "source": "management-api" }
+      }
+    },
+    {
+      "binding_id": "specialist-vision-1",
+      "lane": "specialist",
+      "model_id": "example-vision-free",
+      "provider": "openrouter",
+      "adapter_id": "omp",
+      "harness_restrictions": ["needs-vision"],
+      "in_harness_eligible": true,
+      "exo_harness_eligible": true,
+      "context_limit": 128000,
+      "output_limit": 16000,
+      "modalities": ["text", "vision"],
+      "tool_capability": false,
+      "function_calling": false,
+      "quota_state": "unknown",
+      "provider_health": "unknown",
+      "price_class": "free",
+      "observed_cost_per_task": "unknown",
+      "measured_task_class_performance": "unknown",
+      "observed_latency_ms_p50": "unknown",
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 1,
+      "fallback_chain": [],
+      "freshness": {
+        "lane": { "observed_at": "2026-09-02T00:00:00Z", "source": "lanes.yaml" },
+        "provider_health": { "observed_at": "2026-09-02T00:00:00Z", "source": "health-runner" }
+      }
+    },
+    {
+      "binding_id": "review-high-1",
+      "lane": "review",
+      "model_id": "example-review-max",
+      "provider": "opencode-go",
+      "adapter_id": "agy",
+      "harness_restrictions": null,
+      "in_harness_eligible": false,
+      "exo_harness_eligible": true,
+      "context_limit": 200000,
+      "output_limit": 64000,
+      "modalities": ["text", "tool"],
+      "tool_capability": true,
+      "function_calling": true,
+      "quota_state": {
+        "remaining_fraction": 0.05,
+        "reset_at": "2026-09-03T00:00:00Z",
+        "unit": "usd",
+        "source": "management-api"
+      },
+      "provider_health": "degraded",
+      "price_class": "paid",
+      "observed_cost_per_task": 0.08,
+      "measured_task_class_performance": {
+        "adversarial_review": 61.0
+      },
+      "observed_latency_ms_p50": 4500,
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 1,
+      "fallback_chain": ["review-high-2"],
+      "freshness": {
+        "lane": { "observed_at": "2026-08-20T00:00:00Z", "source": "lanes.yaml", "expires_at": "2026-09-01T00:00:00Z" }
+      }
+    },
+    {
+      "binding_id": "review-high-2",
+      "lane": "review",
+      "model_id": "example-review-high",
+      "provider": "opencode-zen",
+      "adapter_id": "omp",
+      "harness_restrictions": null,
+      "in_harness_eligible": true,
+      "exo_harness_eligible": false,
+      "context_limit": 1000000,
+      "output_limit": 64000,
+      "modalities": ["text", "tool"],
+      "tool_capability": true,
+      "function_calling": true,
+      "quota_state": "unknown",
+      "provider_health": "healthy",
+      "price_class": "free",
+      "observed_cost_per_task": 0.003,
+      "measured_task_class_performance": {
+        "adversarial_review": 55.0
+      },
+      "observed_latency_ms_p50": 1800,
+      "ram_requirement_gb": "unknown",
+      "vram_requirement_gb": "unknown",
+      "capacity_slots": 4,
+      "fallback_chain": [],
+      "freshness": {
+        "lane": { "observed_at": "2026-09-02T00:00:00Z", "source": "lanes.yaml" }
+      }
+    }
+  ]
+}

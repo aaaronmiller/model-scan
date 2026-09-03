@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://model-scan/schemas/routing-decision.json",
+  "title": "RoutingDecision",
+  "description": "D2.6: record which candidates were considered, which floor eliminated each, ranking inputs used",
+  "type": "object",
+  "required": ["timestamp", "lane", "outcome", "candidates_considered"],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "lane": { "type": "string" },
+    "outcome": { "type": "string", "enum": ["resolved", "resolved_with_degradation", "routing_policy_unavailable", "routing_blocked"] },
+    "binding_id": { "type": ["string", "null"] },
+    "degradation_notice": { "type": ["string", "null"] },
+    "reason": { "type": ["string", "null"] },
+    "candidates_considered": { "type": "integer", "minimum": 0 },
+    "eliminated_by_floor": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["binding_id", "reason"],
+        "properties": {
+          "binding_id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "ranking_inputs": { "type": ["object", "null"] },
+    "request": { "type": "object" },
+    "registry_version": { "type": "string" }
+  }
+}
