@@ -1,288 +1,114 @@
-# model-scan
+# Model-Scan — Routing Registry (Component 2)
 
-Model Scan is a local evidence and decision-support system. It discovers exact
-provider model identities, combines published and observed evidence, evaluates
-role fixtures, and publishes immutable advisory results. Gateway owns live
-routing, fallback, and configuration changes. ARDF owns its research ledger,
-calibration policy, Pareto analysis, and dashboard.
+> **what is routable right now** — lanes stable, bindings volatile, `T0` rots unless this exists
 
-The canonical requirements and design are under
-`/home/cheta/LIVING_DOCUMENTS/projects/model-scan`. Older v5 scoring and config
-preview surfaces remain in this checkout as migration evidence. A preview is
-not authority to apply a route or configuration.
+**Spec:** `A2` Component 2 + `P2 v2.1` **Commit** `11f849b` **Tests** `11 passed` (C1-C10) **Policy** `f42df720`
 
-## Quick Start
+Model-Scan is now **Component 2** of the five-component system. Its shift: from a local evidence scanner with 33 CLI commands and a web dashboard to the **registry that holds every volatile fact about models, providers, quotas, health, cost, and invocation** — so the prompt never does.
+
+```
+prompt:  "route this task"
+   ↓ names only a lane (routine / review / specialist ...)
+registry:  lane → bindings (model + provider + adapter_id + capacity_slots + quota + health + freshness + price + cost)
+resolver:  floors first, then cost — never returns nothing, never inverts a floor
+```
+
+## Why This Exists
+
+The previous prompt carried model names, prices, and quota numbers. Those rot between sessions and the prompt has no way to know it. Separation: **prompt = policy (which lane for which task class), registry = reality (what that lane can currently do and what it costs).** Renaming a model now touches only `registry.json` — no prompt or source change (C1, proven by `grep` gate).
+
+## Quick Start (new path)
 
 ```bash
-# Install
-pip install --user httpx pyyaml python-dotenv
-chmod +x dink.py
-ln -s "$(pwd)/dink.py" ~/.local/bin/model-scan
+cd ~/code/model-scan
 
-# Set at least one API key
-export OPENROUTER_API_KEY=sk-or-v1-...    # free models available
-export OPENCODE_GO_API_KEY=ocgo_...        # subscription models
-export AA_API_KEY=aa_...                   # benchmark data (free tier)
+# Human: one screen, healthy / throttled / unknown at a glance
+python3 -m registry.table
+# LANE     BINDING          PROVIDER     MODEL               ADAPTER CAP PRICE  COST  STATUS
+# routine  routine-free-1   opencode-zen example-flash-free  omp     4   free   0.002 ✓ healthy
+# healthy=2 throttled=2 unknown=2
 
-# Run
-model-scan                                # full scan
-model-scan --slot S01_haiku              # single current slot analysis
-model-scan --free-mode                    # free models only
-model-scan --emit-snapshot                # write ~/.config/model-scan/routing_snapshot.json
-model-scan --analyze                      # multi-source analysis
-model-scan --tui                          # keyboard terminal UI
+# Machine
+python3 -m registry.table --json | jq .
+
+# Validate registry against schema (every field present or explicitly unknown)
+python3 -c "import json,jsonschema; jsonschema.validate(json.load(open('registry/registry.json')), json.load(open('registry/schema.json'))); print('OK')"
+
+# Resolver — total over exactly 4 outcomes, floor-before-cost structurally impossible to invert (property test)
+python3 -m pytest tests/test_registry_resolver.py -q  # 11 passed
+# Covers: totality (every lane → one of 4), floor violation unproducible, staleness → degradation, 3-provider quota, unhealthy detection, calibration round-trip, source grep
+
+# Decision log — why this lane was picked
+cat ~/.local/share/model-scan/routing_decisions.jsonl | jq .
+# {candidates_considered: [...], eliminated_by_floor: {...}, ranking_inputs: {cost, latency, quota...}}
+
+# Cost ranking (accepted-result cost, not token price)
+cat docs/cost-formula.md   # generation + reasoning + latency + retries + validation + review + quota + recovery
+cat docs/registry-freshness.md  # per-field freshness, when to refresh (start of orchestration, quota exhaustion, provider failure, sustained 429, resumption)
 ```
 
-## Features
-
-### Core (CLI — 33 commands)
-| Command | Description |
-|---------|-------------|
-| `model-scan` | Full scan across all configured providers |
-| `--slot R1` | Candidates for a specific Hermes task slot |
-| `--free-mode` | Only probe/evaluate free-whitelisted models |
-| `--emit-snapshot [PATH]` | Emit the claude-code-proxy routing snapshot contract |
-| `--score-engine` | Multi-axis scoring (Intel/Speed/Agentic/Coding) |
-| `--gold-standard` | Generate optimal config patches with reasoning traces |
-| `--cpmr` | Config Patch Match Rate vs gold standard |
-| `--optimize` | Grid search over slot weights |
-| `--audit` | Independent verification against benchmarks |
-| `--analyze` | Multi-source fused analysis (3 data sources) |
-| `--popularity` | HuggingFace community adoption scores |
-| `--config-snapshot` | Daily config drift tracking |
-| `--tui` | Keyboard-driven terminal UI |
-| `--refine` | Weekly refinement pipeline |
-| `--json` | Machine-readable output |
-
-### claude-code-proxy Routing Snapshot
-
-`model-scan --emit-snapshot` writes a credential-free routing snapshot for
-claude-code-proxy:
-
-```bash
-model-scan --mode daily --emit-snapshot
-# default: ~/.config/model-scan/routing_snapshot.json
-```
-
-The gateway also serves it:
-
-```bash
-python3 gateway.py 8124
-curl http://127.0.0.1:8124/routing-snapshot
-```
-
-claude-code-proxy can post reliability summaries back to the gateway:
-
-```bash
-curl -X POST http://127.0.0.1:8124/reliability \
-  -H 'content-type: application/json' \
-  -d '{"providers":{"openrouter":{"requests":10,"error_rate":0.1,"rate_limit_frequency":0.0}}}'
-```
-
-The gateway appends those rows to `~/.config/model-scan/reliability_feedback.jsonl` and uses the
-latest provider rates to degrade provider health in rebuilt snapshots.
-
-Daily and weekly cron jobs installed by `cron_manager.py` include `--emit-snapshot` by default.
-
-### Clutch Capability Evidence
-
-The successor Gateway boundary keeps capability evidence separate from callable
-provider identity. Publish it from a saved dossier JSON file without probing a
-provider:
-
-```bash
-python capability_evidence.py \
-  --dossiers dossiers.json \
-  --output ~/.config/model-scan/capability_evidence.json \
-  --evidence-ref scan:2026-07-23
-```
-
-The publisher writes atomically, keeps an independent
-`capability_evidence.last-known-good.json` recovery copy, and never emits
-provider API IDs, endpoints, credential references, or callable IDs. Those are
-joined later through the Gateway's explicit identity map. The older
-`routing_snapshot.py` format remains supported for the existing default-off
-integration but is not the successor callable-identity contract.
-
-### Immutable evidence contract
-
-The current evidence boundary is split into a content object and an external
-manifest:
-
-```bash
-pytest -q test_evidence_contract.py test_ardf_export.py \
-  test_role_evaluation.py test_source_adapter.py
-```
-
-- `evidence_contract.py` validates joins, freshness, exact zero price,
-  privacy-safe task telemetry, role gates, and advisory-only output. It then
-  computes real content and schema hashes in a separate manifest.
-- `ardf_export.py` binds the current ARDF ledger, policy, schemas, executable,
-  projections, and a complete field migration map.
-- `role_evaluation.py` defines typed fixtures, per-call telemetry, Wilson
-  confidence intervals, paired comparison rules, explicit abstention, and
-  hash-pinned advisory recommendations.
-- `source_adapter.py` preserves the useful Model Scraper lineage as a neutral
-  Model Scan module. Catalog discovery, callable state, probe reachability,
-  and policy eligibility remain separate facts.
-
-### Data Sources
-| Source | Models | Data |
-|--------|--------|------|
-| **Live probes** | 100+ | TPS, latency, tool-calling, vision, reliability from 10 providers |
-| **Artificial Analysis** | 1,436 | Intelligence/Coding/Math Index, 15 eval benchmarks |
-| **Models.dev** | 4,817 | Pricing (6 tiers), context limits, 7 capabilities, 5 modalities |
-| **PinchBench** | 50 | Agent task success rates, execution cost/time, 23 task categories |
-| **HuggingFace** | 16+ | Download counts, community adoption scores |
-
-### Scoring Axes
-- **Intelligence** — benchmark-normalized, with sigmoid clamping and knowledge-freshness exponential decay
-- **Speed** — TPS + latency with Gaussian bell-curve penalty for too-fast/slow
-- **Agentic** — tool-calling, PinchBench integration, structured output support
-- **Coding** — SWE-bench verified scores, coding index, context window
-
-### Calculus-Enhanced Metrics
-Sigmoid quality scores, quadratic diminishing returns, bell-curve latency penalties, marginal intelligence per dollar (dI/dC), integral cumulative value (∫P(c)dc), gradient sensitivity analysis (∂C/∂W), tanh-latency normalization, exponential knowledge decay.
-
-### Free-Mode Evaluation
-- 52 models on free whitelist across 8 providers
-- `--free-mode` restricts probing and ranking to free models
-- `--refresh-free` updates whitelist from provider APIs
-- Slot-level `eval_mode: cost_basis | free` in `slot_definitions.yaml`
-
-## Architecture
+## Architecture (after P2)
 
 ```
-┌─────────────────────────────────────────────┐
-│  CLI (dink.py) — 33 commands               │
-│  ├── Run scan (10 providers)               │
-│  ├── Analysis engine (3 sources fused)     │
-│  ├── Scoring engine (4 axes + calculus)    │
-│  ├── Gold standard / CPMR / Audit          │
-│  └── Refinement pipeline                   │
-├─────────────────────────────────────────────┤
-│  Web UI (SvelteKit 5)                      │
-│  ├── Dashboard with ECharts radar + charts │
-│  ├── Model list with preset filters        │
-│  ├── Compare with radar overlay            │
-│  ├── Scan history with trend lines         │
-│  └── Analysis dashboard (9 chart panels)   │
-├─────────────────────────────────────────────┤
-│  API (FastAPI, port 8123)                  │
-│  ├── /api/v1/models — filter, sort, paginate│
-│  ├── /api/v1/analysis — multi-source engine │
-│  ├── /api/v1/popularity — HF adoption scores│
-│  ├── /api/v1/compare — multi-model radars  │
-│  ├── /api/v1/refinement/history            │
-│  └── 12 endpoints; current S-slot contract │
-├─────────────────────────────────────────────┤
-│  TUI (Textual)                             │
-│  ├── Keyboard navigation (↑↓/s/f/t/p)     │
-│  ├── Preset filters, provenance tags       │
-│  ├── Compare mode (up to 4 models)         │
-│  └── Model detail with popularity scores   │
-└─────────────────────────────────────────────┘
+registry/
+  schema.json          # per-model/binding with freshness stamp on every field, unknown sentinel
+  registry.json        # 6 bindings, 3 lanes, capacity_slots (C8: 4 concurrent slots on a lane, not "lane exists")
+  table.py             # human + --json
+
+resolver/
+  resolver.py          # total over 4: resolved / resolved+degradation / routing-policy-unavailable / routing-blocked; floors hard, cost never overrides
+  cost.py              # accepted_result_cost (formula, inputs, missing-input behavior)
+  decision_log.py      # candidates, eliminated_by_floor, ranking_inputs (debuggable bad routes)
+  decision_log.schema.json
+
+adapters/
+  adapter.py           # adapter_id → command line; callers name only a lane; 2 impls: omp in-harness, agy exo-harness
+
+quota/
+  provider.py          # QuotaProvider interface + 4 impls
+                       # CPAManagerPlusQuotaProvider (recommended first target, per-account/model/channel SQLite)
+                       # ManagementAPIQuotaProvider, LocalDBQuotaProvider, CompositeQuotaProvider
+                       # v6.10.0 split: Management API = config/credentials/logs; Usage = companion (SQLite)
+
+health/
+  probe.py             # classify_health(recent error rate, auth validity, quota headroom, p50/p95) + HealthRunner
+                       # proxy account-pool primary, synthetic probe fallback; deliberately-unhealthy account detected
+
+docs/
+  alignment-report.md       # Phase 0 brownfield: punchlist 6/9 already answered, disposition KEEP/ADAPT/REPLACE/RETIRE
+  council-resolution-semantics.md  # V(5,3,1) on four-outcome totality + floor-before-cost, dissent: provider_health==down as hard floor (revisit 1 month)
+  registry-freshness.md     # staleness declared not inferred, refresh triggers
+  cost-formula.md           # accepted-result cost with missing-input behavior
+  handoff-phase2.md         # registry version, lanes, adapter interface, quota/health impls + what they cannot see, unknown fields (ram/vram, zen quota) with reasons
 ```
 
-## Web UI
-
-```bash
-# Start API backend
-cd api && uvicorn main:app --port 8123 &
-
-# Start web dev server
-cd web && npm install && npm run dev
-```
-
-Then open `http://localhost:5173` for the main dashboard or `analysis/dashboard.html` for the ECharts analysis panels.
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENROUTER_API_KEY` | Yes* | OpenRouter API (free models available) |
-| `AA_API_KEY` | No | Artificial Analysis benchmark data (free tier) |
-| `OPENCODE_GO_API_KEY` | No | OpenCode Go subscription models |
-| `OPENCODE_API_KEY` | No | OpenCode Zen free tier |
-| `KILO_API_KEY` | No | Kilo Gateway |
-| `NVIDIA_API_KEY` | No | NVIDIA NIM |
-| `GROQ_API_KEY` | No | Groq LPU |
-| `CEREBRAS_API_KEY` | No | Cerebras ASIC |
-
-*At least one API key required for scanning.
-
-## Project Structure
+## The Four Outcomes (D2.2)
 
 ```
-model-scan/
-├── dink.py                    # Main CLI (33 commands)
-├── api/main.py                # FastAPI backend (12 endpoints)
-├── web/                       # SvelteKit 5 web UI
-├── analysis/                  # Multi-source analysis engine
-│   ├── engine.py              # Metric computation + data fusion
-│   ├── dashboard.html         # ECharts interactive dashboard
-│   ├── popularity.py          # HuggingFace adoption scores
-│   └── refinement.py          # 4-pass deliberative refinement
-├── gold_standard.py           # Config patch generator
-├── cpmr.py                    # Config Patch Match Rate
-├── optimize.py                # Weight grid search
-├── audit.py                   # Independent audit system
-├── tui.py                     # Textual terminal UI
-├── refine.py                  # Weekly refinement pipeline
-├── config_tracker.py          # Config drift detection
-├── scoring/                   # 4-axis scoring engine
-├── token-economics/           # Token economics analysis
-├── archive/                   # Deprecated/old files
-├── env_example.txt            # Reference env vars
-├── test_api.py                # API integration tests (41)
-├── .gitignore
-├── LICENSE                    # MIT
-├── CHANGELOG.md
-├── FINAL_REPORT.md
-└── README.md
+Given a lane request, resolver returns exactly one of:
+  1. resolved route
+  2. resolved route + degradation notice (floor met, preference not)
+  3. routing-policy-unavailable (reason + named safe default)
+  4. routing-blocked (specific missing requirement)
+No fifth state, no silent `None`. Predecessor deadlocked here.
 ```
 
-## Tests
+## What Remains Unknown (honest, from handoff)
 
-```bash
-# Complete offline suite
-pytest -q --ignore=test_api.py
+- `ram/vram` per binding — no local measurement yet
+- `quota_state` / `provider_health` for zen/openrouter — no CPA DB wired for those providers
+- Vision cost/performance — Q3 data not applied
 
-# Read-only local API integration gate
-python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8123
-python3 test_api.py
-```
+These are `unknown` explicitly, never fabricated (D2.1).
 
-The API always exposes the code-owned 15-slot `S*` namespace. If its database
-contains legacy or incomplete slot IDs, config preview returns an explicit
-abstention instead of presenting stale recommendations as current.
+## Migration Note
 
-## License
+Older v5 scoring, web UI (SvelteKit), gateway, ARDF, and 33-command CLI remain in checkout as **migration evidence** but are not authority to apply a route. The new registry is the authority. Do not add model names/prices/quotas to prompts — add them to `registry.json`.
 
-MIT © 2026 Aaron Miller
+## Use When
 
-## Session Tasks — 2026-06-19 (14 items)
+- Picking a harness/model for a task class — ask the registry, not the prompt
+- Debugging a bad route — read `routing_decisions.jsonl`
+- Calibrating — feed `observability/store/calibration-record.jsonl` into `registry.json` rankings (round-trip changes ranking in asserted direction, gate 9)
 
-These tasks were defined during the calibration planning session. See
-`docs/RAW_USER_PROMPTS_2026-06-19.md` for full verbatim source.
-
-### P0 — Must build
-- [ ] **Conditional scoring engine** (`scoring/arch_predictor.py`): Estimate AI Index
-      from arch type, params, release date when AA data is missing
-- [ ] **CLI overall command** (`cli_overall.py`): `model-scan overall -a --free`
-      returns best model ID for tier. Done — see `cli_overall.py`
-
-### P1 — Core improvements
-- [ ] **User sentiment pipeline** (`scoring/sentiment.py`): Scrape X/Reddit for
-      empirical "feels like" comparisons with region tags
-- [ ] **Paper benchmark extractor** (`scoring/paper_benchmarks.py`): Extract
-      benchmark tables from Kimi 2.6, GLM 5.2, Qwen 3.7, MiniMax M3 papers
-- [ ] **Reliability calibration** (`scoring/reliability_calibration.py`):
-      Cross-reference scores with real API error logs
-- [ ] **Model size × AI Index cross-ref**: Apply size/arch data from models.dev
-      to intelligence scores
-
-### P2 — Nice to have
-- [ ] **Magic factor tracking** (`empirical_adjustments.json`): Empirical
-      over/underperformance deltas per model
-- [ ] **Benchmark directory**: Scraped data from paper-referenced benchmark sources
+**Handoff:** `docs/handoff-phase2.md` + `registry/table` output + `calibration-record.json` shape (owned by Component 1, lives in `agent-contracts`, Component 2 consumes it).
