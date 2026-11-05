@@ -1355,7 +1355,11 @@ def render_tiers_document(data: dict[str,Any], calibrated_payload: dict[str,Any]
 
 def embed_dashboard(payload: dict[str,Any], analysis: dict[str,Any]) -> None:
     """Replace only the embedded generated payload block in the standalone dashboard."""
-    text=DASHBOARD_PATH.read_text(encoding='utf-8')
+    # The rendered dashboard is deliberately gitignored. The tracked template
+    # allows a clean checkout to build it without an existing local copy.
+    template = ROOT / 'dashboard-template.html'
+    source = DASHBOARD_PATH if DASHBOARD_PATH.exists() else template
+    text=source.read_text(encoding='utf-8')
     begin='<!-- ARDF_DATA_BEGIN -->'; end='<!-- ARDF_DATA_END -->'
     if begin not in text or end not in text:
         raise RuntimeError('dashboard.html is missing ARDF_DATA_BEGIN/END markers')
