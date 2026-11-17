@@ -451,7 +451,7 @@ def calibrate(input_path: Path, output_path: Path, config_path: Path) -> dict[st
         d=by_source[r['source_id']]; d['rows']+=1; axis=r.get('metric_axis','other'); d[axis]=d.get(axis,0)+1; d['label']=r['source_label']; d['url']=r['source_url']; d['date']=r.get('source_date','')
     for source_id,d in sorted(by_source.items()): sources.append({'source_id':source_id,**d})
 
-    generated_at = datetime.now(timezone.utc).isoformat()
+    generated_at = TODAY  # date stamp only: keeps rebuilds byte-identical (see _build_date)
     payload={'generated_at':generated_at,'config':config,'algorithms':algorithms,'sources':sources,'models':models,'observations':compact_obs,'aggregate_sets':aggregate_sets,'calibration_reports':reports}
     return {'row_count':len(rows),'observation_count':len(observation_rows),'model_count':len(models),'algorithm_count':len(algorithms),'calibration_group_count':len(groups),'reports':reports,'models':models,'aggregate_sets':aggregate_sets,'payload':payload, 'generated_at': generated_at}
 
@@ -465,7 +465,16 @@ DASHBOARD_PATH=ROOT/'dashboard.html'
 PARETO_PATH=ROOT/'pareto-frontier-cheatsheet.md'
 TIERS_PATH=ROOT/'model-tiers-and-contenders.md'
 INDEX_PATH=ROOT/'INDEX.md'
-TODAY=datetime.now(timezone.utc).date().isoformat()
+def _build_date() -> str:
+    """The only wall-clock value in a build: a calendar date (UTC).
+
+    Two builds on the same day are byte-identical. SOURCE_DATE_EPOCH, when set,
+    pins the date so a rebuild on another day can be compared byte for byte.
+    """
+    epoch=os.environ.get('SOURCE_DATE_EPOCH','').strip()
+    if epoch.isdigit(): return datetime.fromtimestamp(int(epoch),timezone.utc).date().isoformat()
+    return datetime.now(timezone.utc).date().isoformat()
+TODAY=_build_date()
 DEFAULT_TOP_END_PREFIXES=('claude-opus-5-','claude-fable-5-','gpt-5-6-sol-','qwen3-8-max-','kimi-k3-')
 
 
@@ -1171,6 +1180,59 @@ def ana_external_frontier_comparisons(rows):
                     'note':'Independent coding-agent completion vs cost per attempt; not calibrated into the AA task-cost plane.'},
             'vals':{'points':vals,'frontier_keys':sorted(vk),'note':'Current Vals Index accuracy vs Cost/Test; independent source-specific Pareto cross-check, not an AA task-cost substitute.'}}
 
+PRIMARY_SOURCE_ID='aa-primary-current'
+PRIMARY_LABELS={'briefcase':'AA-Briefcase','automation':'AutomationBench-AA','terminal':'Terminal-Bench 4.0','coding':'FrontierCode 2.0',
+    'accuracy':'AA-Omniscience accuracy','nonhallucination':'AA-Omniscience non-hallucination','pdf':'GDP.pdf','hle':'HLE (diamond)',
+    'physics':'CritPt v2 hard','science':'Terminal-Bench Science'}
+
+def primary_score(components, weights):
+    """Weighted mean of components (0-100) for weights > 0; None unless every weighted component is present.
+
+    Identical rule to current_frontier.score_components and to the dashboard's offline tier weighting.
+    """
+    total=sum(w for w in weights.values() if w>0)
+    if total<=0: return None
+    if any(components.get(k) is None for k,w in weights.items() if w>0): return None
+    return sum(components[k]*w for k,w in weights.items() if w>0)/total
+
+def ana_current_primary(rows):
+    """Compact, offline-reweightable view of the primary AA v4.2 recomputation (source aa-primary-current).
+
+    Every catalog row of the primary source is kept: scored or not, priced or not.
+    Missing stays None (JSON null); a cost of 0 stays 0 and is a price. No Priors value enters this block.
+    """
+    sys_path_added=False
+    import sys
+    if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT)); sys_path_added=True
+    try: from current_frontier import BENCHMARKS
+    finally:
+        if sys_path_added: sys.path.remove(str(ROOT))
+    benchmarks=[{'id':k,'label':PRIMARY_LABELS[k],'weight':w,'tier':t} for k,(_,w,t) in BENCHMARKS.items()]
+    weights={b['id']:b['weight'] for b in benchmarks}
+    cat={}; obs=defaultdict(dict)
+    for r in rows:
+        if r.get('source_id')!=PRIMARY_SOURCE_ID: continue
+        key=r['model_key']
+        if r.get('record_type')=='catalog': cat[key]=r
+        elif r.get('record_type')=='observation':
+            name=r.get('metric_name','')
+            if name in obs[key]: raise RuntimeError(f'duplicate primary observation {key} {name}')
+            obs[key][name]=ana_number(r.get('raw_value'))
+    out=[]; mismatches=[]
+    for key in sorted(cat):
+        r=cat[key]; o=obs.get(key,{})
+        comps={b['id']:o.get('aa_component_'+b['id']) for b in benchmarks}
+        score=primary_score(comps,weights); published=o.get('aa_intelligence_index')
+        if score is not None and published is not None and abs(score-published)>1e-6: mismatches.append(key)
+        name=r.get('display_name','')
+        out.append({'id':key,'name':name,'provider':r.get('provider',''),'family':r.get('family',''),'effort':r.get('effort',''),
+            'fallback':'fallback' in name.lower(),'release':r.get('release_date','') or None,
+            'components':comps,'score':score,'cost':o.get('aa_cost_per_task_usd'),'url':r.get('source_url','')})
+    if mismatches: raise RuntimeError('primary composite differs from the recomputed one for: '+', '.join(mismatches[:5]))
+    retrieved=sorted({r.get('retrieved_at','') for r in cat.values() if r.get('retrieved_at')})
+    return {'source_id':PRIMARY_SOURCE_ID,'retrieved_at':retrieved[-1] if retrieved else None,'benchmarks':benchmarks,'rows':out,
+        'note':'Artificial Analysis v4.2 10-benchmark composite recomputed by ARDF from AA components; costs are AA workload costs per task. No Priors value enters this block.'}
+
 def ana_build():
     project=json.loads(CONFIG_PATH.read_text(encoding='utf-8')); policy=project['analysis']
     with CSV_PATH.open(newline='',encoding='utf-8-sig') as f:rows=list(csv.DictReader(f))
@@ -1261,7 +1323,7 @@ def ana_build():
                 })
     pinch_points.sort(key=lambda x:(-max(x['cap_a'],x['cap_b']),x['cost_delta_pct']))
     top_end=ana_top_end_analysis(models,rows,policy); external=ana_external_frontier_comparisons(rows)
-    data={'generated_at': datetime.now(timezone.utc).isoformat(),'policy':policy,'counts':{'catalog':len(models),'current_paired':sum(1 for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None and m['cost']>0),'frontier':len(frontier),'near_frontier':len(near)},'frontier':frontier,'near_frontier':near,'major_near_frontier':major,'executor_top5':shortlist,'executor_t3_top5':t3_shortlist,'executor_candidates':candidates[:20],'global_value_top20':global_value[:20],'luna_effort_curve':luna_curve,'pinch_points':pinch_points[:20],'top_end':top_end,'external_frontier_comparisons':external}
+    data={'generated_at': TODAY,'current_primary':ana_current_primary(rows),'policy':policy,'counts':{'catalog':len(models),'current_paired':sum(1 for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None and m['cost']>0),'frontier':len(frontier),'near_frontier':len(near)},'frontier':frontier,'near_frontier':near,'major_near_frontier':major,'executor_top5':shortlist,'executor_t3_top5':t3_shortlist,'executor_candidates':candidates[:20],'global_value_top20':global_value[:20],'luna_effort_curve':luna_curve,'pinch_points':pinch_points[:20],'top_end':top_end,'external_frontier_comparisons':external}
     PARETO_PATH.write_text(ana_render_md(data),encoding='utf-8')
     print(json.dumps(data['counts'],indent=2))
     print('executor $/cap (unrestricted):',[(x['display_name'],round(x['cost_per_capability'],8)) for x in shortlist])
@@ -1460,6 +1522,17 @@ def validate_package(cal_result: dict[str,Any], analysis: dict[str,Any]) -> None
     if cal_result['model_count']<600: raise RuntimeError(f'Unexpected model-count collapse: {cal_result["model_count"]}')
     if cal_result['observation_count']<1000: raise RuntimeError(f'Unexpected observation-count collapse: {cal_result["observation_count"]}')
     if not analysis.get('frontier'): raise RuntimeError('Strict Pareto frontier is empty')
+    # Primary current block: every primary-catalog configuration is preserved, missing stays missing, zero stays a price.
+    cp=analysis.get('current_primary') or {}
+    prim=cp.get('rows') or []
+    if len(prim)<725: raise RuntimeError(f'Primary AA catalog collapsed: {len(prim)} configurations (expected at least 725)')
+    if len({r['id'] for r in prim})!=len(prim): raise RuntimeError('Duplicate primary configuration ids')
+    if sum(1 for r in prim if r['score'] is not None)<100: raise RuntimeError('Primary scored count collapsed')
+    for r in prim:
+        if r['cost'] is not None and not (r['cost']>=0): raise RuntimeError('Invalid primary cost for '+r['id'])
+        if r['score'] is not None and any(v is None for v in r['components'].values()): raise RuntimeError('Scored row missing a component: '+r['id'])
+    csv_primary=sum(1 for r in csv.DictReader(CSV_PATH.open(newline='',encoding='utf-8-sig')) if r.get('source_id')==PRIMARY_SOURCE_ID and r.get('record_type')=='catalog')
+    if csv_primary!=len(prim): raise RuntimeError(f'Primary catalog rows in CSV ({csv_primary}) differ from the embedded payload ({len(prim)})')
     dash=DASHBOARD_PATH.read_text(encoding='utf-8')
     if 'window.ARDF_DATA=' not in dash or 'window.ARDF_ANALYSIS=' not in dash: raise RuntimeError('Dashboard payload embedding failed')
     # Guard the single-ledger/single-policy architecture.

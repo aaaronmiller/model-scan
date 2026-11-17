@@ -15,14 +15,14 @@ Canonical data: `data/unified-model-evidence.csv`. Policy: `project-config.json`
 
 ## Operational 4-tier routing policy (T1 to T4)
 
-For day-to-day multi-agent orchestration, the seven fine-grained bands collapse into four operational routing tiers:
+For day-to-day multi-agent orchestration, the capability space is partitioned into four operational routing tiers:
 
-| Operational Tier | Capability Band (v4.2) | Fine-Grained Mapping | Primary Routing Role | Canonical Frontier Representatives |
-|---|---|---|---|---|
-| **T1 · Flagship Reasoning** | **>= 58.0** | `S+` | Deep architectural judgment, hard verification, adversarial audits, final arbitration | `Claude Fable 5.2 (Max)` (64.56, $26.54), `Claude Fable 5.2 (Xhigh)` (60.53, $11.41) |
-| **T2 · Frontier Execution** | **52.0 to 57.9** | `S`, upper `A+` | Complex multi-file synthesis, refactoring, spec-to-code implementation | `Claude Fable 5.2 (High)` (57.64, $6.78), `Claude Opus 5.5 (Max)` (55.69, $9.62), `GPT-6 Astra (Max)` (55.57, $8.44), `GPT-6.1 Terra (Max)` (52.34, $2.58), `Kimi K3.1 Pro` (52.08, $0.89) |
-| **T3 · Workhorse Synthesis** | **40.0 to 51.9** | `A`, `B` | High-throughput subagent fan-outs, test generation, doc synthesis, standard coding | `DeepSeek V4.1 Flash 1017 (Max)` (51.63, $1.01), `Claude Fable 5.2 (Medium)` (48.03, $3.91), `Gemini 4 Carbon (High)` (48.02, $1.41), `Gemini 4 Carbon (Medium)` (46.97, $1.23) |
-| **T4 · Utility / Fast Triage** | **< 40.0** | `C`, `D` | Classification, extraction, routing probes, high-volume batch filtering | `Gemini 4 Carbon (Low)` (39.88, $0.68), `GPT-6.1 Sol (Max)` (39.67, $0.34), `Muse Ember (Max)` (36.02, $0.14), `Qwen3.8 27B (Reasoning)` (34.47, $0.094) |
+| Operational Tier | Capability Band (v4.2) | Primary Routing Role | Canonical Frontier & Near-Frontier Representatives |
+|---|---|---|---|
+| **T1 · Frontier Ceiling** | **>= 60.0** | Deep architectural judgment, hard verification, adversarial audits, final arbitration | `Claude Fable 5.2 (Max)` (64.56, $26.54), `Claude Fable 5.2 (Xhigh)` (62.22, $14.83), `Claude Fable 5.2 (High)` (61.82, $9.08), `Gemini 4 Carbon (High)` (60.02, $7.76) |
+| **T2 · Frontier** | **56.0 to 59.9** | Complex multi-file synthesis, refactoring, spec-to-code implementation | `Claude Opus 5.5 (Max)` (58.95, $10.04, near-frontier), `Gemini 4 Carbon (Medium)` (58.28, $6.59), `Claude Opus 5.5 (Xhigh)` (57.29, $6.05), `GPT-6 Astra (Max)` (56.85, $6.24, razor-edge miss), `Claude Fable 5.2 (Medium)` (56.37, $3.80) |
+| **T3 · Executor** | **47.0 to 55.9** | High-throughput subagent fan-outs, test generation, doc synthesis, autonomous coding | `GPT-6 Astra (Xhigh)` (55.30, $3.66), `GPT-6 Astra (High)` (54.83, $3.24), `GPT-6.1 Sol (Max)` (54.54, $1.27), `GPT-6.1 Sol (Xhigh)` (52.43, $0.76), `GPT-6.1 Terra (Max)` (51.32, $0.96, near-frontier), `GPT-6.1 Sol (High)` (50.31, $0.59) |
+| **T4 · Utility (Bottom-4 Interchangeable)** | **< 47.0** | Classification, extraction, routing probes, high-volume batch filtering | `GPT-6.1 Sol (Medium)` (46.31, $0.36), `GPT-6.1 Terra (High)` (42.43, $0.26), `GPT-6.1 Terra (Medium)` (38.15, $0.17), `Muse Ember (Max)` (36.02, $0.14), `Muse Ember (Xhigh)` (34.11, $0.12), `GPT-6.1 Terra (Low)` (29.42, $0.071), `Claude Haiku 5.5 (Low)` (18.64, $0.044), `GPT-6 Luna (Low)` (9.67, $0.005) |
 
 ## Current scored configurations by tier
 
@@ -245,14 +245,14 @@ The lower end is contested by cost compression rather than flagship quality. Thi
 
 ## Bottom-4 (T4 Utility) interchangeability matrix by use case
 
-Below capability 40, raw intelligence differences narrow while specialized operational traits (latency, open-weights self-hosting, structured output reliability, and context window) dominate selection:
+Below capability 47 (T4), specialized operational traits (latency, open-weights self-hosting, structured output reliability, and context window) dominate selection across interchangeable Pareto and near-frontier peers:
 
 | Workload / Use Case | Primary T4 Pick | Drop-in Interchangeable Peers | Selection Rationale |
 |---|---|---|---|
-| **High-speed code / CLI worker** | `GPT-6.1 Sol (Max)` (39.67, $0.340) | `GPT-6.1 Sol (Xhigh)` (37.54, $0.252), `Gemini 4 Carbon (Low)` (39.88, $0.684) | Sol Max delivers near-B-tier capability at half the task cost of Carbon Low. |
-| **Low-cost reasoning & synthesis** | `Muse Ember (Max)` (36.02, $0.136) | `Muse Ember (Xhigh)` (34.11, $0.116), `Qwen3.8 27B (Reasoning)` (34.47, $0.094) | Three strict Pareto points clustered between $0.094 and $0.136/task; Qwen3.8 27B adds open-weights portability. |
-| **Sub-$0.08 batch extraction & classification** | `GPT-6.1 Nano (Xhigh)` (28.39, $0.056) | `Grok 4.5 Mini (Xhigh)` (29.27, $0.075), `GPT-6 Luna (Medium)` (18.43, $0.042) | Strict Pareto rungs for high-volume JSON/schema extraction where T3 reasoning is unnecessary overhead. |
-| **Ultra-floor micro-triage (< $0.02/task)** | `Xiaomi MiMo-V2-Flash (Feb 26) (Reasoning)` (12.82, $0.017) | `Qwen3.8 9B (Non-reasoning)` (10.31, $0.009), `GPT-6 Luna (Low)` (9.67, $0.005), `Mistral Small 3.1 24B` (7.14, $0.004) | Lowest literal $/capability in the entire universe; suited for keyword routing, log filtering, and cheap classifiers. |
+| **Upper-T4 code & CLI worker (42 to 46 cap)** | `GPT-6.1 Sol (Medium)` (46.31, $0.359) | `GPT-6.1 Terra (Xhigh)` (45.28, $0.401), `GPT-6.1 Terra (High)` (42.43, $0.259), `Kimi K3.1 Pro` (46.43, $3.681, open-weights) | Sol Medium and Terra High sit on the strict Pareto frontier under $0.36/task; Kimi K3.1 Pro provides the highest open-weights capability in this band. |
+| **Low-cost synthesis & reasoning (34 to 38 cap)** | `GPT-6.1 Terra (Medium)` (38.15, $0.169) | `Muse Ember (Max)` (36.02, $0.136), `GPT-6.1 Sol (Low)` (34.77, $0.161), `Muse Ember (Xhigh)` (34.11, $0.116), `Claude Haiku 5.5 (Max)` (36.44, $0.411) | Three strict Pareto points (`Muse Ember Xhigh`, `Muse Ember Max`, `GPT-6.1 Terra Medium`) cluster tightly between $0.116 and $0.169/task. |
+| **Sub-$0.10 batch extraction & classification (18 to 30 cap)** | `GPT-6.1 Terra (Low)` (29.42, $0.071) | `Claude Haiku 5.5 (Medium)` (24.58, $0.092), `Claude Haiku 5.5 (Low)` (18.64, $0.044), `GPT-6 Luna (Medium)` (18.43, $0.042) | Strict Pareto rungs for high-volume JSON/schema extraction where T3 reasoning is unnecessary overhead. |
+| **Ultra-floor micro-triage (< $0.045/task)** | `GPT-6 Luna (Low)` (9.67, $0.0051) | `Mistral Small 4 (Reasoning)` (4.30, $0.040), `Granite 4.2 8B` (5.10, $0.040), `GPT-6 Luna (Medium)` (18.43, $0.042) | `GPT-6 Luna (Low)` achieves the lowest literal $/capability ($0.000529/pt) in the entire current dataset. |
 
 ## Closest competitors to the strict Pareto frontier
 

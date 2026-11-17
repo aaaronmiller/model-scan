@@ -41,6 +41,19 @@ Per user instruction (*"if any issues are found with the html methodology inform
 
 ---
 
+## Part I-B - 2026-11-17 MVP pass, ARDF-REC-02 (HTML presentation), for owner review
+
+Authorised by the owner's 2026-11-16 MVP instruction ("fix the ardf html page"; reviews follow the build). Finding 5 above had been held back pending review; items 2 and 3 are now addressed, item 1 is addressed for the new panel only. Please review these methodology changes:
+
+1. **Misleading current/historical framing replaced.** The page called an embedded Priors snapshot "current" and the whole calibrated ledger "generated in August 2026 ... not a current model ranking". That was false for v7.5.0: the ledger is rebuilt on every `python3 calibrate.py` and carries the November AA v4.2 rows. The page now leads with a **primary current frontier** panel (AA v4.2 recomputed by ARDF, source `aa-primary-current`, 734 catalog configurations, 116 fully scored). Priors is relabelled an external cross-check and never feeds ARDF scores. A ledger-vintage note is generated from the embedded observations (current vs reference-only vs historical counts). The August essay is kept verbatim inside a closed, labelled archive block; its hardcoded 14-point frontier list is no longer presented as current.
+2. **Zero is a price, unknown is not zero** (Finding 5, item 2). The primary panel keeps $0 configurations in the comparison (Command A+, K2 Horizon 375B A23B, North Mini Code) on a labelled $0 shelf, and lists scored configurations with no published cost (Granite 4.2 3B, K-EXAONE 2.0, Muse Wonder Full (Max), Nanbeige4.3-33B, NVIDIA Nemotron 3 Nano 4B) as unpriced, outside the chart and dominance. Counts are displayed. Note this widens Finding 5 item 2: there are three scored $0 rows, not two. The legacy ledger plot (`combineCosts` requires cost above 0) is unchanged and still cannot plot $0.
+3. **Filters recompute the frontier** (Finding 5, item 1, new panel only). The primary panel computes the frontier within the filtered selection and across all configurations; the legacy plot's static 21-point override (`markFrontier`) is unchanged.
+4. **Offline tier weighting.** Tier multipliers (S, A, B, C, Unrated; 0 to 5) re-score every configuration in the page from embedded per-benchmark AA components. No network and no Priors value is used. A multiplier of 0 removes a tier and can let configurations lacking those benchmarks be scored (116 scored at default, 133 with only the B tier). The Priors panel's own reweighting still needs mypriors.com.
+5. **Deterministic build.** `generated_at` was a microsecond timestamp inside `dashboard.html`; it is now a calendar date (`SOURCE_DATE_EPOCH` pins it). Two consecutive builds are byte-identical (same SHA-256 for CSV, tiers, cheatsheet and dashboard).
+6. **Committed generated files were stale against the committed generator.** At commit 3752a90 the tiers document and cheatsheet did not match what `calibrate.py` produces (for example Claude Fable 5.2 Xhigh 60.53 committed vs 62.22 regenerated), and the CSV differs from a rebuild only in last-digit float noise (for example `0.24567387882790453` vs `...56`), consistent with a different libm or Python on the committing host. This pass commits the regenerated files.
+
+Reproduce: `python3 calibrate.py && python3 tests/verify_dashboard.py` (needs Chromium; add `--screenshot out.png`).
+
 ## Part II - Historical v7.3 -> v7.4 Audit Record (Preserved)
 
 ### Cluster 1 - Policy / code alignment (Green)
