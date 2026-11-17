@@ -134,15 +134,17 @@ def split_segments(text: str) -> list[str]:
 # Headless invocations. Both CLIs run non-interactively; the bare `kilo`
 # command launches a TUI and must never be used here.
 #
-# Model preference, per the 2026-07-30 directive: deepseek-v4-flash first, then
-# the other capable free models. All are zero marginal cost.
+# Model preference, refreshed 2026-10-29 from live `kilo models --refresh`:
+# current free models first, then capable free fallbacks. Zero marginal cost.
+# Deprecated: stepfun/step-3.7-flash, inclusionai/ling-3.0-flash,
+# minimax-m3, laguna-s-2.1-free (no longer on the free roster).
 FALLBACK_MODELS = (
-    "opencode/deepseek-v4-flash-free",
-    "kilo/stepfun/step-3.7-flash:free",
     "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
-    "kilo/inclusionai/ling-3.0-flash:free",
-    "opencode/minimax-m3",
-    "opencode/laguna-s-2.1-free",
+    "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "kilo/poolside/laguna-s-2.1:free",
+    "kilo/cohere/north-mini-code:free",
+    "kilo/nvidia/nemotron-3.5-lightning:free",
+    "opencode/deepseek-v4-flash-free",
 )
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
