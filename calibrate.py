@@ -1278,21 +1278,13 @@ def _read_pinned(name, manifest):
 
 def ana_free_routes(cp, pool, frontier):
     """Evaluate zero-price routes listed in the pinned Kilo, OpenRouter and OpenCode Zen catalogs against scored configurations."""
-    manifest=json.loads((ROOT/'sources/current/manifest.json').read_text(encoding='utf-8'))
-    def price0(v):
-        try: return float(v)==0.0
-        except (TypeError,ValueError): return False
-    routes=[]
-    for m in _read_pinned('openrouter-catalog.json.gz',manifest)['data']:
-        p=m.get('pricing',{})
-        if price0(p.get('prompt')) and price0(p.get('completion')): routes.append({'surface':'OpenRouter','route_id':m['id'],'name':m['name'],'may_train':None,'modalities':m.get('architecture',{}).get('output_modalities',[])})
-    for m in _read_pinned('kilo-catalog.json.gz',manifest)['data']:
-        p=m.get('pricing',{})
-        if price0(p.get('prompt')) and price0(p.get('completion')): routes.append({'surface':'Kilo','route_id':m['id'],'name':m['name'],'may_train':m.get('mayTrainOnYourPrompts'),'modalities':m.get('architecture',{}).get('output_modalities',[])})
-    for m in _read_pinned('zen-catalog.json.gz',manifest)['data']:
-        try: c=m['cost']['text']; ok=c['input']['price']==0 and c['output']['price']==0
-        except (KeyError,TypeError): ok=False
-        if ok: routes.append({'surface':'OpenCode Zen','route_id':'opencode/'+m['id'],'name':m['name'],'may_train':None,'modalities':m.get('modalities',{}).get('output',[])})
+    sys_path_added=False
+    import sys
+    if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT)); sys_path_added=True
+    try: import current_frontier as cf
+    finally:
+        if sys_path_added: sys.path.remove(str(ROOT))
+    routes=[dict(x) for x in cf.catalog_routes() if x['free']]
     def kind(r):
         n=r['route_id'].lower()
         if 'free' in n and ('router' in r['name'].lower() or n in ('openrouter/free','kilo-auto/free')): return 'router (not a stable model)'
@@ -1312,16 +1304,57 @@ def ana_free_routes(cp, pool, frontier):
         if not hit and key in FREE_ROUTE_ALIASES:
             pref=_norm_key(FREE_ROUTE_ALIASES[key]); hit=[r for r in cp['rows'] if _norm_key(r['name']).startswith(pref)]; how='explicit alias (identity unverified)'
         return hit,how
-    by_model={}; unscored=[]
+    def aa_effort(r):
+        # AA's effort slug as something a catalog effort list can be compared with: a literal level; 'none' only when AA's own
+        # name says non-reasoning; otherwise None (AA records no level for this configuration, so no catalog level matches it).
+        e=r['effort']
+        if e not in (None,'','none','default'): return e
+        return 'none' if 'non-reasoning' in r['name'].lower() else None
+    groups={}; unscored=[]
     for rt in routes:
         rt['kind']=kind(rt)
         hit,how=match(rt)
         scored=[h for h in hit if h['score'] is not None]
         if not scored:
             unscored.append({**rt,'why':'no matching primary configuration' if not hit else 'matching primary configuration has no complete score'}); continue
-        best=max(scored,key=lambda h:(h['score'],h['id']))
-        e=by_model.setdefault(best['family'] or best['name'],{'model':best['name'],'provider':best['provider'],'effort':best['effort'],'score':best['score'],'aa_workload_cost':best['cost'],'how':how,'routes':[]})
-        e['routes'].append({k:rt[k] for k in ('surface','route_id','kind','may_train')})
+        best=max(scored,key=lambda h:(h['score'],h['id'])); fam=best['family'] or best['name']
+        g=groups.setdefault(fam,{'rows':{},'routes':[],'how':how,'efforts':set(),'can_disable':False,'defaults':set()})
+        for h in scored:
+            if (h['family'] or h['name'])==fam: g['rows'][h['id']]=h
+        g['routes'].append(rt); g['efforts']|=set(rt['efforts']); g['can_disable']|=bool(rt['can_disable'])
+        if rt['default_effort']: g['defaults'].add(rt['default_effort'])
+        if 'unverified' in how: g['how']=how
+    by_model={}
+    for fam,g in groups.items():
+        levels={e for e in g['efforts'] if e!='none'}; off_ok=g['can_disable'] or 'none' in g['efforts']
+        variants=[]
+        for h in g['rows'].values():
+            lab=aa_effort(h)
+            support='assumed' if lab is None else ('listed' if (lab in levels or (lab=='none' and off_ok)) else 'not offered')
+            variants.append({'name':h['name'],'effort':h['effort'],'score':h['score'],'cost':h['cost'],'support':support,'id':h['id'],'row':h})
+        listed=[v for v in variants if v['support']=='listed']; assumed=[v for v in variants if v['support']=='assumed']
+        use=listed or assumed
+        if not use:
+            for rt in g['routes']:
+                unscored.append({**rt,'why':'AA measured this model only at efforts the route does not list ('+', '.join(sorted({v['effort'] for v in variants}))+')'})
+            continue
+        lo=min(use,key=lambda v:(v['score'],v['id'])); hi=max(use,key=lambda v:(v['score'],v['id']))
+        head=hi if listed else lo
+        cat_levels=', '.join(sorted(levels|({'none'} if off_ok else set()),key=lambda e:['none','minimal','low','medium','high','xhigh','max'].index(e) if e in ['none','minimal','low','medium','high','xhigh','max'] else 99)) or 'no effort levels'
+        default_txt=('the catalog default is '+'/'.join(sorted(g['defaults']))) if g['defaults'] else 'the catalog states no default effort'
+        if listed:
+            if lo is hi: note=f"AA measured only {hi['effort']}, which the catalog lists (catalog efforts: {cat_levels}); {default_txt}, so the score applies when that effort is selected."
+            else: note=f"Ceiling at {hi['effort']} (highest catalog-listed effort AA measured); floor {lo['score']:.2f} at {lo['effort']}. Catalog efforts: {cat_levels}; {default_txt}, so a route used at its default can land anywhere in {lo['score']:.2f} to {hi['score']:.2f}."
+            if any(v['support']=='assumed' for v in variants): note+=' Variants with no AA effort level are not used.'
+        else:
+            note=f"Assumption: AA records no effort level for this configuration, so no catalog level can be matched to it (catalog: {cat_levels}). The score holds only if the route runs AA's measured configuration, which is unverified."
+            if lo is not hi: note+=f" Several AA configurations qualify; the lowest ({lo['score']:.2f}) is shown and {hi['score']:.2f} is an unverified ceiling."
+        excluded=[v for v in variants if v['support']=='not offered']
+        if excluded: note+=' Not offered by the route, excluded: '+', '.join(f"{v['name']} {v['score']:.2f}" for v in sorted(excluded,key=lambda v:v['score']))+'.'
+        by_model[fam]={'model':head['name'],'provider':head['row']['provider'],'effort':head['effort'],'score':head['score'],'aa_workload_cost':head['cost'],'how':g['how'],
+            'effort_basis':'catalog-listed' if listed else 'assumed','score_low':lo['score'],'score_high':hi['score'],'effort_note':note,
+            'variants':[{k:v[k] for k in ('name','effort','score','support')} for v in sorted(variants,key=lambda v:(v['score'],v['id']))],
+            'routes':[{k:rt[k] for k in ('surface','route_id','kind','may_train')} for rt in g['routes']]}
     out=[]
     for e in by_model.values():
         paid=[r for r in pool if r['cost'] and r['cost']>0 and r['score']>=e['score']-1e-12]
@@ -1438,7 +1471,12 @@ def ana_routing(cp):
     fm=free['models']
     if fm:
         b=fm[0]; pc=b['cheapest_paid_at_least']
-        rule('Use free routes for bounded, verifiable work; they top out well below the paid frontier.',f"{len(fm)} free-route models have a measured score ({free['route_count']} free catalog entries in total). Best: {b['model']} at {b['score']:.2f}{' (identity unverified)' if 'unverified' in b['how'] else ''} ({free['best_free_share_of_top']*100:.0f}% of the top frontier score {free['top_score']:.2f}); the cheapest paid configuration at or above it is {_label_dict(pc)}. See docs/free-routes.md.")
+        n_listed=sum(1 for e in fm if e['effort_basis']=='catalog-listed')
+        if b['effort_basis']=='catalog-listed':
+            basis=(f"a ceiling: it is the score at {b['effort']}, the highest effort its route lists that AA measured"+(f", with a floor of {b['score_low']:.2f}" if b['score_low']!=b['score'] else '')+'; the catalog states no default, so default use can score lower')
+        else: basis="an assumption: AA records no effort level for it, so the score holds only if the route runs AA's measured configuration"
+        rule('Use free routes for bounded, verifiable work; their scores are ceilings or assumptions, and even the ceiling is well below the paid frontier.',
+            f"{len(fm)} free-route models have a measured score ({free['route_count']} free catalog entries in total); {n_listed} are scored at an effort their route lists and {len(fm)-n_listed} on the assumption that the route runs AA's configuration. Highest: {b['model']} at {b['score']:.2f}{' (identity unverified)' if 'unverified' in b['how'] else ''}, {basis}; that is at most {free['best_free_share_of_top']*100:.0f}% of the top frontier score {free['top_score']:.2f}. The cheapest paid configuration at or above it is {_label_dict(pc)}. See docs/free-routes.md.")
     # 10 cost basis
     ratios,cf,priors_api=_prior_ratio_rows()
     if ratios:
@@ -1520,12 +1558,14 @@ def render_routing_docs(routing, cp):
     (ROOT/'docs/full-frontier.md').write_text('\n'.join(L),encoding='utf-8')
     R=routing['free']
     L=['# Free-route evaluation','',stamp,'',
-       f"Source: zero-price entries in the pinned OpenRouter, Kilo and OpenCode Zen catalogs ({R['route_count']} entries), matched to the primary AA scores by model name. A match ignores snapshot or version suffixes and is marked unverified when it does; zero listed price does not remove rate limits, privacy terms or availability changes. Scores are the AA v4.2 composite recomputed by ARDF at the model's best measured effort.",'',
-       '## Free routes with a measured score','','| Score | Model (best measured configuration) | Effort | Match | Routes | Cheapest paid configuration at or above this score | Model on frontier at its paid price |','|---:|---|---|---|---|---|:--:|']
+       f"Source: zero-price entries in the pinned OpenRouter, Kilo and OpenCode Zen catalogs ({R['route_count']} entries), matched to the primary AA scores by model name. A match ignores snapshot or version suffixes and is marked unverified when it does; zero listed price does not remove rate limits, privacy terms or availability changes. Scores are the AA v4.2 composite recomputed by ARDF. A score is used only at an effort the route's own catalog lists (AA's effort `none` counts as reasoning off only when AA's name says non-reasoning). When the catalog lists effort levels and AA measured several, the table shows the ceiling at the highest listed effort with the floor beside it; the catalogs do not state which effort a route runs by default, so a ceiling is a best case, not the expected score. When AA records no effort level, the score is an explicit assumption that the route runs AA's measured configuration.",'',
+       '## Free routes with a measured score','','| Headline score | Floor to ceiling | Model (headline configuration) | Effort evidence | Match | Routes | Cheapest paid configuration at or above the headline | Model on frontier at its paid price |','|---:|---:|---|---|---|---|---|:--:|']
     for e in R['models']:
         rts='; '.join(f"{x['surface']} `{x['route_id']}`"+(' (may train on prompts)' if x['may_train'] else '') for x in e['routes'])
-        L.append(f"| {e['score']:.2f} | {e['model']} | {e['effort']} | {e['how']} | {rts} | {_label_dict(e['cheapest_paid_at_least'])} | {'yes' if e['model_row_on_frontier'] else 'no'} |")
-    L+=['','The paid price of these models (AA workload cost per task) is: '+'; '.join(f"{e['model']} {_money(e['aa_workload_cost'])}" for e in R['models'])+'.','',
+        label='CEILING' if e['effort_basis']=='catalog-listed' and e['score_low']!=e['score_high'] else 'LISTED' if e['effort_basis']=='catalog-listed' else 'ASSUMED'
+        rng=f"{e['score_low']:.2f} to {e['score_high']:.2f}" if e['score_low']!=e['score_high'] else f"{e['score']:.2f}"
+        L.append(f"| {e['score']:.2f} | {rng} | {e['model'] if e['model'].endswith(')') else e['model']+' ('+e['effort']+')'} | **{label}**: {e['effort_note']} | {e['how']} | {rts} | {_label_dict(e['cheapest_paid_at_least'])} | {'yes' if e['model_row_on_frontier'] else 'no'} |")
+    L+=['','The paid price of these models (AA workload cost per task, headline configuration) is: '+'; '.join(f"{e['model']} {_money(e['aa_workload_cost'])}" for e in R['models'])+'.','',
         '## AA lists a $0 price: verified or not','','A $0 price from AA counts as verified only when a free route with the same name is listed in a pinned catalog. Unverified rows are held out of the frontier (see `docs/full-frontier.md`).','','| Score | Model | Status | Evidence |','|---:|---|---|---|']
     L+=[f"| {z['score']:.2f} | {z['name']} | {'verified free route' if z['cost_state']=='zero-verified' else 'unverified'} | {z['evidence']} |" for z in R['aa_zero_cost']]
     L+=['','## Free routes with no measured score','','No usable score exists in the pinned data, so they are not ranked. Names do not establish identity.','','| Surface | Route | Kind | Why |','|---|---|---|---|']
@@ -1870,6 +1910,11 @@ def validate_package(cal_result: dict[str,Any], analysis: dict[str,Any]) -> None
     for doc in ('routing-rules.md','full-frontier.md','free-routes.md','priors-deltas.md'):
         if not (ROOT/'docs'/doc).exists(): raise RuntimeError('Missing generated document docs/'+doc)
     if not routing.get('free',{}).get('models'): raise RuntimeError('Free-route evaluation matched no scored model')
+    for e in routing['free']['models']:
+        if e['effort_basis'] not in ('catalog-listed','assumed') or not (e['score_low']-1e-12<=e['score']<=e['score_high']+1e-12) or not e.get('effort_note'):
+            raise RuntimeError('Free-route entry without an explicit effort basis: '+e['model'])
+        used=[v for v in e['variants'] if v['support']==('listed' if e['effort_basis']=='catalog-listed' else 'assumed')]
+        if not used or any(v['score']<e['score_low']-1e-12 or v['score']>e['score_high']+1e-12 for v in used): raise RuntimeError('Free-route score range includes a variant the catalog does not support: '+e['model'])
     if routing.get('priors_deltas',{}).get('max_abs_score_delta',1)>0.0051:
         import sys as _s; print('WARNING: ARDF recomputation differs from the pinned Priors snapshot by more than its two-decimal rounding; see docs/priors-deltas.md',file=_s.stderr)
     csv_primary=sum(1 for r in csv.DictReader(CSV_PATH.open(newline='',encoding='utf-8-sig')) if r.get('source_id')==PRIMARY_SOURCE_ID and r.get('record_type')=='catalog')
