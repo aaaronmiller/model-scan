@@ -1405,7 +1405,7 @@ def ana_routing(cp):
     provider_frontiers=[]
     for prov,items in by_provider.items():
         pf=_frontier(items)
-        provider_frontiers.append({'provider':prov,'scored_configurations':len(items),'frontier':[{**{k:r[k] for k in ('id','name','effort','score','cost')},'on_global_frontier':r['id'] in fids} for r in pf]})
+        provider_frontiers.append({'provider':prov,'scored_configurations':len(items),'frontier':[{**{k:r[k] for k in ('id','name','effort','score','cost','fallback')},'on_global_frontier':r['id'] in fids} for r in pf]})
     provider_frontiers.sort(key=lambda p:(-p['scored_configurations'],p['provider']))
     free=ana_free_routes(cp,pool,frontier)
     rules=[]
@@ -1425,22 +1425,38 @@ def ana_routing(cp):
     lo,hi=cheapest_at_least(40),cheapest_at_least(60)
     if lo and hi: rule('Each extra point at the top costs far more than at the bottom; buy the top tier only when the task needs it.',f"Cheapest config at 40 or more is {_money(lo['cost'])}; at 60 or more it is {_money(hi['cost'])}, {hi['cost']/lo['cost']:.1f}x as much ({_label(lo)} versus {_label(hi)}).")
     # 4 max versus xhigh
-    fam=defaultdict(dict)
+    # Effort ladders per model family (provider, name without its trailing parenthetical, fallback track). A family is used only
+    # when every effort in it has exactly one row, so no step compares an ambiguous pair.
+    order=['none','minimal','low','medium','high','xhigh','max']
+    fam=defaultdict(lambda:defaultdict(list))
     for r in priced:
         base=re.sub(r'\s*\((?:[^)]*)\)\s*$','',r['name'])
-        fam[(r['provider'],base,r['fallback'])][r['effort']]=r
-    pairs=[(v['xhigh'],v['max']) for v in fam.values() if 'xhigh' in v and 'max' in v]
+        fam[(r['provider'],base,r['fallback'])][r['effort']].append(r)
+    ladders={k:{e:v[0] for e,v in d.items()} for k,d in fam.items() if all(len(v)==1 for v in d.values())}
+    def money_x(a,b): return f"{b['cost']/a['cost']:.2f}x cost"
+    pairs=[(v['xhigh'],v['max']) for v in ladders.values() if 'xhigh' in v and 'max' in v]
     if pairs:
         ratios=[b['cost']/a['cost'] for a,b in pairs]; gains=[b['score']-a['score'] for a,b in pairs]
         onf=sum(1 for a,b in pairs if b['id'] in fids)
-        rule('Treat max effort as an exception: price it against xhigh on your task before using it.',f"Across {len(pairs)} families with both settings, max costs a median {_median(ratios):.2f}x xhigh for a median {_median(gains):+.2f} points; {onf} of {len(pairs)} max configurations are on the frontier.")
-    # 5 effort on the frontier
+        worse=[(a,b) for a,b in pairs if b['score']<a['score']-1e-9]
+        wtxt=('; '.join(f"{_label(b)} scores {b['score']:.2f} against {_label(a)} {a['score']:.2f} ({b['score']-a['score']:+.2f}) at {money_x(a,b)}" for a,b in worse) or 'none')
+        rule('Treat max effort as an exception: price it against xhigh on your task before using it.',f"Across {len(pairs)} families with both settings, max costs a median {_median(ratios):.2f}x xhigh (range {min(ratios):.2f}x to {max(ratios):.2f}x) for a median {_median(gains):+.2f} points (range {min(gains):+.2f} to {max(gains):+.2f}). Max scored lower than xhigh in {len(worse)} of {len(pairs)}: {wtxt}. {onf} of {len(pairs)} max configurations are on the frontier.")
+    # 5 effort steps inside a family: the only evidence that a higher setting does not always score higher
+    steps=[]
+    for v in ladders.values():
+        es=[e for e in order if e in v]
+        steps+=[(v[a],v[b]) for a,b in zip(es,es[1:])]
+    regress=sorted([(a,b) for a,b in steps if b['score']<a['score']-1e-9],key=lambda p:p[1]['score']-p[0]['score'])
     eff=defaultdict(int)
     for r in frontier: eff[r['effort']]+=1
-    order=['none','minimal','low','medium','high','xhigh','max']
-    rule('Effort is not monotone value: the frontier mixes every effort setting, so choose model and effort together.','Frontier members by effort: '+', '.join(f"{e} {eff[e]}" for e in order if eff.get(e))+f' (of {len(frontier)}).')
+    if steps:
+        rtxt='; '.join(f"{_label(b)} {b['score']:.2f} against {_label(a)} {a['score']:.2f} ({b['score']-a['score']:+.2f}, {money_x(a,b)})" for a,b in regress) or 'none'
+        rule('A higher effort setting does not always score higher: compare the step you are buying inside the same model before paying for it.',
+            f"Across {len(ladders)} model families, {len(steps)} adjacent effort steps (for example low to medium); the higher setting scored lower in {len(regress)}: {rtxt}. Context only, and not evidence of non-monotonicity because it compares different models: frontier members by effort are "+', '.join(f"{e} {eff[e]}" for e in order if eff.get(e))+f" of {len(frontier)} ({', '.join(e for e in order if not eff.get(e)) or 'every effort'} appear on no frontier row).")
     # 6 fallback tracks
     fb=[r for r in pool if r['fallback']]
+    fb_all=[r for r in rows if r['fallback']]
+    fb_unscored=[r for r in fb_all if r['score'] is None]
     pairs_fb=[]
     stdmap={(r['provider'],re.sub(r',?\s*Default Fallback','',r['name']),r['effort']):r for r in pool if not r['fallback']}
     for r in fb:
@@ -1450,14 +1466,26 @@ def ana_routing(cp):
         extra=f" Compared with their standard track ({len(pairs_fb)} pairs) the fallback track costs a median {_median([b['cost']/a['cost'] for a,b in pairs_fb]):.2f}x with a median score difference of {_median([b['score']-a['score'] for a,b in pairs_fb]):+.2f}." if pairs_fb else ''
         fbprov=defaultdict(int)
         for r in fb: fbprov[r['provider']]+=1
-        fbfront=defaultdict(int)
-        for r in fb:
-            if r['id'] in fids: fbfront[r['provider']]+=1
-        rule('Treat default-fallback tracks as their own configurations, not as the standalone model; the pinned data does not say what the fallback covers.',f"{len(fb)} scored fallback tracks ({', '.join(f'{p} {n}' for p,n in sorted(fbprov.items()))}); {sum(fbfront.values())} on the frontier ({', '.join(f'{p} {n}' for p,n in sorted(fbfront.items())) or 'none'}); {len(pairs_fb)} have a scored standard-track counterpart.{extra}")
-    # 7 multi-provider
-    provcount=defaultdict(int)
-    for r in frontier: provcount[r['provider']]+=1
-    rule('Do not lock to one vendor: the frontier is multi-provider.','Frontier members by provider: '+', '.join(f"{p} {n}" for p,n in sorted(provcount.items(),key=lambda x:(-x[1],x[0])))+'. Each provider\'s own frontier is in docs/full-frontier.md.')
+        allprov=defaultdict(int); fbfront=defaultdict(int)
+        for r in frontier:
+            allprov[r['provider']]+=1
+            if r['fallback']: fbfront[r['provider']]+=1
+        nf_front=_frontier([r for r in pool if not r['fallback']])
+        rule('Treat default-fallback tracks as their own configurations, not as the standalone model; the pinned data does not say what the fallback covers.',
+            f"AA lists {len(fb_all)} fallback tracks, {len(fb)} scored ({', '.join(f'{p} {n}' for p,n in sorted(fbprov.items()))}) and {len(fb_unscored)} unscored ({', '.join(_label(r) for r in fb_unscored) or 'none'}); {('none of them has' if not pairs_fb else f'only {len(pairs_fb)} of them have')} a scored standard-track counterpart, so {('none can' if not pairs_fb else 'most cannot')} be compared with a standard track.{extra} Fallback tracks are {sum(fbfront.values())} of {len(frontier)} frontier members ({', '.join(f'{p} {fbfront[p]} of {allprov[p]}' for p in sorted(fbfront)) or 'none'}). Without them the frontier has {len(nf_front)} members (fallback-free frontier in docs/full-frontier.md), and every fallback track is tagged in that document.")
+    # 7 providers: each provider's frontier members and the score band they cover
+    prov=defaultdict(list)
+    for r in frontier: prov[r['provider']].append(r)
+    def band(p):
+        m=prov[p]; fbm=[r for r in m if r['fallback']]
+        s=f"{p} {len(m)} ({min(r['score'] for r in m):.2f} to {max(r['score'] for r in m):.2f}"
+        if fbm and len(fbm)==len(m): s+=', all fallback tracks'
+        elif fbm:
+            top_std=max(r['score'] for r in m if not r['fallback']); above=[r for r in m if r['score']>top_std]
+            s+=f", {len(fbm)} fallback tracks"+(f"; every member above {top_std:.2f} is a fallback track" if above and all(r['fallback'] for r in above) else '')
+        return s+')'
+    rule('No single provider holds the whole frontier: before locking to one, check that it is on the frontier at the score you need.',
+        'Frontier members by provider, with the lowest and highest score of those members (the span between first and last member, not a guarantee that every score in between is covered): '+'; '.join(band(p) for p in sorted(prov,key=lambda p:(-len(prov[p]),p)))+f". Frontier score range overall: {min(r['score'] for r in frontier):.2f} to {max(r['score'] for r in frontier):.2f}. Each provider's own frontier is in docs/full-frontier.md.")
     # 8 zero cost
     zc=free['aa_zero_cost']
     if zc:
@@ -1490,8 +1518,9 @@ def ana_routing(cp):
     uns=[r for r in rows if r['score'] is None]
     rule('No score is not a low score; it means the benchmark set is incomplete.',f"{len(uns)} of {len(rows)} primary configurations have no complete 10-benchmark score and are not ranked; they are listed on the dashboard's unscored shelf.")
     if len(rules)>MAX_RULES: raise RuntimeError('too many routing rules')
-    cols=('id','name','provider','effort','score','cost')
-    return {'rules':rules,'full_frontier':{'frontier':[{k:r[k] for k in cols} for r in frontier],'paid_frontier':[{k:r[k] for k in cols} for r in paid_frontier],
+    cols=('id','name','provider','effort','score','cost','fallback')
+    nofb=_frontier([r for r in pool if not r['fallback']])
+    return {'rules':rules,'full_frontier':{'frontier':[{k:r[k] for k in cols} for r in frontier],'paid_frontier':[{k:r[k] for k in cols} for r in paid_frontier],'fallback_free_frontier':[{k:r[k] for k in cols} for r in nofb],
         'unverified_free':[{**{k:r[k] for k in cols},'evidence':r['cost_evidence']} for r in held],'by_provider':provider_frontiers,'pool_size':len(pool),'priced_size':len(priced)},'free':free,'priors_deltas':deltas}
 
 def _label_dict(d):
@@ -1544,16 +1573,20 @@ def render_routing_docs(routing, cp):
     F=routing['full_frontier']
     L=['# Full frontier for all models','',stamp,'',
        f"Primary AA v4.2 recomputation. Pool: {F['pool_size']} configurations with a complete score and a trusted cost: prices above $0, plus a $0 only when a free route with the same name is listed in a pinned catalog (verified free). Unknown cost is excluded. An AA $0 with no such route is unverified: it is held out of dominance and listed in its own band below, so it can neither dominate a paid model nor drop one from the frontier. A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.",'',
-       f"## All providers: {len(F['frontier'])} frontier configurations",'','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
-    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['frontier']]
-    L+=['',f"## Paid-only frontier: {len(F['paid_frontier'])} configurations (prices above $0 only, {F['priced_size']} configurations)",'','Same rule with every $0 configuration removed, so it does not depend on whether any free route is real. `pareto-frontier-cheatsheet.md` applies the same cost above $0 rule to the multi-source ledger.','','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
-    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['paid_frontier']]
+       '**Warning on default-fallback tracks.** Rows marked FALLBACK are AA default-fallback tracks. The pinned data does not say what the fallback covers, and most have no scored standard-track counterpart, so read them as their own configurations, not as the standalone model. The fallback-free frontier is listed after the paid-only frontier.','',
+       f"## All providers: {len(F['frontier'])} frontier configurations",'','| Cost / task | Score | Model | Track | Provider | Effort |','|---:|---:|---|---|---|---|']
+    track=lambda r:'FALLBACK' if r['fallback'] else 'standard'
+    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {track(r)} | {r['provider']} | {r['effort']} |" for r in F['frontier']]
+    L+=['',f"## Paid-only frontier: {len(F['paid_frontier'])} configurations (prices above $0 only, {F['priced_size']} configurations)",'','Same rule with every $0 configuration removed, so it does not depend on whether any free route is real. `pareto-frontier-cheatsheet.md` applies the same cost above $0 rule to the multi-source ledger.','','| Cost / task | Score | Model | Track | Provider | Effort |','|---:|---:|---|---|---|---|']
+    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {track(r)} | {r['provider']} | {r['effort']} |" for r in F['paid_frontier']]
+    L+=['',f"## Fallback-free frontier: {len(F['fallback_free_frontier'])} configurations (standard tracks only, $0 rule as in the all-provider frontier)",'','The same pool with every default-fallback track removed, so each row is a standard AA track.','','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
+    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['fallback_free_frontier']]
     L+=['',f"## Unverified free: {len(F['unverified_free'])} configurations (AA lists $0, held out of dominance)",'','These have a score and an AA price of exactly $0 but no free route with the same name in the pinned OpenRouter, Kilo or OpenCode Zen catalogs. They are not compared with any paid model.','','| Score | Model | Provider | Evidence |','|---:|---|---|---|']
     L+=[f"| {r['score']:.2f} | {r['name']} | {r['provider']} | {r['evidence']} |" for r in F['unverified_free']] or ['| | none | | |']
     L+=['','## Each provider\'s own frontier','','A provider\'s frontier is computed over that provider\'s configurations only. "Global" marks members that are also on the all-provider frontier above.','']
     for p in F['by_provider']:
-        L+=[f"### {p['provider']} ({p['scored_configurations']} scored configurations, {len(p['frontier'])} on its frontier)",'','| Cost / task | Score | Model | Effort | Global |','|---:|---:|---|---|:--:|']
-        L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['effort']} | {'yes' if r['on_global_frontier'] else ''} |" for r in p['frontier']]
+        L+=[f"### {p['provider']} ({p['scored_configurations']} scored configurations, {len(p['frontier'])} on its frontier)",'','| Cost / task | Score | Model | Track | Effort | Global |','|---:|---:|---|---|---|:--:|']
+        L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {track(r)} | {r['effort']} | {'yes' if r['on_global_frontier'] else ''} |" for r in p['frontier']]
         L+=['']
     (ROOT/'docs/full-frontier.md').write_text('\n'.join(L),encoding='utf-8')
     R=routing['free']
