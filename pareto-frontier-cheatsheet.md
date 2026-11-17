@@ -5,6 +5,7 @@ Generated 2026-11-17. Canonical source: `data/unified-model-evidence.csv`. Gener
 ## Read this first
 
 - **Strict Pareto frontier** and **price/performance ranking are different calculations.** A Pareto point is simply not dominated by a configuration that is both cheaper and at least as capable. Pareto does not assign a single best model or sort by a capability/price ratio.
+- **This ledger frontier is paid-only.** It requires a task price above $0, so a $0 price (verified or not) never enters it. The AA-only frontier, which admits a $0 only when a free route with the same name is listed in a pinned catalog, and the paid-only AA frontier are in `docs/full-frontier.md`; the two ledgers can differ because this one blends sources through calibration.
 - **Calibrated capability** is the multi-source AA v4.2-equivalent Y coordinate used by the main graph. It is not literal human IQ.
 - **Task price** is the dashboard X coordinate using the best-available cost hierarchy (`best_evidence_then_weighted_geometric_mean`).
 - **Literal price/performance** is `task_price / calibrated_capability`; **lower is better**. Its inverse, capability points per dollar, is also shown.

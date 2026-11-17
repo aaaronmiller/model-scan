@@ -56,6 +56,18 @@ Authorised by the owner's 2026-11-16 MVP instruction ("fix the ardf html page"; 
 
 Reproduce: `python3 calibrate.py && python3 tests/verify_dashboard.py` (needs Chromium; add `--screenshot out.png`).
 
+## Part I-C - 2026-11-17 ARDF-REC-04 review fixes (Gemini REQUEST CHANGES, 3 High, 3 Medium), for owner review
+
+Each finding was checked against the code and pinned data before it was fixed. Methodology changes are logged here, one entry per finding. Review: `docs/reviews/rec-04-review.md`.
+
+### REC-04 finding 1 (High): unverified $0 AA prices dominated paid models
+
+- **Verified as real.** AA lists exactly three scored configurations at cost $0 with input and output price $0: North Mini Code (3.42), Command A+ (6.24), K2 Horizon 375B A23B (17.73). K2 Horizon dominated 23 configurations. Against the pinned catalogs: K2 Horizon has no route in OpenRouter, Kilo or OpenCode Zen; Command A+ is listed at $0.3 per million input and $1.5 per million output on OpenRouter and Kilo (so AA's $0 is contradicted); North Mini Code has a real free route (`cohere/north-mini-code:free` on OpenRouter and Kilo). The review's claim that `pareto()` and `ana_routing` disagreed was also true: the multi-source ledger frontier requires cost above $0, the AA frontier did not.
+- **Rule change.** A $0 AA price now enters dominance only when a free route with the same name is listed in a pinned catalog (`cost_state` `zero-verified`; exact name match, with `+` kept so Command A+ is not Command A). Otherwise it is `zero-unverified`: held out of dominance (it can neither dominate nor be dominated) and listed in its own band with the evidence. Implemented once in `current_frontier.comparable()` and `classify_cost_states()` and reused by `calibrate.py`, the generated documents and the page (`eligible`, `costState`).
+- **Frontier re-derived.** All-provider frontier 21 to 22 configurations (K2 Horizon out; North Mini Code, verified free, in at $0; GPT-6 Luna (Low) back on). A paid-only frontier (prices above $0, 108 configurations, 21 members) is now published beside it in `docs/full-frontier.md`, and the ledger cheatsheet says it is paid-only. Build assertions: no unverified $0 row is in any frontier; the unverified band equals the unverified rows; the full and paid-only frontiers equal `current_frontier.frontier()`.
+- **Page.** Cost filter has separate verified-free and unverified-free values; unverified rows are listed after the table with their evidence and are never plotted; the `$0 shelf` label is drawn only when it holds a point. Self-test adds three checks.
+- **Not changed.** The legacy ledger plot still cannot plot $0 (item 2 of Finding 5).
+
 ## Part II - Historical v7.3 -> v7.4 Audit Record (Preserved)
 
 ### Cluster 1 - Policy / code alignment (Green)

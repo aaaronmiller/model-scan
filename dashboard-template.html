@@ -22,12 +22,12 @@ purpose: Display every model/reasoning configuration and every selected evidence
 
 <section class="panel" id="primary-current" style="border:1px solid #c9a24a;margin-bottom:20px">
 <div class="chart-head"><div><span class="kicker">Primary evidence · Artificial Analysis v4.2, recomputed by ARDF</span><h2>Current frontier: score versus task cost</h2><p id="pc-sub"></p></div></div>
-<p class="note">Score is the weighted mean of AA&rsquo;s ten v4.2 benchmark components, recomputed by ARDF; cost is AA&rsquo;s workload cost per task in USD. These are benchmark workload costs, not your subscription bill. A frontier configuration is not dominated: no other configuration is at least as cheap and at least as good with one strict improvement. <strong>Zero is a price</strong>: $0 configurations stay in the comparison and sit on the $0 shelf at the left of the chart. <strong>Unknown is not zero</strong>: configurations with a score but no published cost are listed as unpriced and are left out of the chart and of dominance. Configurations without every weighted benchmark are counted as unscored. No Priors value enters this panel, and nothing here needs the network.</p>
+<p class="note">Score is the weighted mean of AA&rsquo;s ten v4.2 benchmark components, recomputed by ARDF; cost is AA&rsquo;s workload cost per task in USD. These are benchmark workload costs, not your subscription bill. A frontier configuration is not dominated: no other configuration is at least as cheap and at least as good with one strict improvement. <strong>Zero is a price only when it is verified</strong>: an AA price of $0 stays in the comparison, on the $0 shelf at the left of the chart, only when a free route with the same name is listed in the pinned OpenRouter, Kilo or OpenCode Zen catalogs. An <strong>unverified free</strong> $0 (no such route, or a catalog lists a paid route) is held out of dominance, so it can neither dominate a paid model nor remove one from the frontier; it is listed after the table with its evidence. <strong>Unknown is not zero</strong>: configurations with a score but no published cost are listed as unpriced and are left out of the chart and of dominance. Configurations without every weighted benchmark are counted as unscored. No Priors value enters this panel, and nothing here needs the network.</p>
 <div class="chart-controls">
 <label>Provider <select id="pc-provider"></select></label>
 <label>Effort <select id="pc-effort"></select></label>
 <label>Tracks <select id="pc-track"><option value="all" selected>All tracks</option><option value="exclude">Exclude default-fallback tracks</option><option value="only">Default-fallback tracks only</option></select></label>
-<label>Cost <select id="pc-coststate"><option value="all" selected>All cost states</option><option value="priced">Priced (above $0)</option><option value="zero">Zero cost ($0)</option><option value="unknown">Unknown cost</option></select></label>
+<label>Cost <select id="pc-coststate"><option value="all" selected>All cost states</option><option value="priced">Priced (above $0)</option><option value="zero">Verified free ($0, route listed)</option><option value="unverified">Unverified free ($0, no route found)</option><option value="unknown">Unknown cost</option></select></label>
 <label>Search <input id="pc-search" type="search" placeholder="model name" autocomplete="off"></label>
 <button class="btn" id="pc-reset" type="button">Reset filters and weights</button>
 </div>
@@ -507,8 +507,9 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
  const finite=v=>typeof v==='number'&&Number.isFinite(v);
  const rawWeights=(bench,mult)=>{const w={};for(const b of bench){const m=mult[b.tier];w[b.id]=b.weight*(m===undefined?1:m)}return w};
  const scoreOf=(c,w)=>{let t=0;for(const k in w)if(w[k]>0)t+=w[k];if(!(t>0))return null;let s=0;for(const k in w)if(w[k]>0){const v=c[k];if(!finite(v))return null;s+=v*w[k]}return s/t};
- const costState=r=>finite(r.cost)?(r.cost===0?'zero':'priced'):'unknown';
- const eligible=r=>finite(r.s)&&finite(r.cost)&&r.cost>=0;
+ const costState=r=>finite(r.cost)?(r.cost===0?(r.cost_state==='zero-unverified'?'unverified':'zero'):'priced'):'unknown';
+ // An AA price of $0 is a price only when a free route with the same name is listed (cost_state 'zero-verified'); an unverified $0 is held out of dominance.
+ const eligible=r=>finite(r.s)&&finite(r.cost)&&r.cost>=0&&r.cost_state!=='zero-unverified';
  const dominates=(a,b)=>a.cost<=b.cost&&a.s>=b.s&&(a.cost<b.cost||a.s>b.s);
  const frontierOf=pool=>pool.filter(r=>!pool.some(o=>o!==r&&dominates(o,r)));
  // Dominance notes for every pool member: null on the frontier, else the closest and the strongest dominating frontier members
@@ -517,7 +518,7 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
  const passes=(r,f)=>(!f.provider||r.provider===f.provider)&&(!f.effort||r.effort===f.effort)&&(f.track==='all'||(f.track==='only')===r.fallback)&&(f.cost==='all'||costState(r)===f.cost)&&(!f.q||r.name.toLowerCase().includes(f.q));
  /*PC-LOGIC-END*/
  const tiers=[...new Set(P.benchmarks.map(b=>b.tier))].sort((a,b)=>TIER_ORDER.indexOf(a)-TIER_ORDER.indexOf(b));
- const fmtCost=c=>!finite(c)?'unknown':c===0?'$0 (zero cost)':'$'+Number(c).toLocaleString('en-US',{maximumSignificantDigits:4});
+ const fmtCost=c=>!finite(c)?'unknown':c===0?'$0 (verified free)':'$'+Number(c).toLocaleString('en-US',{maximumSignificantDigits:4});
  const fmtScore=s=>Number(s).toFixed(2);
  const palette=['#a680ed','#65d9c3','#83b9ff','#f28e8e','#9bd36b','#e889c8','#5fc4e8','#d8a26a','#ff9f6b','#c9d46a','#8fa8ff','#7fd1a8','#ffb3c1','#c08cff','#6bd6d6','#b0e57c'];
  const provCount=new Map();for(const r of P.rows)provCount.set(r.provider,(provCount.get(r.provider)||0)+1);
@@ -533,8 +534,8 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
  const filters=()=>({provider:$('pc-provider').value,effort:$('pc-effort').value,track:$('pc-track').value,cost:$('pc-coststate').value,q:$('pc-search').value.trim().toLowerCase()});
  function readMultipliers(){const mult={};for(const t of tiers){const v=$('pc-tier-'+t).value.trim(),m=Number(v);if(v===''||!Number.isFinite(m)||m<0||m>5)return {error:'Each multiplier must be a number from 0 to 5; blank is not allowed. Previous weights kept.'};mult[t]=m}const w=rawWeights(P.benchmarks,mult);if(!(Object.values(w).reduce((a,b)=>a+b,0)>0))return {error:'At least one benchmark must keep a positive weight. Previous weights kept.'};return {mult}}
  const td=(tr,text,cls)=>{const c=document.createElement('td');c.textContent=text;if(cls)c.className=cls;tr.appendChild(c)};
- const nameOf=r=>r.name+(r.cost===0?' (zero cost)':'');
- const noteText=(n,r)=>n===undefined?'':n===null?(r.cost===0?'Frontier (zero cost)':'Frontier'):'Dominated by '+nameOf(n.closest)+(n.strongest!==n.closest?' · strongest: '+nameOf(n.strongest):'');
+ const nameOf=r=>r.name+(r.cost===0?' (verified free)':'');
+ const noteText=(n,r)=>n===undefined?'':n===null?(r.cost===0?'Frontier (verified free)':'Frontier'):'Dominated by '+nameOf(n.closest)+(n.strongest!==n.closest?' · strongest: '+nameOf(n.strongest):'');
  const node=(tag,attrs,text)=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n};
  function render(){
   const m=readMultipliers();let msg;
@@ -546,11 +547,12 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
   const f=filters();state.sel=state.rows.filter(r=>passes(r,f));
   const poolSel=state.sel.filter(eligible),poolAll=state.rows.filter(eligible);
   const aSel=annotate(poolSel),aAll=annotate(poolAll);state.pool=aSel;state.poolAll=aAll;
-  const scored=state.sel.filter(r=>finite(r.s)),priced=scored.filter(r=>costState(r)==='priced'),zero=scored.filter(r=>costState(r)==='zero'),unknown=scored.filter(r=>costState(r)==='unknown'),unscored=state.sel.filter(r=>!finite(r.s));
-  $('pc-counts').textContent='Showing '+state.sel.length+' of '+P.rows.length+' configurations · scored '+scored.length+' (priced '+priced.length+', zero cost '+zero.length+', unknown cost '+unknown.length+') · unscored '+unscored.length+' · frontier within selection '+aSel.frontier.length+' · frontier across all '+aAll.frontier.length+'.';
+  const scored=state.sel.filter(r=>finite(r.s)),priced=scored.filter(r=>costState(r)==='priced'),zero=scored.filter(r=>costState(r)==='zero'),unverified=scored.filter(r=>costState(r)==='unverified'),unknown=scored.filter(r=>costState(r)==='unknown'),unscored=state.sel.filter(r=>!finite(r.s));
+  $('pc-counts').textContent='Showing '+state.sel.length+' of '+P.rows.length+' configurations · scored '+scored.length+' (priced '+priced.length+', verified free '+zero.length+', unverified free '+unverified.length+', unknown cost '+unknown.length+') · unscored '+unscored.length+' · frontier within selection '+aSel.frontier.length+' · frontier across all '+aAll.frontier.length+'.';
   const body=$('pc-table');body.replaceChildren();
   const order=[...poolSel].sort((a,b)=>a.cost-b.cost||b.s-a.s||a.id.localeCompare(b.id));
   for(const r of order){const tr=document.createElement('tr');td(tr,r.name);td(tr,r.provider);td(tr,r.effort);td(tr,r.fallback?'default fallback':'standard');td(tr,fmtScore(r.s),'mono');td(tr,fmtCost(r.cost),'mono');td(tr,noteText(aSel.notes.get(r),r));td(tr,noteText(aAll.notes.get(r),r));body.appendChild(tr)}
+  for(const r of unverified.sort((a,b)=>b.s-a.s||a.id.localeCompare(b.id))){const tr=document.createElement('tr');tr.className='pc-unverified';tr.style.color='var(--muted)';tr.title=r.cost_evidence;td(tr,r.name);td(tr,r.provider);td(tr,r.effort);td(tr,r.fallback?'default fallback':'standard');td(tr,fmtScore(r.s),'mono');td(tr,'$0 (unverified)');td(tr,'Unverified free: held out of dominance. '+r.cost_evidence);td(tr,'Unverified free: held out of dominance');body.appendChild(tr)}
   for(const r of unknown.sort((a,b)=>b.s-a.s||a.id.localeCompare(b.id))){const tr=document.createElement('tr');tr.className='pc-unpriced';tr.style.color='var(--muted)';td(tr,r.name);td(tr,r.provider);td(tr,r.effort);td(tr,r.fallback?'default fallback':'standard');td(tr,fmtScore(r.s),'mono');td(tr,'unknown');td(tr,'Unpriced: cost unknown, not compared');td(tr,'Unpriced: cost unknown, not compared');body.appendChild(tr)}
   $('pc-unscored-summary').textContent='Unscored configurations ('+unscored.length+'): at least one weighted benchmark has no AA score';
   const ul=$('pc-unscored-list');ul.replaceChildren();if($('pc-unscored').open)fillUnscored(unscored);
@@ -570,8 +572,8 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
   svg.appendChild(node('line',{x1:L-20,y1:B,x2:R,y2:B,stroke:'#9aaac0'}));svg.appendChild(node('line',{x1:L-20,y1:T,x2:L-20,y2:B,stroke:'#9aaac0'}));
   for(let i=0;i<=4;i++){const y=B-i*(B-T)/4;svg.appendChild(node('text',{x:6,y:y+4,fill:'#b8c5d5','font-size':12},fmtScore(miny+(maxy-miny)*i/4)))}
   if(pos.length)for(let i=0;i<=4;i++){const x=L+i*(R-L)/4;svg.appendChild(node('text',{x:x-18,y:B+20,fill:'#b8c5d5','font-size':11},'$'+Number(10**(minx+(maxx-minx)*i/4)).toLocaleString('en-US',{maximumSignificantDigits:3})))}
-  svg.appendChild(node('text',{x:ZX-14,y:B+20,fill:'#ffd995','font-size':11},'$0 shelf'));
-  svg.appendChild(node('line',{x1:ZX+22,y1:T,x2:ZX+22,y2:B,stroke:'#33445c','stroke-dasharray':'3 4'}));
+  if(zeros.length){svg.appendChild(node('text',{x:ZX-14,y:B+20,fill:'#ffd995','font-size':11},'$0 shelf'));
+  svg.appendChild(node('line',{x1:ZX+22,y1:T,x2:ZX+22,y2:B,stroke:'#33445c','stroke-dasharray':'3 4'}))}
   const fr=[...a.frontier].sort((p,q)=>p.cost-q.cost||q.s-p.s);
   svg.appendChild(node('polyline',{points:fr.map(r=>X(r)+','+Y(r)).join(' '),fill:'none',stroke:'#f1b84a','stroke-width':2}));
   const onAll=new Set(state.poolAll.frontier);
@@ -603,10 +605,13 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
    chk('routing rules are rendered from the payload, at most 12, each citing data',!!RR&&lis.length>0&&lis.length<=12&&lis.length===RR.rules.length&&[...lis].every(li=>/Data: .+\d/.test(li.textContent)),lis.length+' rules');
    chk('ledger vintage note and live frontier list are filled in',!/Loading/.test($('ledger-vintage').textContent)&&$('guide-frontier-list').textContent.length>40&&/^\d+$/.test($('ledger-frontier-count').textContent),$('ledger-vintage').textContent.slice(0,60));
    chk('chart draws one circle per priced-or-zero scored row',$('pc-chart').querySelectorAll('circle').length===state.rows.filter(eligible).length,$('pc-chart').querySelectorAll('circle').length+' circles');
-   set('pc-coststate','zero');let z=rows();chk('zero-cost filter lists only $0 rows',z.length>0&&z.every(r=>r[5]==='$0 (zero cost)'),z.length+' rows');out.zero_rows=z.map(r=>r[0]);
-   const zeroShelf=$('pc-chart').querySelectorAll('circle').length;chk('zero-cost rows are plotted on the $0 shelf',zeroShelf===z.length,zeroShelf+' circles');
+   set('pc-coststate','zero');let z=rows();chk('verified-free filter lists only verified $0 rows',z.length>0&&z.every(r=>r[5]==='$0 (verified free)'),z.length+' rows');out.zero_rows=z.map(r=>r[0]);
+   const zeroShelf=$('pc-chart').querySelectorAll('circle').length;chk('verified-free rows are plotted on the $0 shelf',zeroShelf===z.length,zeroShelf+' circles');
+   set('pc-coststate','unverified');let uv=rows();chk('unverified-free filter lists only unverified $0 rows, none plotted, evidence shown',uv.length>0&&uv.every(r=>r[5]==='$0 (unverified)'&&/Unverified free/.test(r[6])&&r[6].length>60)&&$('pc-chart').querySelectorAll('circle').length===0,uv.length+' rows');out.unverified_rows=uv.map(r=>r[0]);set('pc-coststate','all');
+   chk('no unverified $0 row is on the frontier or dominates anything',state.rows.filter(r=>r.cost_state==='zero-unverified').every(r=>!state.poolAll.frontier.includes(r)&&![...state.poolAll.notes.values()].some(n=>n&&(n.closest===r||n.strongest===r))),'');
+   chk('no scored unverified $0 row is eligible for dominance',state.rows.filter(r=>finite(r.s)&&r.cost_state==='zero-unverified').every(r=>!eligible(r)),'');
    set('pc-coststate','unknown');let u=rows();chk('unknown-cost filter lists only unpriced rows, none plotted',u.length>0&&u.every(r=>r[5]==='unknown')&&$('pc-chart').querySelectorAll('circle').length===0,u.length+' rows');out.unknown_rows=u.map(r=>r[0]);
-   set('pc-coststate','priced');chk('priced filter excludes $0 and unknown',rows().every(r=>/^\$/.test(r[5])&&r[5]!=='$0 (zero cost)'),rows().length+' rows');
+   set('pc-coststate','priced');chk('priced filter excludes $0 and unknown',rows().every(r=>/^\$/.test(r[5])&&!/^\$0 /.test(r[5])),rows().length+' rows');
    set('pc-coststate','all');set('pc-provider','Anthropic');let an=rows();chk('provider filter',an.length>0&&an.every(r=>r[1]==='Anthropic'),an.length+' rows');out.anthropic_rows=an.length;
    out.anthropic_frontier=state.pool.frontier.map(r=>r.id);
    set('pc-track','exclude');chk('exclude fallback tracks',rows().every(r=>r[3]==='standard'),rows().length+' rows');set('pc-track','only');chk('fallback only',rows().length>0&&rows().every(r=>r[3]==='default fallback'),rows().length+' rows');

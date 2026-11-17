@@ -5,6 +5,7 @@ fallback tracks remain distinct. Missing data stays missing; zero is a price.
 """
 from __future__ import annotations
 import csv
+import functools
 import gzip
 import hashlib
 import json
@@ -38,14 +39,22 @@ def identity(name, effort):
     name = re.sub(r'\s*\((?:High|Max)\)$', '', name, flags=re.I)
     return re.sub(r'[^a-z0-9]', '', name.lower()) + '@' + ('none' if effort in (None, 'default') else effort).lower()
 
+def comparable(r, score='score', cost='cost'):
+    """Eligible for dominance: a score, a known cost (zero is a price) and not an unverified $0.
+
+    An AA price of exactly $0 is only trusted as a price when a free route with the same name exists in a
+    pinned catalog (cost_state 'zero-verified'). Otherwise it is held out as 'zero-unverified': it can neither
+    dominate nor be dominated, and is reported in its own band. Priors rows carry no cost_state and are unaffected.
+    """
+    return finite(r.get(score)) and finite(r.get(cost)) and r[cost] >= 0 and r.get('cost_state') != 'zero-unverified'
+
 def dominates(a, b, score='score', cost='cost'):
-    return (finite(a.get(score)) and finite(a.get(cost)) and a[cost] >= 0
-            and finite(b.get(score)) and finite(b.get(cost)) and b[cost] >= 0
+    return (comparable(a, score, cost) and comparable(b, score, cost)
             and a[cost] <= b[cost] and a[score] >= b[score]
             and (a[cost] < b[cost] or a[score] > b[score]))
 
 def frontier(rows, score='score', cost='cost'):
-    eligible = [r for r in rows if finite(r.get(score)) and finite(r.get(cost)) and r[cost] >= 0]
+    eligible = [r for r in rows if comparable(r, score, cost)]
     return sorted([r for r in eligible if not any(dominates(o, r, score, cost) for o in eligible)],
                   key=lambda r: (r[cost], -r[score], r['id']))
 
@@ -70,6 +79,98 @@ def score_components(comp, multipliers=None):
     if total <= 0: return None
     if any(not finite(comp.get(k)) for k, w in weights.items() if w > 0): return None
     return sum(comp[k] * w for k, w in weights.items() if w > 0) / total
+
+def _norm_name(text):
+    # '+' is part of a model name (Command A+ is not Command A); every other symbol is dropped.
+    return re.sub(r'[^a-z0-9]', '', str(text).lower().replace('+', 'plus'))
+
+def _route_key(name):
+    name = re.sub(r'^[^:]*:\s*', '', name)
+    return _norm_name(re.sub(r'\(free\)|\bfree\b', '', name, flags=re.I))
+
+@functools.lru_cache(maxsize=None)
+def catalog_routes():
+    """Flat route records from the pinned OpenRouter, Kilo and OpenCode Zen catalogs (checksums verified).
+
+    Each record: surface, route_id, name, input_per_m / output_per_m (USD per million tokens, None when absent),
+    free (both listed prices are zero), may_train, modalities, and the effort the route itself lists:
+    efforts (levels the catalog names, 'none' included when reasoning can be switched off), can_disable,
+    default_effort (None unless the catalog states one).
+    """
+    manifest = read_snapshot('manifest.json')
+    def load(name):
+        raw = (SOURCES / name).read_bytes()
+        expected = manifest.get('sha256', {}).get(name)
+        if expected and hashlib.sha256(raw).hexdigest() != expected:
+            raise ValueError('Snapshot checksum mismatch: ' + name)
+        return json.loads(gzip.decompress(raw))['data']
+    def per_m(v):
+        try: return round(float(v) * 1e6, 6)
+        except (TypeError, ValueError): return None
+    routes = []
+    for m in load('openrouter-catalog.json.gz'):
+        p = m.get('pricing') or {}; r = m.get('reasoning') or {}
+        eff = [e for e in (r.get('supported_efforts') or [])]
+        routes.append({'surface': 'OpenRouter', 'route_id': m['id'], 'name': m['name'],
+            'input_per_m': per_m(p.get('prompt')), 'output_per_m': per_m(p.get('completion')), 'may_train': None,
+            'modalities': (m.get('architecture') or {}).get('output_modalities', []),
+            'efforts': sorted(set(eff)), 'can_disable': r.get('mandatory') is False or 'none' in eff, 'default_effort': r.get('default_effort')})
+    for m in load('kilo-catalog.json.gz'):
+        p = m.get('pricing') or {}; o = m.get('opencode') or {}
+        variants = [(v.get('reasoning') or {}) for v in (o.get('variants') or {}).values()]
+        eff = {v['effort'] for v in variants if v.get('effort')}
+        for opt in o.get('reasoning_options') or []:
+            if opt.get('type') == 'effort': eff |= set(opt.get('values') or [])
+        off = any(v.get('enabled') is False for v in variants) or any(opt.get('type') == 'toggle' for opt in o.get('reasoning_options') or [])
+        routes.append({'surface': 'Kilo', 'route_id': m['id'], 'name': m['name'],
+            'input_per_m': per_m(p.get('prompt')), 'output_per_m': per_m(p.get('completion')), 'may_train': m.get('mayTrainOnYourPrompts'),
+            'modalities': (m.get('architecture') or {}).get('output_modalities', []),
+            'efforts': sorted(eff), 'can_disable': off or 'none' in eff, 'default_effort': None})
+    for m in load('zen-catalog.json.gz'):
+        try: c = m['cost']['text']; inp, out = c['input']['price'], c['output']['price']
+        except (KeyError, TypeError): inp = out = None
+        rs = (m.get('capabilities') or {}).get('reasoning') or {}
+        eff = list(rs.get('effort') or [])
+        routes.append({'surface': 'OpenCode Zen', 'route_id': 'opencode/' + m['id'], 'name': m['name'],
+            'input_per_m': inp, 'output_per_m': out, 'may_train': None,
+            'modalities': (m.get('modalities') or {}).get('output', []),
+            'efforts': sorted(set(eff) | ({'none'} if rs.get('toggle') else set())), 'can_disable': bool(rs.get('toggle')) or 'none' in eff, 'default_effort': None})
+    for r in routes:
+        r['free'] = r['input_per_m'] == 0 and r['output_per_m'] == 0
+        r['key'] = _route_key(r['name'])
+    return routes
+
+def _price_text(r):
+    return f"${r['input_per_m']:.4g}/M in, ${r['output_per_m']:.4g}/M out"
+
+def classify_cost_states(rows):
+    """Set cost_state and cost_evidence on every row (dicts with 'name' and 'cost').
+
+    priced: cost above 0.  unknown: no cost.  zero-verified: cost 0 and a free route with the same name is listed in a
+    pinned catalog.  zero-unverified: cost 0 with no such route; the evidence says whether a catalog lists a paid route
+    that contradicts AA's $0 or none at all.  Only exact names count (no suffix or alias matching).
+    """
+    routes = catalog_routes()
+    for r in rows:
+        c = r.get('cost')
+        if not finite(c):
+            r['cost_state'] = 'unknown'; r['cost_evidence'] = ''
+        elif c > 0:
+            r['cost_state'] = 'priced'; r['cost_evidence'] = ''
+        else:
+            key = _norm_name(re.sub(r'\s*\(.*\)$', '', r['name']))
+            free = [x for x in routes if x['free'] and x['key'] == key]
+            paid = [x for x in routes if not x['free'] and x['key'] == key and finite(x['input_per_m']) and finite(x['output_per_m'])]
+            if free:
+                r['cost_state'] = 'zero-verified'
+                r['cost_evidence'] = 'free route listed: ' + '; '.join(f"{x['surface']} {x['route_id']}" for x in free)
+            elif paid:
+                r['cost_state'] = 'zero-unverified'
+                r['cost_evidence'] = "AA lists $0 but the catalogs list a paid route: " + '; '.join(f"{x['surface']} {x['route_id']} {_price_text(x)}" for x in paid)
+            else:
+                r['cost_state'] = 'zero-unverified'
+                r['cost_evidence'] = 'AA lists $0 and no route with this name exists in the pinned OpenRouter, Kilo or OpenCode Zen catalogs'
+    return rows
 
 def primary_rows(models):
     result = []
@@ -102,7 +203,7 @@ def primary_rows(models):
             'url': 'https://artificialanalysis.ai/models/' + m['slug'],
             'specialties': {k: m.get(k) for k in ['mlcrOverall','lcr','itBenchSre','frontierCode','gdpval','aa3dElo','code2videoElo','analystAgent','enterpriseOpsGym']},
         })
-    return result
+    return classify_cost_states(result)
 
 def read_snapshot(name):
     p = SOURCES / name
@@ -188,13 +289,19 @@ status: verified-calculation
 
 Computed from primary Artificial Analysis model payload, not Priors scores.
 Each point is a model/effort/evaluation track. Dominance uses full precision;
-ties are retained, missing prices are excluded with disclosure, and zero costs
-remain eligible. This is the measured universe, not a claim to benchmark every
+ties are retained and missing prices are excluded with disclosure. A zero cost
+stays eligible only when a free route with the same name is listed in a pinned
+catalog (verified free); an unverified $0 is held out of dominance and listed in its own
+band below. This is the measured universe, not a claim to benchmark every
 available model. Prices are benchmark workload estimates, not subscription bills.
 
 '''
     text+=f"Snapshot: {data['manifest']['retrieved_at']}. Catalog: {len(data['rows'])}; complete component score: {sum(finite(r['score']) for r in data['rows'])}; paired score/cost: {sum(finite(r['score']) and finite(r['cost']) for r in data['rows'])}.\n\n"
-    text+=table(data['frontier'])+'\n\n## Priors API cross-check\n\n'+table(data['priors_api_frontier'])
+    held=[r for r in data['rows'] if finite(r['score']) and r.get('cost_state')=='zero-unverified']
+    text+=table(data['frontier'])
+    text+='\n\n## Unverified free ($0 listed by AA, held out of dominance)\n\n| Model / effort | Score | Evidence |\n|---|---:|---|\n'
+    text+=''.join(f"| {r['name']} | {r['score']:.6f} | {r['cost_evidence']} |\n" for r in sorted(held,key=lambda r:(-r['score'],r['id']))) or '| none | | |\n'
+    text+='\n## Priors API cross-check\n\n'+table(data['priors_api_frontier'])
     text+='\n\n## Priors subscription estimates (different objective)\n\n'+table(data['priors_subscription_frontier'])
     text+='\n\n## Exact matched-row differences\n\n| Model / effort | ARDF score | Priors score | Delta | ARDF API cost | Priors API cost |\n|---|---:|---:|---:|---:|---:|\n'
     for c in data['comparisons']:

@@ -15,17 +15,19 @@ Source: zero-price entries in the pinned OpenRouter, Kilo and OpenCode Zen catal
 | 13.62 | Nemotron 3.5 Super VL | high | name match | OpenRouter `nvidia/nemotron-3.5-super-vl:free`; Kilo `nvidia/nemotron-3.5-super-vl:free` (may train on prompts); OpenCode Zen `opencode/nemotron-3.5-super-vl-free` | GPT-6 Luna (Medium) at $0.0422 (18.43) | no |
 | 11.78 | Nemotron 3 Ultra 550B A55B (Reasoning) | none | explicit alias (identity unverified) | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free`; Kilo `nvidia/nemotron-3-ultra-550b-a55b:free` (may train on prompts) | GPT-6 Luna (Medium) at $0.0422 (18.43) | no |
 | 5.58 | Nemotron 3.5 Lightning | none | name match | OpenRouter `nvidia/nemotron-3.5-lightning:free`; Kilo `nvidia/nemotron-3.5-lightning:free` (may train on prompts); OpenCode Zen `opencode/nemotron-3.5-lightning-free` | GPT-6 Luna (Low) at $0.00512 (9.67) | no |
-| 3.42 | North Mini Code | none | name match | OpenRouter `cohere/north-mini-code:free`; Kilo `cohere/north-mini-code:free` (may train on prompts) | GPT-6 Luna (Low) at $0.00512 (9.67) | no |
+| 3.42 | North Mini Code | none | name match | OpenRouter `cohere/north-mini-code:free`; Kilo `cohere/north-mini-code:free` (may train on prompts) | GPT-6 Luna (Low) at $0.00512 (9.67) | yes |
 
 The paid price of these models (AA workload cost per task) is: DeepSeek V4.1 Flash 1017 (Max) $0.602; GLM-5.3-Flash $0.583; MiMo-V2.6-Flash $0.129; Beam 1.0 $0.284; Nemotron 3.5 Super VL $0.52; Nemotron 3 Ultra 550B A55B (Reasoning) $2.23; Nemotron 3.5 Lightning $0.314; North Mini Code $0.
 
-## AA lists a $0 price (route not identified in the three catalogs)
+## AA lists a $0 price: verified or not
 
-| Score | Model |
-|---:|---|
-| 17.73 | K2 Horizon 375B A23B |
-| 6.24 | Command A+ |
-| 3.42 | North Mini Code |
+A $0 price from AA counts as verified only when a free route with the same name is listed in a pinned catalog. Unverified rows are held out of the frontier (see `docs/full-frontier.md`).
+
+| Score | Model | Status | Evidence |
+|---:|---|---|---|
+| 17.73 | K2 Horizon 375B A23B | unverified | AA lists $0 and no route with this name exists in the pinned OpenRouter, Kilo or OpenCode Zen catalogs |
+| 6.24 | Command A+ | unverified | AA lists $0 but the catalogs list a paid route: OpenRouter cohere/command-a-plus $0.3/M in, $1.5/M out; Kilo cohere/command-a-plus $0.3/M in, $1.5/M out |
+| 3.42 | North Mini Code | verified free route | free route listed: OpenRouter cohere/north-mini-code:free; Kilo cohere/north-mini-code:free |
 
 ## Free routes with no measured score
 

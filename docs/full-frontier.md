@@ -2,13 +2,14 @@
 
 Generated 2026-11-17 by `calibrate.py` from `sources/current/` (AA snapshot 2026-11-10). Do not edit by hand.
 
-Primary AA v4.2 recomputation. Pool: 111 configurations with a complete score and a known cost (zero cost included, unknown cost excluded). A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.
+Primary AA v4.2 recomputation. Pool: 109 configurations with a complete score and a trusted cost: prices above $0, plus a $0 only when a free route with the same name is listed in a pinned catalog (verified free). Unknown cost is excluded. An AA $0 with no such route is unverified: it is held out of dominance and listed in its own band below, so it can neither dominate a paid model nor drop one from the frontier. A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.
 
-## All providers: 21 frontier configurations
+## All providers: 22 frontier configurations
 
 | Cost / task | Score | Model | Provider | Effort |
 |---:|---:|---|---|---|
-| $0 | 17.73 | K2 Horizon 375B A23B | Institute of Foundation Models | high |
+| $0 | 3.42 | North Mini Code | Cohere | none |
+| $0.00512 | 9.67 | GPT-6 Luna (Low) | OpenAI | low |
 | $0.0422 | 18.43 | GPT-6 Luna (Medium) | OpenAI | medium |
 | $0.0438 | 18.64 | Claude Haiku 5.5 (Low) | Anthropic | low |
 | $0.0713 | 29.42 | GPT-6.1 Terra (Low) | OpenAI | low |
@@ -29,6 +30,43 @@ Primary AA v4.2 recomputation. Pool: 111 configurations with a complete score an
 | $9.08 | 61.82 | Claude Fable 5.2 (High, Default Fallback) | Anthropic | high |
 | $14.83 | 62.22 | Claude Fable 5.2 (Xhigh, Default Fallback) | Anthropic | xhigh |
 | $26.54 | 64.56 | Claude Fable 5.2 (Max, Default Fallback) | Anthropic | max |
+
+## Paid-only frontier: 21 configurations (prices above $0 only, 108 configurations)
+
+Same rule with every $0 configuration removed, so it does not depend on whether any free route is real. `pareto-frontier-cheatsheet.md` applies the same cost above $0 rule to the multi-source ledger.
+
+| Cost / task | Score | Model | Provider | Effort |
+|---:|---:|---|---|---|
+| $0.00512 | 9.67 | GPT-6 Luna (Low) | OpenAI | low |
+| $0.0422 | 18.43 | GPT-6 Luna (Medium) | OpenAI | medium |
+| $0.0438 | 18.64 | Claude Haiku 5.5 (Low) | Anthropic | low |
+| $0.0713 | 29.42 | GPT-6.1 Terra (Low) | OpenAI | low |
+| $0.116 | 34.11 | Muse Ember (Xhigh) | Meta | xhigh |
+| $0.136 | 36.02 | Muse Ember (Max) | Meta | max |
+| $0.169 | 38.15 | GPT-6.1 Terra (Medium) | OpenAI | medium |
+| $0.259 | 42.43 | GPT-6.1 Terra (High) | OpenAI | high |
+| $0.359 | 46.31 | GPT-6.1 Sol (Medium) | OpenAI | medium |
+| $0.591 | 50.31 | GPT-6.1 Sol (High) | OpenAI | high |
+| $0.764 | 52.43 | GPT-6.1 Sol (Xhigh) | OpenAI | xhigh |
+| $1.27 | 54.54 | GPT-6.1 Sol (Max) | OpenAI | max |
+| $3.24 | 54.83 | GPT-6 Astra (High) | OpenAI | high |
+| $3.66 | 55.30 | GPT-6 Astra (Xhigh) | OpenAI | xhigh |
+| $3.80 | 56.37 | Claude Fable 5.2 (Medium, Default Fallback) | Anthropic | medium |
+| $6.05 | 57.29 | Claude Opus 5.5 (Xhigh, Default Fallback) | Anthropic | xhigh |
+| $6.59 | 58.28 | Gemini 4 Carbon (Medium) | Google | medium |
+| $7.76 | 60.02 | Gemini 4 Carbon (High) | Google | high |
+| $9.08 | 61.82 | Claude Fable 5.2 (High, Default Fallback) | Anthropic | high |
+| $14.83 | 62.22 | Claude Fable 5.2 (Xhigh, Default Fallback) | Anthropic | xhigh |
+| $26.54 | 64.56 | Claude Fable 5.2 (Max, Default Fallback) | Anthropic | max |
+
+## Unverified free: 2 configurations (AA lists $0, held out of dominance)
+
+These have a score and an AA price of exactly $0 but no free route with the same name in the pinned OpenRouter, Kilo or OpenCode Zen catalogs. They are not compared with any paid model.
+
+| Score | Model | Provider | Evidence |
+|---:|---|---|---|
+| 17.73 | K2 Horizon 375B A23B | Institute of Foundation Models | AA lists $0 and no route with this name exists in the pinned OpenRouter, Kilo or OpenCode Zen catalogs |
+| 6.24 | Command A+ | Cohere | AA lists $0 but the catalogs list a paid route: OpenRouter cohere/command-a-plus $0.3/M in, $1.5/M out; Kilo cohere/command-a-plus $0.3/M in, $1.5/M out |
 
 ## Each provider's own frontier
 
@@ -56,7 +94,7 @@ A provider's frontier is computed over that provider's configurations only. "Glo
 
 | Cost / task | Score | Model | Effort | Global |
 |---:|---:|---|---|:--:|
-| $0.00512 | 9.67 | GPT-6 Luna (Low) | low |  |
+| $0.00512 | 9.67 | GPT-6 Luna (Low) | low | yes |
 | $0.0422 | 18.43 | GPT-6 Luna (Medium) | medium | yes |
 | $0.0713 | 29.42 | GPT-6.1 Terra (Low) | low | yes |
 | $0.161 | 34.77 | GPT-6.1 Sol (Low) | low |  |
@@ -145,12 +183,6 @@ A provider's frontier is computed over that provider's configurations only. "Glo
 | $0.583 | 27.73 | GLM-5.3-Flash | max |  |
 | $5.01 | 31.48 | GLM-5.3 (Max) | max |  |
 
-### Cohere (2 scored configurations, 1 on its frontier)
-
-| Cost / task | Score | Model | Effort | Global |
-|---:|---:|---|---|:--:|
-| $0 | 6.24 | Command A+ | none |  |
-
 ### Kimi (2 scored configurations, 2 on its frontier)
 
 | Cost / task | Score | Model | Effort | Global |
@@ -171,6 +203,12 @@ A provider's frontier is computed over that provider's configurations only. "Glo
 | $0.129 | 26.64 | MiMo-V2.6-Flash | none |  |
 | $0.257 | 29.81 | MiMo-V2.6-Pro | none |  |
 
+### Cohere (1 scored configurations, 1 on its frontier)
+
+| Cost / task | Score | Model | Effort | Global |
+|---:|---:|---|---|:--:|
+| $0 | 3.42 | North Mini Code | none | yes |
+
 ### IBM (1 scored configurations, 1 on its frontier)
 
 | Cost / task | Score | Model | Effort | Global |
@@ -182,12 +220,6 @@ A provider's frontier is computed over that provider's configurations only. "Glo
 | Cost / task | Score | Model | Effort | Global |
 |---:|---:|---|---|:--:|
 | $3.19 | 29.56 | Ling 3.1 Flash 1019 | none |  |
-
-### Institute of Foundation Models (1 scored configurations, 1 on its frontier)
-
-| Cost / task | Score | Model | Effort | Global |
-|---:|---:|---|---|:--:|
-| $0 | 17.73 | K2 Horizon 375B A23B | high | yes |
 
 ### Reflection (1 scored configurations, 1 on its frontier)
 

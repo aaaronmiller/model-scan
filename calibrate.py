@@ -1199,12 +1199,16 @@ def ana_current_primary(rows):
     """Compact, offline-reweightable view of the primary AA v4.2 recomputation (source aa-primary-current).
 
     Every catalog row of the primary source is kept: scored or not, priced or not.
-    Missing stays None (JSON null); a cost of 0 stays 0 and is a price. No Priors value enters this block.
+    Missing stays None (JSON null); a cost of 0 stays 0 but is only treated as a price when it is verified
+    (cost_state 'zero-verified'); an unverified $0 ('zero-unverified') is kept visible and held out of dominance.
+    No Priors value enters this block.
     """
     sys_path_added=False
     import sys
     if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT)); sys_path_added=True
-    try: from current_frontier import BENCHMARKS
+    try:
+        import current_frontier as cf
+        BENCHMARKS=cf.BENCHMARKS
     finally:
         if sys_path_added: sys.path.remove(str(ROOT))
     benchmarks=[{'id':k,'label':PRIMARY_LABELS[k],'weight':w,'tier':t} for k,(_,w,t) in BENCHMARKS.items()]
@@ -1229,6 +1233,7 @@ def ana_current_primary(rows):
             'fallback':'fallback' in name.lower(),'release':r.get('release_date','') or None,
             'components':comps,'score':score,'cost':o.get('aa_cost_per_task_usd'),'url':r.get('source_url','')})
     if mismatches: raise RuntimeError('primary composite differs from the recomputed one for: '+', '.join(mismatches[:5]))
+    cf.classify_cost_states(out)  # zero is a price only when a free route with the same name is listed; see current_frontier.comparable
     retrieved=sorted({r.get('retrieved_at','') for r in cat.values() if r.get('retrieved_at')})
     return {'source_id':PRIMARY_SOURCE_ID,'retrieved_at':retrieved[-1] if retrieved else None,'benchmarks':benchmarks,'rows':out,
         'note':'Artificial Analysis v4.2 10-benchmark composite recomputed by ARDF from AA components; costs are AA workload costs per task. No Priors value enters this block.'}
@@ -1329,7 +1334,7 @@ def ana_free_routes(cp, pool, frontier):
     top=max((r['score'] for r in pool),default=None)
     best=out[0] if out else None
     return {'models':out,'unscored_routes':sorted(unscored,key=lambda r:(r['surface'],r['route_id'])),'route_count':len(routes),
-        'aa_zero_cost':[{'name':r['name'],'score':r['score'],'cost':0} for r in zero],'top_score':top,
+        'aa_zero_cost':[{'name':r['name'],'score':r['score'],'cost':0,'cost_state':r['cost_state'],'evidence':r['cost_evidence']} for r in zero],'top_score':top,
         'best_free_score':best['score'] if best else None,'best_free_share_of_top':(best['score']/top if best and top else None)}
 
 def _prior_ratio_rows():
@@ -1350,9 +1355,13 @@ def _prior_ratio_rows():
 def ana_routing(cp):
     """Rules of thumb (at most MAX_RULES), the full all-model frontier and the free-route evaluation."""
     rows=cp['rows']
-    pool=[r for r in rows if r['score'] is not None and r['cost'] is not None and r['cost']>=0]
+    known=[r for r in rows if r['score'] is not None and r['cost'] is not None and r['cost']>=0]
+    # An AA price of $0 enters dominance only when a free route with the same name is listed in a pinned catalog.
+    held=sorted([r for r in known if r['cost_state']=='zero-unverified'],key=lambda r:(-r['score'],r['id']))
+    pool=[r for r in known if r['cost_state']!='zero-unverified']
     priced=[r for r in pool if r['cost']>0]
     frontier=_frontier(pool); fids={r['id'] for r in frontier}
+    paid_frontier=_frontier(priced)
     dominated=[r for r in pool if r['id'] not in fids]
     def cheapest_at_least(t,src=priced):
         c=[r for r in src if r['score']>=t]
@@ -1374,7 +1383,7 @@ def ana_routing(cp):
         dom=min([f for f in frontier if _dominates(f,worst)],key=lambda f:(f['cost'],-f['score']))
         ex=f"{_label(worst)} ({worst['score']:.2f}, {_money(worst['cost'])}) is dominated by {_label(dom)} ({dom['score']:.2f}, {_money(dom['cost'])})."
     else: ex='no dominated configuration'
-    rule('Choose from the frontier first; a dominated configuration has a cheaper or equal and at least as good alternative.',f"{len(frontier)} of {len(pool)} scored and priced configurations are undominated (full list: docs/full-frontier.md). Example: {ex}")
+    rule('Choose from the frontier first; a dominated configuration has a cheaper or equal and at least as good alternative.',f"{len(frontier)} of {len(pool)} scored configurations with a trusted cost are undominated ({len(paid_frontier)} of {len(priced)} when only prices above $0 count); {len(held)} scored configurations with an unverified AA price of $0 are held out of both (full lists: docs/full-frontier.md). Example: {ex}")
     # 2 cheapest to reach a score
     ts=[20,30,40,50,55,60]; steps=[(t,cheapest_at_least(t)) for t in ts]
     steps=[(t,c) for t,c in steps if c]
@@ -1419,8 +1428,12 @@ def ana_routing(cp):
     # 8 zero cost
     zc=free['aa_zero_cost']
     if zc:
-        top0=zc[0]; paid0=cheapest_at_least(top0['score'])
-        rule('A $0 configuration is a real price but not a free lunch: check rate limits, terms and identity before relying on it.',f"AA lists {len(zc)} scored $0 configurations: "+'; '.join(f"{z['name']} {z['score']:.2f}" for z in zc)+f". The best of them ({top0['score']:.2f}) is matched by a paid configuration at {_money(paid0['cost']) if paid0 else 'n/a'} ({_label(paid0) if paid0 else 'n/a'}).")
+        ver=[z for z in zc if z['cost_state']=='zero-verified']; unv=[z for z in zc if z['cost_state']=='zero-unverified']
+        best0=max(zc,key=lambda z:z['score']); paid0=cheapest_at_least(best0['score'])
+        rule('Do not trust an AA price of $0 until a free route with the same name is listed; unverified $0 configurations stay out of the frontier, and a verified one still needs its rate limits and terms checked.',
+            f"AA lists {len(zc)} scored $0 configurations. Verified free route: "+('; '.join(f"{z['name']} {z['score']:.2f} ({z['evidence']})" for z in ver) or 'none')
+            +". Unverified, held out of dominance: "+('; '.join(f"{z['name']} {z['score']:.2f} ({z['evidence']})" for z in unv) or 'none')
+            +f". For scale, the best of all three ({best0['score']:.2f}) is matched by a paid configuration at {_money(paid0['cost']) if paid0 else 'n/a'} ({_label(paid0) if paid0 else 'n/a'}).")
     # 9 free routes
     fm=free['models']
     if fm:
@@ -1439,7 +1452,9 @@ def ana_routing(cp):
     uns=[r for r in rows if r['score'] is None]
     rule('No score is not a low score; it means the benchmark set is incomplete.',f"{len(uns)} of {len(rows)} primary configurations have no complete 10-benchmark score and are not ranked; they are listed on the dashboard's unscored shelf.")
     if len(rules)>MAX_RULES: raise RuntimeError('too many routing rules')
-    return {'rules':rules,'full_frontier':{'frontier':[{**{k:r[k] for k in ('id','name','provider','effort','score','cost')}} for r in frontier],'by_provider':provider_frontiers,'pool_size':len(pool)},'free':free,'priors_deltas':deltas}
+    cols=('id','name','provider','effort','score','cost')
+    return {'rules':rules,'full_frontier':{'frontier':[{k:r[k] for k in cols} for r in frontier],'paid_frontier':[{k:r[k] for k in cols} for r in paid_frontier],
+        'unverified_free':[{**{k:r[k] for k in cols},'evidence':r['cost_evidence']} for r in held],'by_provider':provider_frontiers,'pool_size':len(pool),'priced_size':len(priced)},'free':free,'priors_deltas':deltas}
 
 def _label_dict(d):
     return f"{d['name']} at {_money(d['cost'])} ({d['score']:.2f})" if d else 'none (no paid configuration scores that high)'
@@ -1490,9 +1505,13 @@ def render_routing_docs(routing, cp):
     (ROOT/'docs/routing-rules.md').write_text('\n'.join(L),encoding='utf-8')
     F=routing['full_frontier']
     L=['# Full frontier for all models','',stamp,'',
-       f"Primary AA v4.2 recomputation. Pool: {F['pool_size']} configurations with a complete score and a known cost (zero cost included, unknown cost excluded). A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.",'',
+       f"Primary AA v4.2 recomputation. Pool: {F['pool_size']} configurations with a complete score and a trusted cost: prices above $0, plus a $0 only when a free route with the same name is listed in a pinned catalog (verified free). Unknown cost is excluded. An AA $0 with no such route is unverified: it is held out of dominance and listed in its own band below, so it can neither dominate a paid model nor drop one from the frontier. A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.",'',
        f"## All providers: {len(F['frontier'])} frontier configurations",'','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
     L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['frontier']]
+    L+=['',f"## Paid-only frontier: {len(F['paid_frontier'])} configurations (prices above $0 only, {F['priced_size']} configurations)",'','Same rule with every $0 configuration removed, so it does not depend on whether any free route is real. `pareto-frontier-cheatsheet.md` applies the same cost above $0 rule to the multi-source ledger.','','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
+    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['paid_frontier']]
+    L+=['',f"## Unverified free: {len(F['unverified_free'])} configurations (AA lists $0, held out of dominance)",'','These have a score and an AA price of exactly $0 but no free route with the same name in the pinned OpenRouter, Kilo or OpenCode Zen catalogs. They are not compared with any paid model.','','| Score | Model | Provider | Evidence |','|---:|---|---|---|']
+    L+=[f"| {r['score']:.2f} | {r['name']} | {r['provider']} | {r['evidence']} |" for r in F['unverified_free']] or ['| | none | | |']
     L+=['','## Each provider\'s own frontier','','A provider\'s frontier is computed over that provider\'s configurations only. "Global" marks members that are also on the all-provider frontier above.','']
     for p in F['by_provider']:
         L+=[f"### {p['provider']} ({p['scored_configurations']} scored configurations, {len(p['frontier'])} on its frontier)",'','| Cost / task | Score | Model | Effort | Global |','|---:|---:|---|---|:--:|']
@@ -1507,8 +1526,8 @@ def render_routing_docs(routing, cp):
         rts='; '.join(f"{x['surface']} `{x['route_id']}`"+(' (may train on prompts)' if x['may_train'] else '') for x in e['routes'])
         L.append(f"| {e['score']:.2f} | {e['model']} | {e['effort']} | {e['how']} | {rts} | {_label_dict(e['cheapest_paid_at_least'])} | {'yes' if e['model_row_on_frontier'] else 'no'} |")
     L+=['','The paid price of these models (AA workload cost per task) is: '+'; '.join(f"{e['model']} {_money(e['aa_workload_cost'])}" for e in R['models'])+'.','',
-        '## AA lists a $0 price (route not identified in the three catalogs)','','| Score | Model |','|---:|---|']
-    L+=[f"| {z['score']:.2f} | {z['name']} |" for z in R['aa_zero_cost']]
+        '## AA lists a $0 price: verified or not','','A $0 price from AA counts as verified only when a free route with the same name is listed in a pinned catalog. Unverified rows are held out of the frontier (see `docs/full-frontier.md`).','','| Score | Model | Status | Evidence |','|---:|---|---|---|']
+    L+=[f"| {z['score']:.2f} | {z['name']} | {'verified free route' if z['cost_state']=='zero-verified' else 'unverified'} | {z['evidence']} |" for z in R['aa_zero_cost']]
     L+=['','## Free routes with no measured score','','No usable score exists in the pinned data, so they are not ranked. Names do not establish identity.','','| Surface | Route | Kind | Why |','|---|---|---|---|']
     L+=[f"| {r['surface']} | `{r['route_id']}` | {r['kind']} | {r['why']} |" for r in R['unscored_routes']]
     L+=['']
@@ -1633,6 +1652,7 @@ def ana_render_md(d):
     )
     lines=['# ARDF Pareto Frontier + Price/Performance Cheatsheet (v7.5.0)','',f"Generated {TODAY}. Canonical source: `data/unified-model-evidence.csv`. Generated by `calibrate.py`; edit policy in `project-config.json`, not these tables by hand.",'','## Read this first','',
     '- **Strict Pareto frontier** and **price/performance ranking are different calculations.** A Pareto point is simply not dominated by a configuration that is both cheaper and at least as capable. Pareto does not assign a single best model or sort by a capability/price ratio.',
+    '- **This ledger frontier is paid-only.** It requires a task price above $0, so a $0 price (verified or not) never enters it. The AA-only frontier, which admits a $0 only when a free route with the same name is listed in a pinned catalog, and the paid-only AA frontier are in `docs/full-frontier.md`; the two ledgers can differ because this one blends sources through calibration.',
     '- **Calibrated capability** is the multi-source AA v4.2-equivalent Y coordinate used by the main graph. It is not literal human IQ.',
     '- **Task price** is the dashboard X coordinate using the best-available cost hierarchy (`best_evidence_then_weighted_geometric_mean`).',
     '- **Literal price/performance** is `task_price / calibrated_capability`; **lower is better**. Its inverse, capability points per dollar, is also shown.',
@@ -1837,6 +1857,16 @@ def validate_package(cal_result: dict[str,Any], analysis: dict[str,Any]) -> None
     expected={r['id'] for r in _cf.frontier(prim)}
     got={r['id'] for r in routing.get('full_frontier',{}).get('frontier',[])}
     if expected!=got: raise RuntimeError('Full frontier differs from current_frontier.frontier(): '+str(sorted(expected^got))[:200])
+    # Unverified $0 prices must never silently dominate: held out of every frontier, listed in their own band.
+    ff=routing['full_frontier']
+    if any(r.get('cost_state') not in ('priced','unknown','zero-verified','zero-unverified') for r in prim): raise RuntimeError('Primary row without a valid cost_state')
+    held={r['id'] for r in prim if r['cost_state']=='zero-unverified' and r['score'] is not None}
+    in_frontiers={r['id'] for r in ff['frontier']}|{r['id'] for r in ff['paid_frontier']}|{r['id'] for p in ff['by_provider'] for r in p['frontier']}
+    if held&in_frontiers: raise RuntimeError('Unverified $0 configuration entered a frontier: '+str(sorted(held&in_frontiers))[:200])
+    if {r['id'] for r in ff['unverified_free']}!=held: raise RuntimeError('Unverified-free band differs from the unverified $0 rows')
+    paid_expected={r['id'] for r in _cf.frontier([r for r in prim if r['cost'] is not None and r['cost']>0])}
+    if paid_expected!={r['id'] for r in ff['paid_frontier']}: raise RuntimeError('Paid-only frontier differs from current_frontier.frontier() over prices above $0')
+    if _cf.frontier([r for r in prim if r['cost_state']=='zero-unverified']): raise RuntimeError('Unverified $0 rows formed a frontier on their own')
     for doc in ('routing-rules.md','full-frontier.md','free-routes.md','priors-deltas.md'):
         if not (ROOT/'docs'/doc).exists(): raise RuntimeError('Missing generated document docs/'+doc)
     if not routing.get('free',{}).get('models'): raise RuntimeError('Free-route evaluation matched no scored model')
