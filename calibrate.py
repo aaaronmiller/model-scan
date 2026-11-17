@@ -1513,7 +1513,9 @@ def ana_routing(cp):
     # 11 source deltas
     deltas=ana_priors_deltas(cp,cf,priors_api)
     if deltas['matched']:
-        rule('Keep each comparison within one source and one cost basis, even though ARDF and Priors scores agree closely.',f"On {deltas['matched']} of {deltas['priors_rows']} Priors API rows the independently recomputed ARDF score differs from Priors by a median {deltas['median_abs_score_delta']:.4f} and at most {deltas['max_abs_score_delta']:.4f} points; API cost differs by a median {deltas['median_abs_cost_delta']:.4f} and at most {deltas['max_abs_cost_delta']:.4f} USD per task. Exact table: docs/priors-deltas.md.")
+        A=deltas['aa_divergence']
+        rule('Do not read ARDF and Priors agreeing as validation, and keep each comparison within one source and one cost basis.',
+            f"The agreement is circular: ARDF's composite uses the Priors weights ({A['weights']}) on the same AA snapshot, so on {deltas['matched']} of {deltas['priors_rows']} Priors API rows the scores differ by a median {deltas['median_abs_score_delta']:.4f} and at most {deltas['max_abs_score_delta']:.4f} points (Priors' two-decimal rounding) and API cost by at most {deltas['max_abs_cost_delta']:.4f} USD per task by construction. AA's own published index, which does not share those weights, differs from the ARDF composite on {A['configurations']} configurations by a median {A['median_abs']:.4f} and at most {A['max_abs']:.4f} points, with {A['over_0_1']} above 0.1 (largest: {A['largest'][0]['name']}, {A['largest'][0]['delta']:+.4f}). Exact tables: docs/priors-deltas.md.")
     # 12 unscored
     uns=[r for r in rows if r['score'] is None]
     rule('No score is not a low score; it means the benchmark set is incomplete.',f"{len(uns)} of {len(rows)} primary configurations have no complete 10-benchmark score and are not ranked; they are listed on the dashboard's unscored shelf.")
@@ -1531,11 +1533,21 @@ def ana_priors_deltas(cp, cf, priors_api):
 
     Priors never enters ARDF scores; this only reports how the independent recomputation differs from it.
     """
-    comps=cf.build()['comparisons']
+    built=cf.build(); comps=built['comparisons']
+    # AA's own published intelligenceIndex is the comparator that does not share ARDF's weights: ARDF's composite uses the Priors
+    # weights, so ARDF versus Priors on the same AA snapshot is the same arithmetic and agrees by construction.
+    published={r['id']:r['published_score'] for r in built['rows']}
+    both=[(r,r['score']-r['published_score']) for r in built['rows'] if cf.finite(r['score']) and cf.finite(r['published_score'])]
+    both.sort(key=lambda x:(-abs(x[1]),x[0]['name']))
+    aa_div={'configurations':len(both),'max_abs':max((abs(d) for _,d in both),default=None),'median_abs':_median([abs(d) for _,d in both]) if both else None,
+        'over_0_1':sum(1 for _,d in both if abs(d)>0.1),'over_rounding':sum(1 for _,d in both if abs(d)>0.005),
+        'largest':[{'name':r['name'],'ardf_score':r['score'],'aa_published':r['published_score'],'delta':d} for r,d in both[:10]],
+        'weights':'/'.join(str(w) for _,w,_ in cf.BENCHMARKS.values())}
     out=[]
     for c in comps:
         if not c['matched'] or c['score_delta'] is None: continue
-        out.append({'name':c['name'],'match':'exact identity','ardf_score':c['ardf_score'],'priors_score':c['priors_score'],'delta':c['score_delta'],'ardf_cost':c['ardf_cost'],'priors_cost':c['priors_cost'],'cost_delta':c['cost_delta']})
+        pub=published.get(c['ardf_id']); out.append({'name':c['name'],'match':'exact identity','ardf_score':c['ardf_score'],'priors_score':c['priors_score'],'delta':c['score_delta'],'ardf_cost':c['ardf_cost'],'priors_cost':c['priors_cost'],'cost_delta':c['cost_delta'],
+            'aa_published':pub,'aa_delta':(c['ardf_score']-pub) if cf.finite(pub) and cf.finite(c['ardf_score']) else None})
     # Second pass, flagged: Priors rows whose model name embeds the effort (for example "Muse Ember (Xhigh)") fail the strict
     # identity; match them on the name without its trailing parenthetical plus the effort, only when that is unambiguous.
     strip=lambda s:re.sub(r'\s*\([^)]*\)\s*$','',s)
@@ -1551,14 +1563,16 @@ def ana_priors_deltas(cp, cf, priors_api):
         hits=loose.get(_norm_key(strip(p['model']))+'@'+eff(p['effort']),[])
         if len(hits)!=1: continue
         a=hits[0]
-        out.append({'name':c['name'],'match':'loose name plus effort (identity unverified)','ardf_score':a['score'],'priors_score':p['score'],'delta':a['score']-p['score'],'ardf_cost':a['cost'],'priors_cost':p['cost'],'cost_delta':(a['cost']-p['cost']) if a['cost'] is not None and p['cost'] is not None else None})
+        pub=published.get(a['id'].replace('aa-current:','',1))
+        out.append({'name':c['name'],'match':'loose name plus effort (identity unverified)','ardf_score':a['score'],'priors_score':p['score'],'delta':a['score']-p['score'],'ardf_cost':a['cost'],'priors_cost':p['cost'],'cost_delta':(a['cost']-p['cost']) if a['cost'] is not None and p['cost'] is not None else None,
+            'aa_published':pub,'aa_delta':(a['score']-pub) if cf.finite(pub) else None})
     out.sort(key=lambda d:(-abs(d['delta']),d['name']))
     cd=[abs(d['cost_delta']) for d in out if d['cost_delta'] is not None]
     matched_names={d['name'] for d in out}
     unmatched=[c['name'] for c in comps if c['name'] not in matched_names]
     return {'priors_rows':len(comps),'matched':len(out),'exact':sum(1 for d in out if d['match']=='exact identity'),'unmatched':unmatched,'rows':out,
         'median_abs_score_delta':_median([abs(d['delta']) for d in out]) if out else None,
-        'max_abs_score_delta':max((abs(d['delta']) for d in out),default=None),
+        'max_abs_score_delta':max((abs(d['delta']) for d in out),default=None),'aa_divergence':aa_div,
         'median_abs_cost_delta':_median(cd) if cd else None,'max_abs_cost_delta':max(cd,default=None),
         'largest':out[0] if out else None}
 
@@ -1606,12 +1620,18 @@ def render_routing_docs(routing, cp):
     L+=['']
     (ROOT/'docs/free-routes.md').write_text('\n'.join(L),encoding='utf-8')
     D=routing['priors_deltas']
+    A=D['aa_divergence']
     L=['# ARDF recomputation versus Priors: exact deltas','',stamp,'',
-       f"ARDF scores and costs are recomputed independently from the primary Artificial Analysis snapshot ({str(cp['retrieved_at'])[:10]}, {len(cp['rows'])} configurations preserved, {sum(1 for r in cp['rows'] if r['score'] is not None)} with a complete 10-benchmark score). Priors (API cost basis, snapshot in `sources/current/priors-api.json`) is a cross-check only; no Priors value enters any ARDF score or cost. Delta = ARDF minus Priors.",'',
+       '## Read this first: this agreement is circular, not independent validation','',
+       f"ARDF's composite score applies the ten benchmark weights {A['weights']} (the weights of the owner-selected Priors index) to AA's per-benchmark components. Priors applies the same weights to the same AA data. So ARDF versus Priors below is the same arithmetic on the same AA snapshot: agreement to within Priors' two-decimal rounding is guaranteed by construction and says nothing about whether those weights are right. API-basis costs agree to within the maximum cost delta below, which is consistent with Priors using AA's own per-task costs; the pinned Priors snapshot does not state its method.",'',
+       f"The comparator that does not share ARDF's weights is AA's own published `intelligenceIndex`. ARDF's composite differs from it on {A['configurations']} scored configurations by a median {A['median_abs']:.4f} and at most {A['max_abs']:.4f} points; {A['over_0_1']} differ by more than 0.1 and {A['over_rounding']} by more than 0.005. AA's published values carry full float precision in the snapshot, so the gap is not rounding. The pinned data does not say why (AA's own weighting or normalization is not in the snapshot). The two columns at the right of the matched table and the table of largest divergences below show it.",'',
+       f"ARDF scores and costs are recomputed from the primary Artificial Analysis snapshot ({str(cp['retrieved_at'])[:10]}, {len(cp['rows'])} configurations preserved, {sum(1 for r in cp['rows'] if r['score'] is not None)} with a complete 10-benchmark score). Priors (API cost basis, snapshot in `sources/current/priors-api.json`) is a cross-check only; no Priors value enters any ARDF score or cost. Delta = ARDF minus Priors.",'',
        f"Matched {D['matched']} of {D['priors_rows']} Priors rows ({D['exact']} by exact identity, {D['matched']-D['exact']} by a flagged loose name-plus-effort pass). Score delta: median |d| {D['median_abs_score_delta']:.6f}, max |d| {D['max_abs_score_delta']:.6f}. Priors publishes two decimals, so a score delta up to 0.005 is rounding. Cost delta (USD per task): median |d| {D['median_abs_cost_delta']:.6f}, max |d| {D['max_abs_cost_delta']:.6f}.",'',
-       '## Matched rows, largest absolute score delta first','','| Model / effort | Match | ARDF score | Priors score | Score delta | ARDF cost | Priors cost | Cost delta |','|---|---|---:|---:|---:|---:|---:|---:|']
+       f"## AA published index versus the ARDF composite: {A['configurations']} configurations, largest divergences",'','| Model / effort | ARDF score | AA published index | ARDF minus AA |','|---|---:|---:|---:|']
     fmt=lambda v:'-' if v is None else repr(float(v))
-    L+=[f"| {d['name']} | {d['match']} | {fmt(d['ardf_score'])} | {fmt(d['priors_score'])} | {fmt(d['delta'])} | {fmt(d['ardf_cost'])} | {fmt(d['priors_cost'])} | {fmt(d['cost_delta'])} |" for d in D['rows']]
+    L+=[f"| {d['name']} | {fmt(d['ardf_score'])} | {fmt(d['aa_published'])} | {fmt(d['delta'])} |" for d in A['largest']]
+    L+=['','## Matched rows, largest absolute score delta first','','| Model / effort | Match | ARDF score | Priors score | Score delta | ARDF cost | Priors cost | Cost delta | AA published index | ARDF minus AA |','|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+    L+=[f"| {d['name']} | {d['match']} | {fmt(d['ardf_score'])} | {fmt(d['priors_score'])} | {fmt(d['delta'])} | {fmt(d['ardf_cost'])} | {fmt(d['priors_cost'])} | {fmt(d['cost_delta'])} | {fmt(d['aa_published'])} | {fmt(d['aa_delta'])} |" for d in D['rows']]
     L+=['','## Priors rows not compared','','No ARDF configuration matched, or the matched ARDF configuration has no complete score.','']+([f"- {n}" for n in D['unmatched']] or ['None.'])+['']
     (ROOT/'docs/priors-deltas.md').write_text('\n'.join(L),encoding='utf-8')
 
