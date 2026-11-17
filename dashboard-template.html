@@ -59,7 +59,7 @@ purpose: Display every model/reasoning configuration and every selected evidence
 
 <section class="panel" id="frontier-graph" style="padding:16px;border:1px solid #2a3a52;">
 <div class="chart-head" style="align-items:center">
-<div><h2 style="font-size:22px;margin:0">Pareto frontier — task cost vs capability</h2><p style="color:var(--muted);font-size:12.5px;margin:4px 0 0">Frontier in gold. Provider lineages in distinct hues. Initial view focuses on capability 47 and above. Fullscreen for wall-map detail.</p></div>
+<div><h2 style="font-size:22px;margin:0">Pareto frontier: task cost vs capability</h2><p style="color:var(--muted);font-size:12.5px;margin:4px 0 0">Frontier in gold. Provider lineages in distinct hues. Initial view focuses on capability 47 and above. Fullscreen for wall-map detail.</p></div>
 <div class="chart-controls" style="gap:6px">
 <button class="btn" id="fsBtn" title="Fullscreen graph (f)">Fullscreen</button>
 <select id="focusMode"><option value="above-muse" selected>Focus: capability >= 47</option><option value="all">Show all</option><option value="frontier-only">Frontier only</option></select>
@@ -76,7 +76,7 @@ purpose: Display every model/reasoning configuration and every selected evidence
 <div class="note" id="chartNote"></div>
 </section>
 
-<section class="panel" id="frontier-list" style="padding:16px"><h2 style="margin:0 0 8px">Strict Pareto frontier of the multi-source ledger · <span id="ledger-frontier-count">current</span> points (v7.5.0)</h2><p style="color:var(--muted);font-size:12.5px;margin:0 0 10px">Not dominated on both cheaper and at least as capable. Read before executor rank — frontier answers “not dominated”, executor answers “best $/capability above floor”.</p><div class="tablewrap" style="max-height:420px"><table id="frontierTable"><thead><tr><th>Rank</th><th>Model/configuration</th><th>Provider</th><th>Effort</th><th>Cap</th><th>Task price</th><th>$/cap</th><th>Pareto?</th></tr></thead><tbody id="frontierTableBody"></tbody></table></div><p style="color:var(--muted);font-size:11.5px;margin-top:8px">The first row is the cheapest undominated configuration in the ledger. Provider lines link same-family effort variants. Zero-cost configurations cannot sit on a log axis and are not on this ledger plot; the primary panel above shows them on its $0 shelf.</p></section>
+<section class="panel" id="frontier-list" style="padding:16px"><h2 style="margin:0 0 8px">Strict Pareto frontier of the multi-source ledger · <span id="ledger-frontier-count">current</span> points (v7.5.0)</h2><p style="color:var(--muted);font-size:12.5px;margin:0 0 10px">Not dominated on both cheaper and at least as capable. Read before executor rank: frontier answers “not dominated”, executor answers “best $/capability above floor”.</p><div class="tablewrap" style="max-height:420px"><table id="frontierTable"><thead><tr><th>Rank</th><th>Model/configuration</th><th>Provider</th><th>Effort</th><th>Cap</th><th>Task price</th><th>$/cap</th><th>Pareto?</th></tr></thead><tbody id="frontierTableBody"></tbody></table></div><p style="color:var(--muted);font-size:11.5px;margin-top:8px">The first row is the cheapest undominated configuration in the ledger. Provider lines link same-family effort variants. Zero-cost configurations cannot sit on a log axis and are not on this ledger plot; the primary panel above shows them on its $0 shelf.</p></section>
 
 
 <section class="panel" id="frontier-guide" style="padding:22px;line-height:1.6">
