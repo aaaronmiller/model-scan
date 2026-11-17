@@ -6,15 +6,15 @@ This is the canonical accumulation of user requirements and restart instructions
 
 The working package contains exactly nine files. Do not re-split them into generated/config/archive variants unless a future requirement genuinely cannot be represented by the existing responsibilities.
 
-1. `data/unified-model-evidence.csv` — one canonical evidence ledger containing raw observations, provenance, catalog metadata, and calibrated columns.
-2. `project-config.json` — one machine-readable policy/source manifest.
-3. `calibrate.py` — one deterministic calibration/build/validation program.
-4. `dashboard.html` — one self-contained offline visualization with embedded generated payloads.
-5. `pareto-frontier-cheatsheet.md` — strict Pareto/economic decision reference.
-6. `model-tiers-and-contenders.md` — capability tiers plus the most contested top/bottom regions and close competitors.
-7. `user-prompt-aggregation.md` — this file.
-8. `ardf-research-paper.md` — overall methodology, source acquisition, calibration, interpretation, limitations, and project history.
-9. `INDEX.md` — purpose/status/migration map for the package.
+1. `data/unified-model-evidence.csv` - one canonical evidence ledger containing raw observations, provenance, catalog metadata, and calibrated columns.
+2. `project-config.json` - one machine-readable policy/source manifest.
+3. `calibrate.py` - one deterministic calibration/build/validation program.
+4. `dashboard.html` - one self-contained offline visualization with embedded generated payloads.
+5. `pareto-frontier-cheatsheet.md` - strict Pareto/economic decision reference.
+6. `model-tiers-and-contenders.md` - capability tiers plus the most contested top/bottom regions and close competitors.
+7. `user-prompt-aggregation.md` - this file.
+8. `ardf-research-paper.md` - overall methodology, source acquisition, calibration, interpretation, limitations, and project history.
+9. `INDEX.md` - purpose/status/migration map for the package.
 
 ### Consolidation rule
 
@@ -24,10 +24,11 @@ Derived JS/JSON payloads belong inside `dashboard.html`; calibration/analysis/so
 
 <!--
 ---
-title: ARDF Living Model-Evidence System — Context Restart Meta-Prompt
-version: 7.3.0
+title: ARDF Living Model-Evidence System - Context Restart Meta-Prompt
+version: 7.5.0
 created: 2026-08-08
-model: GPT-5.6 Sol
+updated: 2026-11-09
+model: Claude Fable 5.2 / Gemini 4 Argon High
 reasoning_level: high
 purpose: Comprehensive restart prompt carrying the full design intent, accumulated corrections, failure lessons, and deliverable contract into a fresh agent session.
 ---
@@ -61,13 +62,13 @@ Do not collapse these distinct questions into one scalar ranking.
 
 When package components disagree, use this authority order:
 
-1. `data/unified-model-evidence.csv` — canonical atomic evidence and catalog ledger.
+1. `data/unified-model-evidence.csv` - canonical atomic evidence and catalog ledger.
 2. Current first-party source pages/API responses and current independent benchmark records during acquisition.
-3. `project-config.json` — all explicit calibration, analysis, dashboard, source-manifest, and source-ledger policy.
-4. `calibrate.py` — authoritative deterministic transformations and validation.
-5. `dashboard.html`, `pareto-frontier-cheatsheet.md`, and `model-tiers-and-contenders.md` — derived/rendered state rebuilt from the ledger and policy.
-6. `ardf-research-paper.md` — human methodology, source-acquisition guidance, limitations, and history.
-7. `user-prompt-aggregation.md` — accumulated user intent; if an explicit user requirement conflicts with implementation, fix the implementation rather than silently weakening the requirement.
+3. `project-config.json` - all explicit calibration, analysis, dashboard, source-manifest, and source-ledger policy.
+4. `calibrate.py` - authoritative deterministic transformations and validation.
+5. `dashboard.html`, `pareto-frontier-cheatsheet.md`, and `model-tiers-and-contenders.md` - derived/rendered state rebuilt from the ledger and policy.
+6. `ardf-research-paper.md` - human methodology, source-acquisition guidance, limitations, and history.
+7. `user-prompt-aggregation.md` - accumulated user intent; if an explicit user requirement conflicts with implementation, fix the implementation rather than silently weakening the requirement.
 
 Never hand-edit benchmark coordinates or generated frontier/tier tables inside the HTML. Generated browser payloads are embedded in `dashboard.html` only to make the file self-contained.
 
@@ -246,9 +247,9 @@ Use `calibrate.py` as the reproducible authority. The dashboard should consume a
 
 Support multiple calibration algorithms, at least:
 
-1. **Robust affine / Theil-Sen** — default production mapping.
-2. **Huber IRLS affine** — robust regression alternative.
-3. **Monotone piecewise** — isotonic/PAV plus piecewise interpolation for nonlinear/compressed source scales.
+1. **Robust affine / Theil-Sen** - default production mapping.
+2. **Huber IRLS affine** - robust regression alternative.
+3. **Monotone piecewise** - isotonic/PAV plus piecewise interpolation for nonlinear/compressed source scales.
 
 Cost calibration should happen in log space because cost relationships are multiplicative.
 
@@ -546,7 +547,7 @@ Collapse effort siblings only when presenting the top-five *models*: keep the be
 
 Current v7.3 expected executor-grade order, subject to deterministic recalculation after every source refresh:
 
-1. Muse Spark 1.2 xhigh — Contributor/data-sharing economics
+1. Muse Spark 1.2 xhigh - Contributor/data-sharing economics
 2. GPT-5.6 Luna high
 3. DeepSeek V4 Flash 0731 max
 4. Grok 4.3 high
@@ -581,9 +582,9 @@ Before calibration or routing, resolve exact checkpoint identity.
 
 **MiMo:** keep these separate:
 
-- MiMo-V2.5 — current AA 38
-- MiMo-V2.5-Pro — current AA 43
-- MiMo-V2-Pro — older predecessor
+- MiMo-V2.5 - current AA 38
+- MiMo-V2.5-Pro - current AA 43
+- MiMo-V2-Pro - older predecessor
 - non-reasoning/provider/UltraSpeed variants when measurements differ
 
 Merge only genuine aliases such as the old `mimo-v2-5-0424` row into canonical MiMo-V2.5. Never copy a score across similarly named variants.
@@ -647,11 +648,11 @@ On every refresh:
 
 Current post-v7.1 / immediate-delta models already incorporated in the v7.3 lineage include:
 
-- **LFM2.5-2.6B** — 2026-08-04; benchmarked but intentionally unpriced for hosted-task economics.
-- **Ling 3.0 Flash FP8** — 2026-08-04; keep separate from the Jul-23 BF16/base model and never copy BF16 scores/pricing onto the quantized checkpoint.
-- **Muse Spark 1.2** — 2026-08-05; Contributor/data-sharing pricing is the user-selected primary economic tier.
-- **Hark Handoff** — 2026-08-05 research preview; currently unscored/unpriced rather than estimated.
-- **Ling 3.0 Tiny** — 2026-08-06; promotional $0 pricing is visible but excluded from Pareto denominator.
+- **LFM2.5-2.6B** - 2026-08-04; benchmarked but intentionally unpriced for hosted-task economics.
+- **Ling 3.0 Flash FP8** - 2026-08-04; keep separate from the Jul-23 BF16/base model and never copy BF16 scores/pricing onto the quantized checkpoint.
+- **Muse Spark 1.2** - 2026-08-05; Contributor/data-sharing pricing is the user-selected primary economic tier.
+- **Hark Handoff** - 2026-08-05 research preview; currently unscored/unpriced rather than estimated.
+- **Ling 3.0 Tiny** - 2026-08-06; promotional $0 pricing is visible but excluded from Pareto denominator.
 
 The same audit corrected omitted-current entries including **Ling 3.0 Flash BF16/base** and **Pokee-Isaac 28B v0**. Treat quantized checkpoints, preview/stable releases and dated revisions as separate identities when measurements differ.
 
@@ -750,6 +751,6 @@ In the final chat response, do not embed/render the HTML. Give the ZIP download 
 
 ---
 
-# XX. Current user intent in one sentence
+# XX. Current user intent in one sentence (v7.5.0, 2026-11-09)
 
-Build a living, source-auditable, multi-calibrated AI-model evidence universe where **every model/reasoning configuration remains visible**, strict Pareto efficiency is only one overlay, famous near-misses are explicitly quantified, and the system identifies the models that buy the most useful executor capability per real task dollar — currently with special emphasis on **Muse Spark 1.2 Contributor pricing, DeepSeek V4 Flash 0731, GPT-5.6 Luna high for executor value, and the Opus/Fable/Sol/Qwen3.8/Kimi-K3 top-end routing surface**, with independent AA/Kilo/Vals Pareto cross-checks and strict checkpoint identity hygiene.
+Build a living, source-auditable, multi-calibrated AI-model evidence universe where **every model/reasoning configuration remains visible**, **dim effort-lineage polylines connect reasoning tiers of the same family (`low -> medium -> high -> xhigh -> max`)**, **labels for all 21 strict Pareto frontier points and key contenders are always visible without overlap**, and **all research, methodology, routing, tier/pinch-point, and judicial audit documents are styled and integrated directly into `dashboard.html`** rather than linked as raw Markdown files.

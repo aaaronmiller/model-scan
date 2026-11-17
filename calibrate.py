@@ -1,7 +1,7 @@
 # ---
 # title: ARDF Multipoint Calibration and Display-Data Engine
-# version: 7.3-refined
-# refined: 2026-08-09 — policy top_end diagnostic alignment, typo fixes, empty-field documentation
+# version: 7.5.0
+# refined: 2026-11-09 (v7.5.0 consolidated audit, cost-priority fix in aggregate_sets, lineage + 4-tier + pinch-point integration)
 # created: 2026-08-04
 # model: GPT-5.6 Sol
 # reasoning_level: high
@@ -246,11 +246,17 @@ def rmse(points: list[tuple[float,float,float]], predict: Callable[[float],float
 def pareto(models: list[dict[str,Any]], capability_field: str, cost_field: str) -> list[str]:
     candidates=[m for m in models if number(m.get(capability_field)) is not None and number(m.get(cost_field)) is not None and number(m.get(cost_field))>0]
     candidates.sort(key=lambda m:(float(m[cost_field]),-float(m[capability_field]),m['model_key']))
-    best=-float('inf'); result=[]
-    for model in candidates:
-        score=float(model[capability_field])
-        if score>best+1e-12:
-            result.append(model['model_key']); best=score
+    eps=1e-12; result=[]
+    for m in candidates:
+        mx=float(m[cost_field]); my=float(m[capability_field])
+        dominated=False
+        for q in candidates:
+            if q['model_key']==m['model_key']: continue
+            qx=float(q[cost_field]); qy=float(q[capability_field])
+            if (qx<=mx+eps and qy>=my-eps) and (qx<mx-eps or qy>my+eps):
+                dominated=True; break
+        if not dominated:
+            result.append(m['model_key'])
     return result
 
 
@@ -417,12 +423,24 @@ def calibrate(input_path: Path, output_path: Path, config_path: Path) -> dict[st
             if not truthy(r.get('use_in_aggregate')): continue
             value=number(r.get(column)); weight=number(r.get('base_weight')) or 1.0
             if value is None: continue
-            per_model[r['model_key']][r['metric_axis']].append((value,weight)); per_model[r['model_key']]['sources'].add(r['source_id'])
+            if r.get('metric_axis')=='cost':
+                if value<=0: continue
+                per_model[r['model_key']]['cost'].append((value,weight,r))
+            elif r.get('metric_axis')=='capability':
+                per_model[r['model_key']]['capability'].append((value,weight,r))
+            per_model[r['model_key']]['sources'].add(r['source_id'])
         agg=[]
         for m in models:
             d=per_model[m['model_key']]
-            cap=weighted_mean(d['capability']); cost=weighted_geometric_mean(d['cost'])
-            agg.append({**m,'capability':cap,'cost':cost,'source_count':len(d['sources']),'capability_observations':len(d['capability']),'cost_observations':len(d['cost'])})
+            cap_items,_=ana_scale_filter(d['capability'],m['model_key'])
+            cap=weighted_mean([(v,w) for v,w,_ in cap_items])
+            if d['cost']:
+                max_p=max(ana_cost_priority(r) for _,_,r in d['cost'])
+                used_cost=[(v,w) for v,w,r in d['cost'] if ana_cost_priority(r)==max_p]
+                cost=weighted_geometric_mean(used_cost)
+            else:
+                cost=None
+            agg.append({**m,'capability':cap,'cost':cost,'source_count':len(d['sources']),'capability_observations':len(cap_items),'cost_observations':len(d['cost'])})
         frontier=set(pareto(agg,'capability','cost'))
         for m in agg: m['frontier']=m['model_key'] in frontier
         aggregate_sets[algorithm['id']]=agg
@@ -803,7 +821,7 @@ def augment_standardized_cost(csv_path: Path, config_path: Path) -> dict[str,Any
         row.update({
             'record_type':'observation','observation_id':'obs-'+oid(key),'source_id':source_id,
             'source_original_id':source_id,'source_label':'Standardized task token-price proxy','source_publisher':'ARDF derived',
-            'source_version':'7.3-consolidated','source_date':TODAY,'source_url':'project-config.json','retrieved_at':'2026-08-08T10:46:00-07:00',
+            'source_version':'7.4.0','source_date':TODAY,'source_url':'project-config.json','retrieved_at':'2026-08-08T10:46:00-07:00',
             'metric_axis':'cost','metric_name':'standardized_task_price_proxy_usd','raw_value':f'{cost:.12g}',
             'raw_unit':'estimated USD per standardized task','raw_direction':'lower','is_reference_scale':'0',
             'quality':'estimated-current-list-price','confidence':str(cfg.get('confidence','estimated')),
@@ -1040,7 +1058,8 @@ def ana_current_aa_by_model(rows):
     """
     out=defaultdict(dict)
     for r in rows:
-        if r.get('record_type')!='observation' or r.get('source_id')!='artificial-analysis-current':continue
+        if r.get('record_type')!='observation' or r.get('source_id') not in ('artificial-analysis-current','aa-primary-current'):continue
+        if not ana_truthy(r.get('use_in_aggregate')):continue
         val=ana_number(r.get('raw_value'))
         if val is None:continue
         out[r['model_key']][r.get('metric_name','')]=val
@@ -1065,7 +1084,7 @@ def ana_top_end_analysis(models, rows, policy):
     aa=ana_current_aa_by_model(rows); selected=[]
     for m in models:
         prefixes=tuple(policy.get('top_end',{}).get('model_key_prefixes',DEFAULT_TOP_END_PREFIXES))
-        if not m['current'] or not m['model_key'].startswith(prefixes):continue
+        if not m['current'] or m.get('capability') is None or not m['model_key'].startswith(prefixes):continue
         a=aa.get(m['model_key'],{})
         task=a.get('aa_cost_per_task_usd'); full=a.get('aa_full_suite_cost_usd')
         row={**m,'aa_score_exact':a.get('aa_intelligence_index'),
@@ -1093,7 +1112,7 @@ def ana_top_end_analysis(models, rows, policy):
         x['top_end_aa_frontier']=x['model_key'] in aa_keys
         x['operational_cost_per_capability']=(x['cost']/x['capability']) if x['cost'] and x['capability'] else None
         x['aa_cost_per_point']=(x['aa_economic_cost']/x['aa_score_exact']) if x['aa_economic_cost'] and x['aa_score_exact'] else None
-    order={'low':1,'medium':2,'high':3,'xhigh':4,'max':5,'default':3,'non-reasoning':0}
+    order={'none':0,'non-reasoning':0,'low':1,'medium':2,'high':3,'xhigh':4,'max':5,'default':3}
     selected.sort(key=lambda x:(x['family'],order.get(x['effort'],99),x['model_key']))
     return {'configurations':selected,'operational_frontier_keys':sorted(op_keys),'aa_same_source_frontier_keys':sorted(aa_keys)}
 
@@ -1108,18 +1127,16 @@ def ana_external_frontier_comparisons(rows):
     # AA direct current task cost + exact current score.
     aa=defaultdict(dict)
     for r in rows:
-        if r.get('record_type')!='observation' or r.get('source_id')!='artificial-analysis-current':continue
+        if r.get('record_type')!='observation' or r.get('source_id') not in ('artificial-analysis-current','aa-primary-current'):continue
+        if not ana_truthy(r.get('use_in_aggregate')):continue
         v=ana_number(r.get('raw_value'));
         if v is None:continue
         if r.get('metric_name')=='aa_intelligence_index':aa[r['model_key']]['capability']=v
         elif r.get('metric_name')=='aa_cost_per_task_usd':aa[r['model_key']]['cost']=v
     aa_pts=[]
     for k,d in aa.items():
-        if 'capability' not in d or 'cost' not in d:continue
+        if 'capability' not in d or 'cost' not in d or d['cost']<=0:continue
         label=catalog.get(k,{}).get('display_name',k)
-        # The project routes Muse on Contributor pricing, but this source-native AA
-        # cross-check is AA's Standard-priced evaluation. Make that distinction
-        # visible instead of inheriting the catalog's Contributor routing label.
         if k=='muse-spark-1-2-xhigh': label='Muse Spark 1.2 (AA Standard-priced evaluation)'
         aa_pts.append({'model_key':k,'display_name':label,**d})
     aa_front=ana_simple_frontier(aa_pts,'cost','capability');aa_keys={x['model_key'] for x in aa_front}
@@ -1149,7 +1166,7 @@ def ana_external_frontier_comparisons(rows):
     for x in vals:x['frontier']=x['model_key'] in vk
     vals.sort(key=lambda x:(x.get('cost') if x.get('cost') is not None else math.inf,-(x.get('accuracy') or -1)))
     return {'artificial_analysis':{'points':sorted(aa_pts,key=lambda x:x['cost']),'frontier_keys':sorted(aa_keys),
-                                   'note':'Exact current AA Intelligence Index vs public numeric Cost per Intelligence Index Task rows in the package. AA public explorer currently renders a 26-model Pareto view; this extracted graph is a reproducible subset, not a pixel scrape. Muse here is the AA Standard-priced evaluation, not the ARDF Contributor route.'},
+                                   'note':'Exact current AA v4.2 Intelligence Index vs public numeric Cost per Intelligence Index Task rows in the package (114 positively priced configurations, 21 strict Pareto points).'},
             'kilo':{'points':sorted(kp,key=lambda x:x['cost']),'frontier_keys':sorted(kk),
                     'note':'Independent coding-agent completion vs cost per attempt; not calibrated into the AA task-cost plane.'},
             'vals':{'points':vals,'frontier_keys':sorted(vk),'note':'Current Vals Index accuracy vs Cost/Test; independent source-specific Pareto cross-check, not an AA task-cost substitute.'}}
@@ -1188,7 +1205,7 @@ def ana_build():
     # Executor price/performance is deliberately separate from Pareto membership.
     # Pareto is a dominance relation; it does not rank survivors by a scalar ratio.
     # The user explicitly requested literal task-price per calibrated capability.
-    e=policy['executor']; candidates=[]; global_value=[]
+    e=policy['executor']; candidates=[]; global_value=[]; t3_candidates=[]
     executor_floor=number(e.get('minimum_aggregate_capability'))
     for m in models:
         if not m['current'] or m['cost'] is None or m['cost']<=0 or m['capability'] is None or m['capability']<=0:continue
@@ -1201,93 +1218,120 @@ def ana_build():
         global_value.append(valued)
         if executor_floor is None or m['capability']>=executor_floor:
             candidates.append(valued)
+        if m['capability']>=47.0:
+            t3_candidates.append(valued)
     # Lower $/capability is better. No exponent, capability subtraction, or forced slot.
     global_value.sort(key=lambda x:(x['cost_per_capability'],-x['capability'],x['cost']))
     candidates.sort(key=lambda x:(x['cost_per_capability'],-x['capability'],x['cost']))
-    # The user asked for five executor *models*, not five effort configurations.
-    # Collapse reasoning/effort siblings by model family and keep the best literal ratio
-    # from each family. The full effort/configuration ranking remains in executor_candidates.
+    t3_candidates.sort(key=lambda x:(x['cost_per_capability'],-x['capability'],x['cost']))
+    # Collapse reasoning/effort siblings by model family and keep the best literal ratio from each family.
     best_by_family={}
     for c in candidates:
         fam=c.get('family') or c['model_key']
         if fam not in best_by_family: best_by_family[fam]=c
     shortlist=list(best_by_family.values())[:e['top_n']]
-    # Luna effort comparison uses the same literal ratio. High is presently the best
-    # value setting; xhigh can still be called a marginal-capability knee, but it is
-    # not the lowest-price-per-capability executor setting.
-    luna_curve=sorted([{**x,'marginal_note':''} for x in candidates if x['model_key'].startswith('gpt-5-6-luna-') and x['effort'] in {'high','xhigh','max'}],key=lambda x:['high','xhigh','max'].index(x['effort']))
+    t3_best_by_family={}
+    for c in t3_candidates:
+        fam=c.get('family') or c['model_key']
+        if fam not in t3_best_by_family: t3_best_by_family[fam]=c
+    t3_shortlist=list(t3_best_by_family.values())[:e['top_n']]
+    # GPT-6 Luna effort curve across all 6 effort configurations.
+    luna_order=['none','non-reasoning','low','medium','high','xhigh','max']
+    luna_curve=sorted([{**x,'marginal_note':''} for x in global_value if x.get('family')=='GPT-6 Luna' and x.get('effort') in luna_order],key=lambda x:(luna_order.index(x['effort']),x['cost']))
     for i,x in enumerate(luna_curve):
         if i:
             prev=luna_curve[i-1]
             x['aa_gain_vs_previous']=(x['aa_reference'] or x['capability'])-(prev['aa_reference'] or prev['capability'])
             x['cost_increase_vs_previous_pct']=(x['cost']/prev['cost']-1)*100
+    # Pinch-point contested pairs: configurations within 2.0 capability points and 25% cost of each other.
+    pinch_points=[]
+    scored_current=sorted([m for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None and m['cost']>0],key=lambda x:(-x['capability'],x['cost']))
+    for i,a in enumerate(scored_current):
+        for b in scored_current[i+1:]:
+            if a.get('family')==b.get('family'):continue
+            cap_diff=abs(a['capability']-b['capability'])
+            if cap_diff>2.0:continue
+            min_c=min(a['cost'],b['cost']); max_c=max(a['cost'],b['cost'])
+            cost_diff_pct=(max_c/min_c-1)*100 if min_c>0 else 999
+            if cost_diff_pct<=25.0 and (a['frontier'] or b['frontier'] or a['capability']>=45.0):
+                pinch_points.append({
+                    'model_a':a['display_name'],'tier_a':a['tier']['id'],'cap_a':a['capability'],'cost_a':a['cost'],'frontier_a':a['frontier'],
+                    'model_b':b['display_name'],'tier_b':b['tier']['id'],'cap_b':b['capability'],'cost_b':b['cost'],'frontier_b':b['frontier'],
+                    'cap_delta':cap_diff,'cost_delta_pct':cost_diff_pct
+                })
+    pinch_points.sort(key=lambda x:(-max(x['cap_a'],x['cap_b']),x['cost_delta_pct']))
     top_end=ana_top_end_analysis(models,rows,policy); external=ana_external_frontier_comparisons(rows)
-    data={'generated_at': datetime.now(timezone.utc).isoformat(),'policy':policy,'counts':{'catalog':len(models),'current_paired':sum(1 for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None),'frontier':len(frontier),'near_frontier':len(near)},'frontier':frontier,'near_frontier':near,'major_near_frontier':major,'executor_top5':shortlist,'executor_candidates':candidates[:20],'global_value_top20':global_value[:20],'luna_effort_curve':luna_curve,'top_end':top_end,'external_frontier_comparisons':external}
+    data={'generated_at': datetime.now(timezone.utc).isoformat(),'policy':policy,'counts':{'catalog':len(models),'current_paired':sum(1 for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None and m['cost']>0),'frontier':len(frontier),'near_frontier':len(near)},'frontier':frontier,'near_frontier':near,'major_near_frontier':major,'executor_top5':shortlist,'executor_t3_top5':t3_shortlist,'executor_candidates':candidates[:20],'global_value_top20':global_value[:20],'luna_effort_curve':luna_curve,'pinch_points':pinch_points[:20],'top_end':top_end,'external_frontier_comparisons':external}
     PARETO_PATH.write_text(ana_render_md(data),encoding='utf-8')
     print(json.dumps(data['counts'],indent=2))
-    print('executor $/cap:',[(x['display_name'],round(x['cost_per_capability'],8)) for x in shortlist])
+    print('executor $/cap (unrestricted):',[(x['display_name'],round(x['cost_per_capability'],8)) for x in shortlist])
+    print('executor $/cap (T3+ floor>=47):',[(x['display_name'],round(x['cost_per_capability'],8)) for x in t3_shortlist])
     return data
 
-def ana_money(v):return '—' if v is None else f'${v:.5g}'
-def ana_f2(v):return '—' if v is None else f'{v:.2f}'
+def ana_money(v):return '-' if v is None else f'${v:.5g}'
+def ana_f2(v):return '-' if v is None else f'{v:.2f}'
 def ana_render_md(d):
     executor_floor=number(d['policy']['executor'].get('minimum_aggregate_capability'))
     executor_eligibility=(
         'No global capability floor. Named roles may apply visible, role-specific gates.'
         if executor_floor is None
-        else f'Calibrated capability ≥ {executor_floor:.0f}.'
+        else f'Calibrated capability >= {executor_floor:.0f}.'
     )
-    lines=['# ARDF Pareto Frontier + Price/Performance Cheatsheet','',f"Generated {TODAY}. Canonical source: `data/unified-model-evidence.csv`. Generated by `calibrate.py`; edit policy in `project-config.json`, not these tables by hand.",'','## Read this first','',
+    lines=['# ARDF Pareto Frontier + Price/Performance Cheatsheet (v7.5.0)','',f"Generated {TODAY}. Canonical source: `data/unified-model-evidence.csv`. Generated by `calibrate.py`; edit policy in `project-config.json`, not these tables by hand.",'','## Read this first','',
     '- **Strict Pareto frontier** and **price/performance ranking are different calculations.** A Pareto point is simply not dominated by a configuration that is both cheaper and at least as capable. Pareto does not assign a single best model or sort by a capability/price ratio.',
-    '- **Calibrated capability** is the multi-source AA-equivalent Y coordinate used by the main graph. It is not literal human IQ.',
-    '- **Task price** is the dashboard X coordinate using the best-available cost hierarchy.',
+    '- **Calibrated capability** is the multi-source AA v4.2-equivalent Y coordinate used by the main graph. It is not literal human IQ.',
+    '- **Task price** is the dashboard X coordinate using the best-available cost hierarchy (`best_evidence_then_weighted_geometric_mean`).',
     '- **Literal price/performance** is `task_price / calibrated_capability`; **lower is better**. Its inverse, capability points per dollar, is also shown.',
     f"- **Executor eligibility:** {executor_eligibility}",
     '- **AA $/point** is a secondary same-source diagnostic where exact AA Intelligence Index exists. It never replaces the multi-source primary ranking.',
-    '- Muse Spark 1.2 uses **Contributor/data-sharing pricing as its primary economic coordinate**. Standard/no-sharing pricing is retained as secondary evidence.','','## Strict current Pareto frontier','', '| Tier | Model/configuration | Provider | Effort | Capability | Task price | $/capability point | $/M in/out | Released | Context | Weights | Sources |','|---|---|---|---|---:|---:|---:|---:|---|---:|---|---:|']
+    '- Muse Spark 1.2 (historical August v4.0 reference) used Contributor/data-sharing pricing ($0.02123) as its primary economic coordinate; in the November 2026 v4.2 suite, Meta is represented on the active frontier by **Muse Ember (Xhigh)** ($0.1162, cap 34.11) and **Muse Ember (Max)** ($0.1359, cap 36.02).','','## Strict current Pareto frontier (21 points)','', '| Tier | Model/configuration | Provider | Effort | Capability | Task price | $/capability point | $/M in/out | Released | Context | Weights | Sources |','|---|---|---|---|---:|---:|---:|---:|---|---:|---|---:|']
     for m in d['frontier']:
         ratio=m['cost']/m['capability'] if m['capability'] and m['cost'] else None
-        lines.append(f"| {m['tier']['id']} | {m['display_name']} | {m['provider']} | {m['effort']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {ana_money(ratio)} | {ana_money(m['input_price_per_m'])} / {ana_money(m['output_price_per_m'])} | {m['release_date'] or '—'} | {int(m['context_tokens']) if m['context_tokens'] else '—'} | {'open' if str(m['models_dev_open_weights'])=='1' else 'closed/API'} | {m['source_count']} |")
-    lines += ['','## Muse Spark 1.2 economics','','The project deliberately uses the **Contributor/data-sharing** Meta SKU as Muse Spark 1.2’s primary economic coordinate. The Standard/no-sharing tier remains in the canonical CSV and hover metadata.','','| Tier | Input / M | Cache read / M | Output / M | AA-equivalent task cost | Role |','|---|---:|---:|---:|---:|---|','| Contributor / data-sharing | $0.10 | $0.002 | $0.20 | **$0.02123 derived/repriced** | **Primary ARDF coordinate** |','| Standard / no-sharing | $1.25 | $0.15 | $4.25 | $0.40 measured by AA | Secondary metadata/evidence |','','The Contributor task coordinate is not a direct AA billing observation. It reprices the same AA workload using the lower published Meta tier, preserving the workload while changing only the token-price schedule.','','## Major models that miss the frontier','', '| Model/configuration | Tier | Capability | Task price | Dominated by | Capability gap | Price premium | Verdict |','|---|---|---:|---:|---|---:|---:|---|']
+        lines.append(f"| {m['tier']['id']} | {m['display_name']} | {m['provider']} | {m['effort']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {ana_money(ratio)} | {ana_money(m['input_price_per_m'])} / {ana_money(m['output_price_per_m'])} | {m['release_date'] or '-'} | {int(m['context_tokens']) if m['context_tokens'] else '-'} | {'open' if str(m['models_dev_open_weights'])=='1' else 'closed/API'} | {m['source_count']} |")
+    lines += ['','## Muse economics and lineage notes','','In the August 2026 v4.0 baseline, **Muse Spark 1.2** used the **Contributor/data-sharing** Meta SKU ($0.10 input / $0.20 output per M, $0.02123 repriced task cost) vs Standard ($1.25 / $4.25 per M, $0.40 direct AA cost). In the November 2026 v4.2 evaluation suite, **Muse Ember (Xhigh)** ($0.1162 task cost, capability 34.11) and **Muse Ember (Max)** ($0.1359 task cost, capability 36.02) sit directly on the strict 21-point Pareto frontier, while **Muse Wonder (Max)** reaches capability 43.57 ($6.95 task cost) and **Muse Wonder Full (Max)** reaches capability 50.08 (unpriced on direct task cost).','','## Major models that miss the frontier','', '| Model/configuration | Tier | Capability | Task price | Dominated by | Capability gap | Price premium | Verdict |','|---|---|---:|---:|---|---:|---:|---|']
     for m in d['major_near_frontier']:
-        lines.append(f"| {m['display_name']} | {m['tier']['id']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {m['dominated_by'] or '—'} | {m['capability_gap']:.2f} | {m['cost_premium_pct']:.1f}% | {m['near_status']} |")
+        lines.append(f"| {m['display_name']} | {m['tier']['id']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {m['dominated_by'] or '-'} | {m['capability_gap']:.2f} | {m['cost_premium_pct']:.1f}% | {m['near_status']} |")
     lines += ['','## Closest near-frontier misses (all families)','', 'This table is algorithmic rather than hand-picked: the first 20 current non-frontier configurations with the smallest configured dominance regret are shown. It catches alternatives that a strict frontier necessarily excludes.','', '| Model/configuration | Tier | Capability | Task price | Dominated by | Capability gap | Price premium | Verdict |','|---|---|---:|---:|---|---:|---:|---|']
     for m in d['near_frontier'][:20]:
         lines.append(f"| {m['display_name']} | {m['tier']['id']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {m['dominated_by']} | {m['capability_gap']:.2f} | {m['cost_premium_pct']:.1f}% | {m['near_status']} |")
     lines += ['','## Capability-tier interpretation','','Tier thresholds classify calibrated **capability only**. They do not overwrite Pareto status or price/performance rank.','']
     for t in d['policy']['capability_tiers']:
-        lines.append(f"- **{t['id']}**: ≥ {t['min']:.0f} — {t['label']}")
-    lines += ['','## Global raw price/performance leaders','','This table has **no executor capability floor**. It is included to make the denominator policy visible: cheap mid/low-capability models can outrank frontier-class models on raw `$ / capability` alone.','', '| Rank | Model/configuration | Tier | Capability | Task price | $/capability | Capability/$ | Pareto? |','|---:|---|---|---:|---:|---:|---:|---|']
+        lines.append(f"- **{t['id']}**: >= {t['min']:.0f} ({t['label']})")
+    lines += ['','## Global raw price/performance leaders (unrestricted)','', 'This table has **no executor capability floor**. It makes the denominator policy visible: ultra-cheap utility models outrank frontier-class models on raw `$ / capability` alone.','', '| Rank | Model/configuration | Tier | Capability | Task price | $/capability | Capability/$ | Pareto? |','|---:|---|---|---:|---:|---:|---:|---|']
     for i,m in enumerate(d['global_value_top20'][:10],1):
         lines.append(f"| {i} | {m['display_name']} | {m['tier']['id']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {ana_money(m['cost_per_capability'])} | {m['capability_per_dollar']:.1f} | {'YES' if m['frontier'] else 'no'} |")
-    lines += ['','## Top five executor-grade price/performance candidates','', f"Eligibility: current, priced, positive calibrated capability. {executor_eligibility} Ranked strictly by `task_price / calibrated_capability`, ascending. No exponent, capability subtraction, or forced provider/model slot.",'', '| Rank | Model/configuration | Provider | Multi-source capability | AA reference | Task price | $/capability ↓ | Capability/$ ↑ | $/AA point | Pareto? | Cost vs Muse |','|---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|']
-    muse=next((x for x in d['executor_top5'] if x['model_key']=='muse-spark-1-2-xhigh'),None); mc=muse['cost'] if muse else min(x['cost'] for x in d['executor_top5'])
+    lines += ['','## Top five unrestricted price/performance families (collapsed by family)','', f"Eligibility: current, positively priced, positive calibrated capability. {executor_eligibility} Ranked strictly by `task_price / calibrated_capability`, ascending, keeping the best effort configuration per model family.",'', '| Rank | Model/configuration | Provider | Multi-source capability | AA reference | Task price | $/capability | Capability/$ | $/AA point | Pareto? | Cost vs #1 |','|---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|']
+    mc=min((x['cost'] for x in d['executor_top5']),default=1.0)
     for i,m in enumerate(d['executor_top5'],1):
-        aa_ratio=ana_money(m.get('cost_per_aa_point')) if m.get('cost_per_aa_point') is not None else '—'
-        lines.append(f"| {i} | {m['display_name']} | {m['provider']} | {ana_f2(m['capability'])} | {ana_f2(m['executor_reference_capability'])} | {ana_money(m['cost'])} | {ana_money(m['cost_per_capability'])} | {m['capability_per_dollar']:.1f} | {aa_ratio} | {'YES' if m['frontier'] else 'no'} | {m['cost']/mc:.2f}× |")
-    lines += ['','**Important:** Muse remains #1 **within the executor-eligible set** under the corrected literal ratio. It is not necessarily #1 across the unrestricted model universe; the no-floor table above deliberately shows cheaper lower-capability configurations that can have an even lower raw `$ / capability` ratio.','','**MiMo identity correction:** MiMo-V2.5 and MiMo-V2.5-Pro are distinct. Current AA scores are 38 and 43 respectively. The former dated `mimo-v2-5-0424` alias is merged into MiMo-V2.5; no Pro/preview score is borrowed across identities.','','### GPT-5.6 Luna price/performance by effort','', '| Effort | Multi-source capability | AA reference | Task price | $/capability ↓ | $/AA point | Gain vs prior effort | Cost increase |','|---|---:|---:|---:|---:|---:|---:|---:|']
+        aa_ratio=ana_money(m.get('cost_per_aa_point')) if m.get('cost_per_aa_point') is not None else '-'
+        lines.append(f"| {i} | {m['display_name']} | {m['provider']} | {ana_f2(m['capability'])} | {ana_f2(m['executor_reference_capability'])} | {ana_money(m['cost'])} | {ana_money(m['cost_per_capability'])} | {m['capability_per_dollar']:.1f} | {aa_ratio} | {'YES' if m['frontier'] else 'no'} | {m['cost']/mc:.2f}x |")
+    lines += ['','## Role-gated T3+ executor price/performance shortlist (capability >= 47)','', 'When routing autonomous coding or tool-calling subagents that require at least **T3 Workhorse capability (>= 47.0 on the v4.2 scale)**, applying a visible role-specific gate yields the top five high-capability executor families by literal `task_price / calibrated_capability`:','', '| Rank | Model/configuration | Provider | Multi-source capability | AA reference | Task price | $/capability | Capability/$ | Pareto? | Cost vs T3 #1 |','|---:|---|---|---:|---:|---:|---:|---:|---|---:|']
+    t3_mc=min((x['cost'] for x in d.get('executor_t3_top5',[])),default=1.0)
+    for i,m in enumerate(d.get('executor_t3_top5',[]),1):
+        lines.append(f"| {i} | {m['display_name']} | {m['provider']} | {ana_f2(m['capability'])} | {ana_f2(m['executor_reference_capability'])} | {ana_money(m['cost'])} | {ana_money(m['cost_per_capability'])} | {m['capability_per_dollar']:.1f} | {'YES' if m['frontier'] else 'no'} | {m['cost']/t3_mc:.2f}x |")
+    lines += ['','### GPT-6 Luna price/performance by effort','', '| Effort | Multi-source capability | AA reference | Task price | $/capability | $/AA point | Gain vs prior effort | Cost increase |','|---|---:|---:|---:|---:|---:|---:|---:|']
     for m in d['luna_effort_curve']:
-        cost_inc='—' if m.get('cost_increase_vs_previous_pct') is None else f"{m['cost_increase_vs_previous_pct']:.1f}%"
-        aa_ratio=ana_money(m.get('cost_per_aa_point')) if m.get('cost_per_aa_point') is not None else '—'
+        cost_inc='-' if m.get('cost_increase_vs_previous_pct') is None else f"{m['cost_increase_vs_previous_pct']:.1f}%"
+        aa_ratio=ana_money(m.get('cost_per_aa_point')) if m.get('cost_per_aa_point') is not None else '-'
         lines.append(f"| {m['effort']} | {ana_f2(m['capability'])} | {ana_f2(m['aa_reference'])} | {ana_money(m['cost'])} | {ana_money(m['cost_per_capability'])} | {aa_ratio} | {ana_f2(m.get('aa_gain_vs_previous'))} | {cost_inc} |")
     best_luna=min(d['luna_effort_curve'], key=lambda x:x['cost_per_capability']) if d['luna_effort_curve'] else None
     if best_luna:
-        lines += ['',f"**Literal price/performance winner for Luna: `{best_luna['effort']}`.** Its `$ / calibrated-capability` ratio is {ana_money(best_luna['cost_per_capability'])}. Xhigh remains a reasonable *capability knee* if extra quality is worth paying for, but it is not the lowest-cost-per-capability setting. Primary API economics use Standard / short-context $0.20 input and $1.20 output per million tokens; Batch remains secondary asynchronous pricing."]
-    lines += ['','## Top-end configuration audit','', 'This is the high-cost/high-capability zone the project is meant to prune aggressively. The **operational** columns use the multi-source ARDF task-cost plane. The **AA same-source** columns use current Artificial Analysis Intelligence Index and direct Cost per Intelligence Index Task wherever AA exposes it. Full-evaluation cost is shown separately and used only as an explicit fallback, so reasoning levels are compared without source-density bias.','','| Model/configuration | Effort | ARDF cap | ARDF task cost | $/cap | AA score | AA task cost | AA full-eval cost | AA $/score | AA cost basis | Op. frontier? | AA top-end frontier? | Within-family AA optimal? |','|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|']
+        lines += ['',f"**Literal price/performance winner for GPT-6 Luna: `{best_luna['effort']}`.** Its `$ / calibrated-capability` ratio is {ana_money(best_luna['cost_per_capability'])}. Both `low` ($0.00512, cap 9.67) and `medium` ($0.04220, cap 18.43) sit on the strict 21-point Pareto frontier, while `non-reasoning` ($0.07142, cap 9.44) is strictly dominated within its own family by `low` and `medium`."]
+    lines += ['','## Top-end configuration audit','', 'This is the high-cost/high-capability zone the project is meant to prune aggressively. The **operational** columns use the multi-source ARDF task-cost plane. The **AA same-source** columns use current Artificial Analysis v4.2 Intelligence Index and direct Cost per Intelligence Index Task wherever AA exposes it.','','| Model/configuration | Effort | ARDF cap | ARDF task cost | $/cap | AA score | AA task cost | AA full-eval cost | AA $/score | AA cost basis | Op. frontier? | AA top-end frontier? | Within-family AA optimal? |','|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|']
     for m in d['top_end']['configurations']:
-        lines.append(f"| {m['display_name']} | {m['effort']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {ana_money(m['operational_cost_per_capability'])} | {ana_f2(m['aa_score_exact'])} | {ana_money(m['aa_task_cost_exact'])} | {ana_money(m['aa_full_eval_cost'])} | {ana_money(m['aa_cost_per_point'])} | {m['aa_economic_cost_basis'] or '—'} | {'YES' if m['top_end_operational_frontier'] else 'no'} | {'YES' if m['top_end_aa_frontier'] else 'no'} | {'YES' if m.get('within_family_aa_frontier') else ('dominated by '+m.get('within_family_dominated_by','') if m.get('within_family_dominated_by') else 'unscored')} |")
-    lines += ['','**Key pruning rule:** an effort configuration that is dominated within its own family on exact AA score/cost should normally be eliminated from default routing unless another task-specific benchmark demonstrates a compensating specialty. Opus 5 max is the canonical example when xhigh has the same AA Intelligence Index at lower direct AA task cost.','','### Current top-end routing cuts','','- **Hard prune from general default routing:** Opus 5 max. Xhigh has the same exact AA score (63) at lower direct AA task cost.','- **Keep as explicit Opus cost/quality rungs:** medium, high, xhigh. Low also remains same-source Pareto-efficient but is below the primary high-end quality band.','- **Sol:** its effort curve is internally monotone, so there is no same-family hard prune from AA alone. However, Sol xhigh/max can be cross-family dominated in the AA direct-task-cost plane; keep Sol where coding/agent benchmarks such as Kilo justify it rather than because of general cost efficiency.','- **Qwen3.8 Max xhigh:** is currently dominated on both the ARDF operational top-end plane and the AA direct-task-cost plane by cheaper configurations with equal or higher capability. Keep it only when a Qwen-specific workload, provider constraint, or specialist benchmark justifies the premium.','- **Kimi K3 max:** remains on the audited operational and AA top-end frontiers and is especially strong on coding-agent economics. Preserve it as a first-class high-end alternative rather than treating it as merely an almost-frontier model.','- **Fable 5 max:** remains near the capability ceiling but is strongly price-heavy in general economic planes. Preserve it for benchmark/task areas where it demonstrably wins; do not default-route it merely because it is a flagship.','','## External Pareto cross-checks','', 'These are diagnostic planes, not extra votes in the calibrated aggregate. Agreement increases confidence; disagreement tells us where benchmark/harness semantics matter.','','### Artificial Analysis direct task-cost subset','', '| Model | AA capability | AA cost/task | AA Pareto within extracted subset? |','|---|---:|---:|---|']
+        lines.append(f"| {m['display_name']} | {m['effort']} | {ana_f2(m['capability'])} | {ana_money(m['cost'])} | {ana_money(m['operational_cost_per_capability'])} | {ana_f2(m['aa_score_exact'])} | {ana_money(m['aa_task_cost_exact'])} | {ana_money(m['aa_full_eval_cost'])} | {ana_money(m['aa_cost_per_point'])} | {m['aa_economic_cost_basis'] or '-'} | {'YES' if m['top_end_operational_frontier'] else 'no'} | {'YES' if m['top_end_aa_frontier'] else 'no'} | {'YES' if m.get('within_family_aa_frontier') else ('dominated by '+m.get('within_family_dominated_by','') if m.get('within_family_dominated_by') else 'unscored')} |")
+    lines += ['','**Key pruning rule:** an effort configuration that is dominated within its own family on exact AA score/cost or cross-family dominated at a tiny capability margin should be pruned from default routing unless a specialized benchmark justifies it.','','### Current November 2026 top-end routing cuts','','- **Claude Fable 5.2 (Max / Xhigh / High / Medium):** Dominates the upper capability frontier from 56.37 (`medium`, $3.80) through 61.82 (`high`, $9.08) and 62.22 (`xhigh`, $14.83) to the absolute ceiling at 64.56 (`max`, $26.54). Note that `Claude Fable 5.2 (Low)` (53.89, $3.10) is dominated by `GPT-6.1 Sol (Max)` (54.54, $1.27).','- **Gemini 4 Carbon (High / Medium):** Holds the T1/T2 transition knee of the Pareto frontier at 58.28 (`medium`, $6.59) and 60.02 (`high`, $7.76), while `Gemini 4 Carbon (Low)` (54.22, $7.19) is dominated within its own family by `Gemini 4 Carbon (Medium)`.','- **Claude Opus 5.5 & GPT-6 Astra:** `Claude Opus 5.5 (Xhigh)` (57.29, $6.05) and `GPT-6 Astra (Xhigh)` (55.30, $3.66) / `GPT-6 Astra (High)` (54.83, $3.24) sit on the strict Pareto frontier, while `GPT-6 Astra (Max)` (56.85, $6.24, razor-edge miss) and `Claude Opus 5.5 (Max)` (58.95, $10.04, near-frontier) sit just inside the frontier. Route to Max when subscription quota (Claude Max / ChatGPT Pro) makes marginal API cost zero.','- **GPT-6.1 Sol vs GPT-6.1 Terra:** `GPT-6.1 Sol` sweeps the T3 workhorse Pareto frontier from `medium` (46.31, $0.359) through `high` (50.31, $0.591) and `xhigh` (52.43, $0.764) to `max` (54.54, $1.272), while `GPT-6.1 Terra` sweeps the lower T4 frontier at `low` (29.42, $0.071), `medium` (38.15, $0.169), and `high` (42.43, $0.259), with `GPT-6.1 Terra (Max)` (51.32, $0.961) as the #2 T3+ executor contender.','- **Claude Fable 5.1 (Max):** Dominated within its own family by `Claude Fable 5.1 (Xhigh)` (49.87 at $10.85 vs 49.09 at $12.99); hard-prune from default routing.','','## External Pareto cross-checks','', 'These are diagnostic planes, not extra votes in the calibrated aggregate. Agreement increases confidence; disagreement tells us where benchmark/harness semantics matter.','','### Artificial Analysis direct task-cost subset','', '| Model | AA capability | AA cost/task | AA Pareto within extracted subset? |','|---|---:|---:|---|']
     for x in d['external_frontier_comparisons']['artificial_analysis']['points']:
         lines.append(f"| {x['display_name']} | {ana_f2(x['capability'])} | {ana_money(x['cost'])} | {'YES' if x['frontier'] else 'no'} |")
     lines += ['','### Kilo coding-agent frontier','', '| Model | Completion | Cost/attempt | Kilo Pareto? |','|---|---:|---:|---|']
     for x in d['external_frontier_comparisons']['kilo']['points']:
         lines.append(f"| {x['display_name']} | {x['completion']:.1f}% | {ana_money(x['cost'])} | {'YES' if x['frontier'] else 'no'} |")
-    lines += ['','Kilo currently retains Grok 4.5 → Kimi K3 → GPT-5.5 → GPT-5.6 Sol as the observed completion/cost frontier among its public top-10 table. Fable 5 and Opus 5 are dominated there despite being near the capability ceiling, which reinforces the need to separate **maximum quality** from **economic efficiency**.','','### Vals Index cost/test frontier','', '| Model | Vals Index | Cost/Test | Vals Pareto? |','|---|---:|---:|---|']
+    lines += ['','Kilo retains Grok 4.5 -> Kimi K3 -> GPT-5.5 -> GPT-5.6 Sol as the observed completion/cost frontier among its public top-10 table.','','### Vals Index cost/test frontier','', '| Model | Vals Index | Cost/Test | Vals Pareto? |','|---|---:|---:|---|']
     for x in d['external_frontier_comparisons']['vals']['points']:
         if x.get('cost') is not None:
             lines.append(f"| {x['display_name']} | {x['accuracy']:.2f}% | {ana_money(x['cost'])} | {'YES' if x['frontier'] else 'no'} |")
     lines += ['','Vals is a second independent cost/performance plane. Its Cost/Test is benchmark-specific; it is calibrated through overlaps when used in ARDF, but the raw Vals frontier is preserved here for comparison.']
-    lines += ['','## Near-frontier interpretation','', '- **razor-edge miss:** ≤0.75 capability points behind and ≤25% more expensive than its closest dominating frontier point.', '- **near-frontier:** ≤2 capability points behind and ≤50% more expensive.', '- **capability-close / price-heavy:** capability is close but the price penalty is substantial.', '- **price-close / capability-behind:** price is close, but capability gives up more than the near band.', '- **economically dominated:** neither condition is close.','']
+    lines += ['','## Near-frontier interpretation','', '- **razor-edge miss:** <= 0.75 capability points behind and <= 25% more expensive than its closest dominating frontier point.', '- **near-frontier:** <= 2 capability points behind and <= 50% more expensive.', '- **capability-close / price-heavy:** capability is close but the price penalty is substantial.', '- **price-close / capability-behind:** price is close, but capability gives up more than the near band.', '- **economically dominated:** neither condition is close.','']
     return '\n'.join(lines)
 
 
@@ -1301,33 +1345,47 @@ def render_tiers_document(data: dict[str,Any], calibrated_payload: dict[str,Any]
     near={m['model_key']:m for m in data.get('near_frontier',[])}
     frontier={m['model_key'] for m in data.get('frontier',[])}
     def tf(v): return ana_tier_for(v,policy)
-    def money(v): return '—' if v is None else f'${v:.5g}'
-    def f2(v): return '—' if v is None else f'{v:.2f}'
+    def money(v): return '-' if v is None else f'${v:.5g}'
+    def f2(v): return '-' if v is None else f'{v:.2f}'
     for m in models:
         m['tier']=tf(m.get('capability')); m['frontier']=m['model_key'] in frontier
     current=[m for m in models if m.get('capability') is not None and (m.get('models_dev_status') or '').lower()!='deprecated']
-    lines=['# ARDF Model Tiers + Contested Regions','',
+    lines=['# ARDF Model Tiers + Contested Regions (v7.5.0)','',
            'This document answers a different question from the Pareto cheatsheet: **tiers classify calibrated capability**, while Pareto membership classifies economic non-dominance.','',
            'Canonical data: `data/unified-model-evidence.csv`. Policy: `project-config.json`. Regenerate with `python calibrate.py`.','',
-           '## Capability tier policy','', '| Tier | Minimum calibrated capability | Interpretation |','|---|---:|---|']
+           '## Fine-grained capability tier policy (S+ through D)','', '| Tier | Minimum calibrated capability | Interpretation |','|---|---:|---|']
     for t in policy['capability_tiers']:
         lines.append(f"| {t['id']} | {t['min']:.0f} | {t['label']} |")
-    lines += ['','## Current scored configurations by tier','']
+    lines += ['',
+              '## Operational 4-tier routing policy (T1 to T4)','',
+              'For day-to-day multi-agent orchestration, the capability space is partitioned into four operational routing tiers:','',
+              '| Operational Tier | Capability Band (v4.2) | Primary Routing Role | Canonical Frontier & Near-Frontier Representatives |',
+              '|---|---|---|---|',
+              '| **T1 · Frontier Ceiling** | **>= 60.0** | Deep architectural judgment, hard verification, adversarial audits, final arbitration | `Claude Fable 5.2 (Max)` (64.56, $26.54), `Claude Fable 5.2 (Xhigh)` (62.22, $14.83), `Claude Fable 5.2 (High)` (61.82, $9.08), `Gemini 4 Carbon (High)` (60.02, $7.76) |',
+              '| **T2 · Frontier** | **56.0 to 59.9** | Complex multi-file synthesis, refactoring, spec-to-code implementation | `Claude Opus 5.5 (Max)` (58.95, $10.04, near-frontier), `Gemini 4 Carbon (Medium)` (58.28, $6.59), `Claude Opus 5.5 (Xhigh)` (57.29, $6.05), `GPT-6 Astra (Max)` (56.85, $6.24, razor-edge miss), `Claude Fable 5.2 (Medium)` (56.37, $3.80) |',
+              '| **T3 · Executor** | **47.0 to 55.9** | High-throughput subagent fan-outs, test generation, doc synthesis, autonomous coding | `GPT-6 Astra (Xhigh)` (55.30, $3.66), `GPT-6 Astra (High)` (54.83, $3.24), `GPT-6.1 Sol (Max)` (54.54, $1.27), `GPT-6.1 Sol (Xhigh)` (52.43, $0.76), `GPT-6.1 Terra (Max)` (51.32, $0.96, near-frontier), `GPT-6.1 Sol (High)` (50.31, $0.59) |',
+              '| **T4 · Utility (Bottom-4 Interchangeable)** | **< 47.0** | Classification, extraction, routing probes, high-volume batch filtering | `GPT-6.1 Sol (Medium)` (46.31, $0.36), `GPT-6.1 Terra (High)` (42.43, $0.26), `GPT-6.1 Terra (Medium)` (38.15, $0.17), `Muse Ember (Max)` (36.02, $0.14), `Muse Ember (Xhigh)` (34.11, $0.12), `GPT-6.1 Terra (Low)` (29.42, $0.071), `Claude Haiku 5.5 (Low)` (18.64, $0.044), `GPT-6 Luna (Low)` (9.67, $0.005) |',
+              '','## Current scored configurations by tier','']
     for t in policy['capability_tiers']:
         members=sorted((m for m in current if m['tier']['id']==t['id']),key=lambda x:(-(x.get('capability') or -1),x.get('display_name','')))
         lines += [f"### {t['id']} · {t['label']} ({len(members)})",'', '| Model/configuration | Capability | Calibrated aggregate cost | Pareto | Near-frontier status |','|---|---:|---:|---|---|']
         for m in members:
             n=near.get(m['model_key'],{})
-            lines.append(f"| {m.get('display_name') or m['model_key']} | {f2(m.get('capability'))} | {money(m.get('cost'))} | {'YES' if m['frontier'] else 'no'} | {n.get('near_status','—')} |")
+            lines.append(f"| {m.get('display_name') or m['model_key']} | {f2(m.get('capability'))} | {money(m.get('cost'))} | {'YES' if m['frontier'] else 'no'} | {n.get('near_status','-')} |")
         lines.append('')
     lines += ['## Top contested region','',
-              'The upper contest zone includes configurations at capability ≥50, spanning the A+/S/S+ boundary neighborhood where small capability differences can carry large cost penalties.','',
+              'The upper contest zone includes configurations at capability >= 50, spanning the A+/S/S+ boundary neighborhood where small capability differences can carry large cost penalties.','',
               '| Model/configuration | Tier | Capability | Cost | Pareto | Closest economic verdict |','|---|---|---:|---:|---|---|']
     for m in sorted((m for m in current if (m.get('capability') or -1)>=50),key=lambda x:(-(x.get('capability') or -1),x.get('cost') if x.get('cost') is not None else math.inf)):
         n=near.get(m['model_key'],{}); verdict='STRICT FRONTIER' if m['frontier'] else n.get('near_status','dominated / outside near band')
         lines.append(f"| {m.get('display_name') or m['model_key']} | {m['tier']['id']} | {f2(m.get('capability'))} | {money(m.get('cost'))} | {'YES' if m['frontier'] else 'no'} | {verdict} |")
+    lines += ['','## Pinch-point contested pairs (delta capability <= 2.0, delta cost <= 25%)','',
+              'Pinch points identify cross-family pairs that sit within 2.0 capability points and 25% task cost of one another. Within a pinch point, benchmark noise exceeds the capability gap, so harness fit, latency, context window, and subscription quota should decide routing.','',
+              '| Model A | Tier A | Cap A | Cost A | Model B | Tier B | Cap B | Cost B | Cap Delta | Cost Delta |','|---|---|---:|---:|---|---|---:|---:|---:|---:|']
+    for p in data.get('pinch_points',[]):
+        lines.append(f"| {p['model_a']} | {p['tier_a']} | {f2(p['cap_a'])} | {money(p['cost_a'])} | {p['model_b']} | {p['tier_b']} | {f2(p['cap_b'])} | {money(p['cost_b'])} | {f2(p['cap_delta'])} | {p['cost_delta_pct']:.1f}% |")
     lines += ['','## Bottom contested region','',
-              'The lower end is contested by cost compression rather than flagship quality. This section combines the cheapest eight Pareto configurations with models within ±2 capability points of the D↔C (30) and C↔B (40) boundaries.','',
+              'The lower end is contested by cost compression rather than flagship quality. This section combines the cheapest eight Pareto configurations with models within +/- 2 capability points of the D/C (30) and C/B (40) boundaries.','',
               '| Model/configuration | Tier | Capability | Cost | Pareto | Why included |','|---|---|---:|---:|---|---|']
     low_front=sorted((m for m in current if m['frontier']),key=lambda x:x.get('cost') if x.get('cost') is not None else math.inf)[:8]
     boundary=sorted((m for m in current if any(abs((m.get('capability') or -999)-b)<=2 for b in (30,40))),key=lambda x:(x.get('capability') or -1,x.get('cost') if x.get('cost') is not None else math.inf))
@@ -1341,7 +1399,16 @@ def render_tiers_document(data: dict[str,Any], calibrated_payload: dict[str,Any]
         if c is not None and abs(c-40)<=2: reasons.append('near C/B boundary')
         if m['model_key'] in near: reasons.append(near[m['model_key']]['near_status'])
         lines.append(f"| {m.get('display_name') or m['model_key']} | {m['tier']['id']} | {f2(c)} | {money(m.get('cost'))} | {'YES' if m['frontier'] else 'no'} | {'; '.join(reasons) or 'boundary neighborhood'} |")
-    lines += ['','## Closest competitors to the strict Pareto frontier','',
+    lines += ['',
+              '## Bottom-4 (T4 Utility) interchangeability matrix by use case','',
+              'Below capability 47 (T4), specialized operational traits (latency, open-weights self-hosting, structured output reliability, and context window) dominate selection across interchangeable Pareto and near-frontier peers:','',
+              '| Workload / Use Case | Primary T4 Pick | Drop-in Interchangeable Peers | Selection Rationale |',
+              '|---|---|---|---|',
+              '| **Upper-T4 code & CLI worker (42 to 46 cap)** | `GPT-6.1 Sol (Medium)` (46.31, $0.359) | `GPT-6.1 Terra (Xhigh)` (45.28, $0.401), `GPT-6.1 Terra (High)` (42.43, $0.259), `Kimi K3.1 Pro` (46.43, $3.681, open-weights) | Sol Medium and Terra High sit on the strict Pareto frontier under $0.36/task; Kimi K3.1 Pro provides the highest open-weights capability in this band. |',
+              '| **Low-cost synthesis & reasoning (34 to 38 cap)** | `GPT-6.1 Terra (Medium)` (38.15, $0.169) | `Muse Ember (Max)` (36.02, $0.136), `GPT-6.1 Sol (Low)` (34.77, $0.161), `Muse Ember (Xhigh)` (34.11, $0.116), `Claude Haiku 5.5 (Max)` (36.44, $0.411) | Three strict Pareto points (`Muse Ember Xhigh`, `Muse Ember Max`, `GPT-6.1 Terra Medium`) cluster tightly between $0.116 and $0.169/task. |',
+              '| **Sub-$0.10 batch extraction & classification (18 to 30 cap)** | `GPT-6.1 Terra (Low)` (29.42, $0.071) | `Claude Haiku 5.5 (Medium)` (24.58, $0.092), `Claude Haiku 5.5 (Low)` (18.64, $0.044), `GPT-6 Luna (Medium)` (18.43, $0.042) | Strict Pareto rungs for high-volume JSON/schema extraction where T3 reasoning is unnecessary overhead. |',
+              '| **Ultra-floor micro-triage (< $0.045/task)** | `GPT-6 Luna (Low)` (9.67, $0.0051) | `Mistral Small 4 (Reasoning)` (4.30, $0.040), `Granite 4.2 8B` (5.10, $0.040), `GPT-6 Luna (Medium)` (18.43, $0.042) | `GPT-6 Luna (Low)` achieves the lowest literal $/capability ($0.000529/pt) in the entire current dataset. |',
+              '','## Closest competitors to the strict Pareto frontier','',
               '| Model/configuration | Tier | Capability | Cost | Dominated by | Capability gap | Cost premium | Status |','|---|---|---:|---:|---|---:|---:|---|']
     for m in data.get('near_frontier',[])[:20]:
         lines.append(f"| {m['display_name']} | {m['tier']['id']} | {f2(m['capability'])} | {money(m['cost'])} | {m['dominated_by']} | {m['capability_gap']:.2f} | {m['cost_premium_pct']:.1f}% | {m['near_status']} |")

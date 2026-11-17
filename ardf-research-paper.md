@@ -229,6 +229,14 @@ The same SVG reserves:
 
 The shelves are not fake numerical coordinates and never enter Pareto calculation.
 
+### 9.4 Dispersion annotation and 6-MAD scale outlier quarantine (v7.5.0)
+
+Multi-source aggregation must distinguish between genuine cross-benchmark disagreement and a mis-scaled source observation, while also exposing when a model's coordinate rests on a single benchmark:
+
+1. **6-MAD scale sanity filter (`ana_scale_filter`, `SCALE_OUTLIER_MADS = 6.0`):** When a model has `n >= 4` calibrated capability observations, `calibrate.py` computes the sample median and median absolute deviation (MAD). Any observation more than `6.0 * MAD` away from the model's own median is quarantined before computing the weighted mean (`capability_scale_dropped`). A robust fitter like Theil-Sen suppresses an outlier's influence on the linear fit, but without a pre-aggregation quarantine a single mis-scaled observation would still corrupt the model's aggregate coordinate.
+2. **Sample dispersion metadata (`ana_dispersion`):** Every aggregated model record carries `capability_std_dev`, `capability_std_err` (`sd / sqrt(n)`), `capability_spread` (`max - min`), and `capability_provisional` (`True` when `n < 3`). These fields are non-graphical selector metadata: downstream routing policies may penalize or flag provisional single-source points without distorting the primary Y coordinate on the chart.
+3. **Confidence as selector metadata (`confidence`):** Source-level `confidence` (`high`, `medium`, `estimated`) is preserved in the ledger and hover inspector rather than multiplied into `base_weight`, preventing double-discounting of proxy or secondary sources.
+
 ## 10. Labels and dense rendering
 
 The default 3,400-pixel wall-map canvas prints every configuration name. Paired-point labels use collision-aware offsets. Shelf entries use deterministic capability sorting and grid placement. Hovering reveals full model identity, release date, lifecycle, reasoning level, harness, aggregate values, cost provenance, frontier status, and every selected observation with its raw and calibrated values.
@@ -486,32 +494,32 @@ This is the **v7.3 current-source field manual**. It is generated from `project-
 
 | Source ID | Source | Method | Metadata | Capability | Cost | Tokens | Runtime | Rows | Refresh |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|
-| `models-dev-current` | models.dev model catalog | API JSON | ✓ | — | ✓ | — | — | 0 | **critical** |
+| `models-dev-current` | models.dev model catalog | API JSON | ✓ | - | ✓ | - | - | 0 | **critical** |
 | `artificial-analysis-current` | Artificial Analysis current consolidated language-model data | Authenticated API preferred; HTML only as fallback | ✓ | ✓ | ✓ | ✓ | ✓ | 731 | **critical** |
-| `meta-muse-pricing-current` | Meta Muse Spark 1.2 dual pricing | API/structured metadata preferred; HTML fallback | ✓ | — | ✓ | — | — | 6 | **critical** |
-| `meta-muse-contributor-repricing-current` | Muse Spark 1.2 Contributor-equivalent AA task cost | local deterministic derivation | — | — | ✓ | ✓ | — | 1 | **critical** |
-| `artificial-analysis-muse-1-2-components-2026-08-05` | Artificial Analysis Muse Spark 1.2 launch/component evaluation | API/article structured extraction | — | ✓ | — | — | — | 9 | **medium** |
-| `meta-muse-1-2-model-card-current` | Meta Muse Spark 1.2 official benchmark card | official HTML/model-card table | ✓ | ✓ | — | — | — | 2 | **medium** |
+| `meta-muse-pricing-current` | Meta Muse Spark 1.2 dual pricing | API/structured metadata preferred; HTML fallback | ✓ | - | ✓ | - | - | 6 | **critical** |
+| `meta-muse-contributor-repricing-current` | Muse Spark 1.2 Contributor-equivalent AA task cost | local deterministic derivation | - | - | ✓ | ✓ | - | 1 | **critical** |
+| `artificial-analysis-muse-1-2-components-2026-08-05` | Artificial Analysis Muse Spark 1.2 launch/component evaluation | API/article structured extraction | - | ✓ | - | - | - | 9 | **medium** |
+| `meta-muse-1-2-model-card-current` | Meta Muse Spark 1.2 official benchmark card | official HTML/model-card table | ✓ | ✓ | - | - | - | 2 | **medium** |
 | `inclusionai-ling-3-0-tiny-promotional-current` | Ling 3.0 Tiny promotional API pricing | AA API/provider page | ✓ | ✓ | ✓ | ✓ | ✓ | 2 | **high** |
-| `openrouter-current-pricing` | OpenRouter current provider pricing | structured API preferred; model-page fallback | ✓ | — | ✓ | — | — | 1 | **high** |
-| `aa-token-price-proxy-v7` | AA evaluation-token × blended-price proxy | Local derivation from AA API data | — | — | ✓ | ✓ | — | 284 | **high** |
-| `benchlm-current` | BenchLM current benchmark/model pages | HTML extraction or official data download | ✓ | ✓ | ✓ | — | ✓ | 115 | **critical** |
-| `openai-gpt-5-6-current` | OpenAI GPT-5.6 current comparative evaluation table | Official HTML table scrape | ✓ | ✓ | ✓ | — | — | 60 | **medium** |
-| `official-token-pricing-current` | Official provider token pricing · current consolidated slice | Official docs scrape/API where offered | ✓ | — | ✓ | — | — | 34 | **critical** |
-| `vals-index-current-2026-08-06` | Vals Index current accuracy + Cost/Test | structured page/API payload preferred | — | ✓ | ✓ | — | ✓ | 31 | **critical** |
-| `kilo-leaderboard-current-2026-08-08` | KiloBench current coding-agent completion + cost/attempt | HTML/structured table extraction | — | ✓ | ✓ | — | — | 20 | **high** |
-| `claw-eval-attached` | Claw-Eval attached snapshot | Official HTML leaderboard + repository/HF cross-check | — | ✓ | — | ✓ | — | 22 | **high** |
-| `deepseek-v4-flash-0731-model-card-2026-07-31` | DeepSeek V4 Flash 0731 release/model-card table | Official HTML table scrape + official pricing page | ✓ | ✓ | ✓ | — | — | 7 | **medium** |
-| `livebench-2026-06-25` | LiveBench release 2026-06-25 | Repository CSV preferred; HTML fallback | — | ✓ | ✓ | — | — | 45 | **medium** |
-| `qwen3-8-max-stable-scorecard-2026-08-03` | Qwen3.8 Max stable-release scorecard | Official HTML/model-card table scrape | ✓ | ✓ | ✓ | — | — | 15 | **high** |
-| `qwencloud-pricing-2026-08-03` | Alibaba Cloud Qwen3.8 Max pricing | Official documentation table scrape | ✓ | — | ✓ | — | — | 1 | **high** |
-| `skatebench-official-attached` | SkateBench official attached table | Repository data extraction preferred; HTML tabs fallback | — | ✓ | ✓ | ✓ | ✓ | 48 | **high** |
-| `skatebench-v2-attached` | SkateBench visible v2 attached table | Repository data extraction preferred; HTML tabs fallback | — | ✓ | ✓ | ✓ | ✓ | 30 | **high** |
-| `standard-task-price-proxy-v7` | Standardized task token-price estimator | Local deterministic derivation | ✓ | — | ✓ | — | — | 413 | **high** |
-| `user-best-cost-attached` | User-supplied best-cost table | Manual import with mandatory provenance manifest | — | — | ✓ | — | — | 47 | **critical** |
-| `vals-swe-bench-2026-07-22` | Vals SWE-bench mirror | HTML table extraction; inspect network payload if stable | ✓ | ✓ | — | — | — | 74 | **critical** |
-| `vals-terminal-bench-2-1-2026-07-22` | Vals Terminal-Bench 2.1 | HTML table extraction; inspect network payload if stable | ✓ | ✓ | — | — | — | 44 | **critical** |
-| `vals-vibe-code-v1-1-2026-07-23` | Vals Vibe Code Bench v1.1 | HTML table extraction; inspect network payload if stable | ✓ | ✓ | — | — | — | 73 | **critical** |
+| `openrouter-current-pricing` | OpenRouter current provider pricing | structured API preferred; model-page fallback | ✓ | - | ✓ | - | - | 1 | **high** |
+| `aa-token-price-proxy-v7` | AA evaluation-token × blended-price proxy | Local derivation from AA API data | - | - | ✓ | ✓ | - | 284 | **high** |
+| `benchlm-current` | BenchLM current benchmark/model pages | HTML extraction or official data download | ✓ | ✓ | ✓ | - | ✓ | 115 | **critical** |
+| `openai-gpt-5-6-current` | OpenAI GPT-5.6 current comparative evaluation table | Official HTML table scrape | ✓ | ✓ | ✓ | - | - | 60 | **medium** |
+| `official-token-pricing-current` | Official provider token pricing · current consolidated slice | Official docs scrape/API where offered | ✓ | - | ✓ | - | - | 34 | **critical** |
+| `vals-index-current-2026-08-06` | Vals Index current accuracy + Cost/Test | structured page/API payload preferred | - | ✓ | ✓ | - | ✓ | 31 | **critical** |
+| `kilo-leaderboard-current-2026-08-08` | KiloBench current coding-agent completion + cost/attempt | HTML/structured table extraction | - | ✓ | ✓ | - | - | 20 | **high** |
+| `claw-eval-attached` | Claw-Eval attached snapshot | Official HTML leaderboard + repository/HF cross-check | - | ✓ | - | ✓ | - | 22 | **high** |
+| `deepseek-v4-flash-0731-model-card-2026-07-31` | DeepSeek V4 Flash 0731 release/model-card table | Official HTML table scrape + official pricing page | ✓ | ✓ | ✓ | - | - | 7 | **medium** |
+| `livebench-2026-06-25` | LiveBench release 2026-06-25 | Repository CSV preferred; HTML fallback | - | ✓ | ✓ | - | - | 45 | **medium** |
+| `qwen3-8-max-stable-scorecard-2026-08-03` | Qwen3.8 Max stable-release scorecard | Official HTML/model-card table scrape | ✓ | ✓ | ✓ | - | - | 15 | **high** |
+| `qwencloud-pricing-2026-08-03` | Alibaba Cloud Qwen3.8 Max pricing | Official documentation table scrape | ✓ | - | ✓ | - | - | 1 | **high** |
+| `skatebench-official-attached` | SkateBench official attached table | Repository data extraction preferred; HTML tabs fallback | - | ✓ | ✓ | ✓ | ✓ | 48 | **high** |
+| `skatebench-v2-attached` | SkateBench visible v2 attached table | Repository data extraction preferred; HTML tabs fallback | - | ✓ | ✓ | ✓ | ✓ | 30 | **high** |
+| `standard-task-price-proxy-v7` | Standardized task token-price estimator | Local deterministic derivation | ✓ | - | ✓ | - | - | 413 | **high** |
+| `user-best-cost-attached` | User-supplied best-cost table | Manual import with mandatory provenance manifest | - | - | ✓ | - | - | 47 | **critical** |
+| `vals-swe-bench-2026-07-22` | Vals SWE-bench mirror | HTML table extraction; inspect network payload if stable | ✓ | ✓ | - | - | - | 74 | **critical** |
+| `vals-terminal-bench-2-1-2026-07-22` | Vals Terminal-Bench 2.1 | HTML table extraction; inspect network payload if stable | ✓ | ✓ | - | - | - | 44 | **critical** |
+| `vals-vibe-code-v1-1-2026-07-23` | Vals Vibe Code Bench v1.1 | HTML table extraction; inspect network payload if stable | ✓ | ✓ | - | - | - | 73 | **critical** |
 
 ## Canonical post-acquisition schema
 
@@ -1438,7 +1446,7 @@ Null is null, never zero-filled. Capability and monetary cost are separate axes.
 
 These sources are **not independent votes until ingested and deduplicated**. Their likely value is documented so a future agent can target gaps rather than randomly scrape another leaderboard.
 
-### SWE-bench official leaderboards and experiment records — critical priority
+### SWE-bench official leaderboards and experiment records - critical priority
 
 **Why:** Canonical coding-agent source; resolves ambiguity introduced by Vals/BenchLM mirrors and lets the project distinguish model from scaffold.
 
@@ -1451,7 +1459,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://github.com/swe-bench/swe-bench.github.io>
 - <https://github.com/swe-bench/experiments>
 
-### Terminal-Bench official leaderboard and registry — critical priority
+### Terminal-Bench official leaderboard and registry - critical priority
 
 **Why:** Independent source for one of the most influential agentic metrics already appearing in vendor tables.
 
@@ -1464,7 +1472,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://www.tbench.ai/registry>
 - <https://www.tbench.ai/benchmarks/terminal-bench-2>
 
-### Berkeley Function Calling Leaderboard (BFCL V4) — critical priority
+### Berkeley Function Calling Leaderboard (BFCL V4) - critical priority
 
 **Why:** Rare source that provides capability, benchmark-wide USD cost and latency together, ideal for direct Pareto evidence.
 
@@ -1476,7 +1484,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://gorilla.cs.berkeley.edu/leaderboard.html>
 - <https://github.com/ShishirPatil/gorilla>
 
-### Aider Polyglot coding leaderboard — high priority
+### Aider Polyglot coding leaderboard - high priority
 
 **Why:** Another direct capability-plus-cost source, with transparent coding workflow configuration.
 
@@ -1488,7 +1496,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://aider.chat/docs/leaderboards/>
 - <https://aider.chat/docs/leaderboards/notes.html>
 
-### LiveCodeBench official leaderboard — high priority
+### LiveCodeBench official leaderboard - high priority
 
 **Why:** Contamination-limited coding evidence that complements SWE-bench’s repository repair focus.
 
@@ -1500,7 +1508,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://livecodebench.github.io/leaderboard.html>
 - <https://github.com/livecodebench/livecodebench>
 
-### Epoch AI Benchmarking database — high priority
+### Epoch AI Benchmarking database - high priority
 
 **Why:** High-quality normalization layer with explicit provenance and downloadable structured data.
 
@@ -1513,7 +1521,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://epoch.ai/benchmarks/use-this-data>
 - <https://epoch.ai/data/ai-models>
 
-### Arena / LMArena leaderboard dataset — high priority
+### Arena / LMArena leaderboard dataset - high priority
 
 **Why:** Adds human preference and confidence intervals, a useful orthogonal signal to automatic task benchmarks.
 
@@ -1526,7 +1534,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://huggingface.co/spaces/lmarena-ai/arena-leaderboard>
 - <https://arena.ai/blog/arena-leaderboard-dataset>
 
-### OpenRouter Models and provider-performance API — high priority
+### OpenRouter Models and provider-performance API - high priority
 
 **Why:** Best provider-routing and live-market complement to models.dev. Avoid using its AA-derived intelligence field as a new independent benchmark.
 
@@ -1538,7 +1546,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://openrouter.ai/docs/api/api-reference/models/get-models>
 - <https://openrouter.ai/api/v1/models>
 
-### Stanford HELM Capabilities — medium priority
+### Stanford HELM Capabilities - medium priority
 
 **Why:** Broad reproducible academic evidence and detailed prompt-level auditability.
 
@@ -1550,7 +1558,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://crfm.stanford.edu/helm/index.html>
 - <https://crfm.stanford.edu/helm/capabilities/>
 
-### OSWorld / OSWorld 2.0 official results — high priority
+### OSWorld / OSWorld 2.0 official results - high priority
 
 **Why:** Adds genuine GUI/computer-use evidence for models whose marketing tables currently dominate that domain.
 
@@ -1562,7 +1570,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://osworld-v1.xlang.ai/>
 - <https://github.com/xlang-ai/OSWorld>
 
-### BigCodeBench official leaderboard — medium priority
+### BigCodeBench official leaderboard - medium priority
 
 **Why:** Broadens coding beyond repository patching into complex API/library use.
 
@@ -1574,7 +1582,7 @@ These sources are **not independent votes until ingested and deduplicated**. The
 - <https://bigcode-bench.github.io/>
 - <https://github.com/bigcode-project/bigcodebench>
 
-### METR time-horizon evaluations — medium priority
+### METR time-horizon evaluations - medium priority
 
 **Why:** Adds a different notion of capability: how long a task an agent can reliably complete, rather than one-shot benchmark accuracy.
 
@@ -1601,16 +1609,16 @@ These sources are **not independent votes until ingested and deduplicated**. The
 
 The original v7.3 README contained useful operational facts mixed with a now-superseded multi-directory package layout. The folder-layout material is intentionally not reproduced here; `INDEX.md` contains the complete 40-file → 9-file migration map. The durable operational facts follow.
 
-## Current build
+## Current build (v7.5.0, 2026-11-09)
 
-- **683** cataloged model × reasoning/effort configurations
-- **2115** atomic capability/cost/diagnostic-metadata observations
-- **2798** total canonical CSV records
-- **25** observation source datasets, plus models.dev static metadata
-- **44** exact models.dev matches; remaining catalog rows are explicitly marked provider/fallback matches rather than faked exact matches
-- **252** current/recent paired configurations under the default analysis policy
-- **16** strict current Pareto points
-- **65** current configurations in the configured near-frontier band
+- **1,418** cataloged model x reasoning/effort configurations (`1,540` total model keys across observations)
+- **6,312** atomic capability/cost/diagnostic-metadata observations (`854` standardized task-price proxy rows)
+- **7,775** total canonical CSV records
+- **153** calibration groups across **4** active calibration algorithms (`robust_affine`, `huber_affine`, `monotone_piecewise`, `auto_best_rmse`)
+- **116** complete November 2026 Artificial Analysis v4.2 10-benchmark configurations (`107` current positively priced under default cutoff; `114` positively priced across all release dates; `2` zero-priced)
+- **21** strict current Pareto frontier points (spanning `$0.0051` at capability `9.67` for `GPT-6 Luna Low` up to `$26.54` at capability `64.56` for `Claude Fable 5.2 Max`)
+- **35** current configurations in the configured near-frontier band
+- **19** multi-effort reasoning lineages connected by dim trajectory polylines on the scatter canvas
 
 ## Identity corrections that matter
 
@@ -1630,10 +1638,10 @@ Verification targets:
 
 The earlier package mixed stale/current evidence around similarly named Xiaomi rows. V7.3 enforces:
 
-- **MiMo-V2.5** — current AA Intelligence Index **38**
-- **MiMo-V2.5-Pro** — current AA Intelligence Index **43**, 1.0T total / 42B active, current AA full-evaluation cost `$98.86`
-- **MiMo-V2-Pro** — older predecessor, retained separately
-- former alias `mimo-v2-5-0424` — merged into canonical `mimo-v2-5`; it is not a separate model vote
+- **MiMo-V2.5** - current AA Intelligence Index **38**
+- **MiMo-V2.5-Pro** - current AA Intelligence Index **43**, 1.0T total / 42B active, current AA full-evaluation cost `$98.86`
+- **MiMo-V2-Pro** - older predecessor, retained separately
+- former alias `mimo-v2-5-0424` - merged into canonical `mimo-v2-5`; it is not a separate model vote
 - non-reasoning/provider/UltraSpeed variants remain separate when measurements or economics differ
 
 Verification targets:
@@ -1662,11 +1670,11 @@ The executor list applies a calibrated-capability floor of 45. The floor is visi
 
 Current executor-grade ranking:
 
-1. **Muse Spark 1.2 (xhigh, Contributor pricing)** — capability 54.54, task cost $0.02123, $/capability 0.0003893
-2. **GPT-5.6 Luna (high)** — capability 47.00, direct AA task cost $0.02000, $/capability 0.0004255
-3. **DeepSeek V4 Flash 0731 (max)** — capability 52.00, direct AA task cost $0.03000, $/capability 0.0005769
-4. **Grok 4.3 (high)** — capability 53.00, task cost $0.10662, $/capability 0.0020117
-5. **MiniMax-M3** — capability 46.59, task cost $0.12295, $/capability 0.0026391
+1. **Muse Spark 1.2 (xhigh, Contributor pricing)** - capability 54.54, task cost $0.02123, $/capability 0.0003893
+2. **GPT-5.6 Luna (high)** - capability 47.00, direct AA task cost $0.02000, $/capability 0.0004255
+3. **DeepSeek V4 Flash 0731 (max)** - capability 52.00, direct AA task cost $0.03000, $/capability 0.0005769
+4. **Grok 4.3 (high)** - capability 53.00, task cost $0.10662, $/capability 0.0020117
+5. **MiniMax-M3** - capability 46.59, task cost $0.12295, $/capability 0.0026391
 
 
 Muse Spark 1.2 continues to use the user-selected **Contributor/data-sharing** price tier as its primary operational coordinate. AA's Standard-priced evaluation remains separate evidence and is not averaged with Contributor economics.
@@ -1775,7 +1783,7 @@ Current AA identity check:
 |---|---:|---:|---|
 | MiMo-V2.5 | 38 | $25.18 | Canonical plain V2.5; merge old `mimo-v2-5-0424` alias |
 | MiMo-V2.5-Pro | 43 | $98.86 | Distinct Pro model; do not borrow plain score |
-| MiMo-V2-Pro | older separate evidence | — | Preserve predecessor as separate identity |
+| MiMo-V2-Pro | older separate evidence | - | Preserve predecessor as separate identity |
 
 This changes routing: MiMo-V2.5-Pro no longer clears the project's 45-point general-executor eligibility floor.
 
@@ -1823,5 +1831,42 @@ These views intentionally disagree. Kilo's current public top-10 cost/completion
 
 ## Build script semantics
 
-`calibrate.py` is the sole calibration engine. `calibrate.py` is the sole complete package-generation/orchestration entry point. The ambiguous legacy `rebuild.py` wrapper was removed in v7.3 so future agents cannot mistake it for a second calibration implementation.
+`calibrate.py` is the sole calibration engine and complete package-generation/orchestration entry point. `current_frontier.py` refreshes the November 2026 primary Artificial Analysis v4.2 10-benchmark composite and Priors API verification ledger (`docs/current-frontier.md`).
+
+---
+
+# Appendix D. November 2026 (v7.5.0) Operational Routing Matrix, Subscription Economics, and Provisional Free Candidates
+
+*Consolidated from the November 2026 Living Documents routing dossier (`model-routing-2026-11-04.md`) and updated for the 2026-11-09 v4.2 frontier.*
+
+## D.1 Two economic planes: Metered API vs. Subscription Quota
+
+A single model configuration has two distinct marginal cost coordinates depending on how it is invoked:
+
+1. **Metered API Task Cost (Primary ARDF X-axis):** Measures the expected USD bill per standardized Artificial Analysis v4.2 task (`aa_cost_per_task_usd`), combining input, output, and reasoning token consumption at published API list prices.
+2. **Subscription-Equivalent Marginal Cost (`docs/current-frontier.md` Priors subscription plane):** When an operator holds active flat-rate subscriptions (**Claude Max / Code**, **ChatGPT Pro / Codex**, **Gemini Ultra / Antigravity**, **OpenCode Go**), marginal API spend is `$0` up to the rolling rate window. Within a subscription pool, routing optimizes **quota burn rate per capability point** rather than dollar invoice.
+   - Example: On metered API pricing, `Claude Opus 5.5 (Max)` (`58.95`, `$10.04`) and `GPT-6 Astra (Max)` (`56.85`, `$6.24`) sit slightly inside the strict API Pareto frontier defined by `Gemini 4 Carbon (Medium)` (`58.28`, `$6.59`) and `Claude Opus 5.5 (Xhigh)` (`57.29`, `$6.05`). Under subscription quota (`docs/current-frontier.md`), `Opus 5.5 (Max)` drops to `$0.1519` effective task cost and `GPT-6.1 Sol (Max)` drops to `$0.0742`, making them primary zero-marginal-spend workhorses.
+
+## D.2 Operational Routing Matrix by Task Type
+
+| Workload / Role | Operational Tier | Primary Metered API Route | Primary Subscription / Quota Route | Open-Weights / Self-Hosted Route |
+|---|---|---|---|---|
+| **Architecture, Judicial Audit, Hard Verification** | **T1 (`>= 60`)** | `Claude Fable 5.2 (High)` (`61.82`, `$9.08`) or `Gemini 4 Carbon (High)` (`60.02`, `$7.76`) | `Claude Fable 5.2 (Max)` (`64.56`) / `Claude Fable 5.2 (Xhigh)` (`62.22`) | `Kimi K3.1 Pro` (`46.43`, `$3.68`) + multi-sample verification |
+| **Complex Multi-File Implementation & Refactoring** | **T2 (`56 to 59.9`)** | `Claude Fable 5.2 (Medium)` (`56.37`, `$3.80`) or `Claude Opus 5.5 (Xhigh)` (`57.29`, `$6.05`) | `Claude Opus 5.5 (Max)` (`58.95`) or `GPT-6 Astra (Max)` (`56.85`) | `Kimi K3.1 Pro` (`46.43`) / `Muse Wonder Full (Max)` (`50.08`) |
+| **Autonomous Subagent Fan-Out & Test Generation** | **T3 (`47 to 55.9`)** | `GPT-6.1 Sol (High)` (`50.31`, `$0.591`) or `GPT-6.1 Sol (Xhigh)` (`52.43`, `$0.764`) | `GPT-6.1 Sol (Max)` (`54.54`) or `GPT-6.1 Terra (Max)` (`51.32`, `$0.961`) | `DeepSeek V4.1 Flash 1017 (Max)` (`32.59`, `$0.602`) |
+| **Fast CLI Triage, Schema Extraction, Batch Loops** | **T4 (`< 47`)** | `GPT-6.1 Terra (Medium)` (`38.15`, `$0.169`), `Muse Ember (Max)` (`36.02`, `$0.136`), or `GPT-6 Luna (Low)` (`9.67`, `$0.0051`) | `Claude Haiku 5.5 (Low)` (`18.64`, `$0.044`) or `GPT-6.1 Terra (Low)` (`29.42`, `$0.071`) | `K2 Horizon 375B A23B` (`17.73`, `$0.00`) / `Granite 4.2 8B` (`5.10`, `$0.040`) |
+
+## D.3 Zero-Cost and Provisional Free-Tier Candidates
+
+The ARDF ledger separates **verified v4.2 `$0`-cost models** from **provisional free-routed candidates** (available via OpenRouter `:free`, Google AI Studio free tier, or contributor endpoints):
+
+| Candidate Model | Provider / Route | Verified v4.2 Capability | Task Cost | Status & Routing Guidance |
+|---|---|---:|---:|---|
+| `K2 Horizon 375B A23B` | Moonshot / Open-weights | `17.73` | `$0.00` | **Verified v4.2 `$0` point** (`docs/current-frontier.md`). High-capacity MoE (`375B` total, `23B` active) suitable for zero-spend batch synthesis. |
+| `North Mini Code` | Cohere / North | `3.42` | `$0.00` | **Verified v4.2 `$0` point** (`docs/current-frontier.md`). Lightweight code completion utility. |
+| `Muse Wonder Full (Max)` | Meta (Open-weights preview) | `50.08` | Unpriced | **Verified v4.2 T3 capability (`50.08`)** on the unpriced shelf; top candidate when hosted on flat-rate or internal GPU capacity. |
+| `Nanbeige4.3-33B` | Nanbeige (Open-weights) | `20.41` | Unpriced | **Verified v4.2 T4 capability (`20.41`)** on the unpriced shelf; compact 33B open-weights model. |
+| `Gemini 3.8 Flash (Low)` | Google AI Studio | `22.55` (AA Index) | Free tier / API | Published AA Intelligence Index `22.55`; fast multimodal triage fallback. |
+| `Muse Spark 1.2 (Xhigh, Contributor)` | Meta Contributor SKU | `54.54` (Aug v4.0) | `$0.02123` | Historical v4.0 Contributor-tier benchmark (`$0.10/M` in, `$0.20/M` out); superseded in v4.2 by `Muse Ember (Max)` (`36.02`, `$0.136`). |
+
 
