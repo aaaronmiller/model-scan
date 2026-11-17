@@ -75,10 +75,11 @@ def score_components(comp, multipliers=None):
     weights = {k: w * multipliers.get(t, 1) for k, (_, w, t) in BENCHMARKS.items()}
     if any(not finite(w) or w < 0 for w in weights.values()):
         raise ValueError('Weights must be finite and nonnegative')
-    total = sum(weights.values())
+    # math.fsum, not sum(): the built-in sum is naive on Python 3.11 and compensated on 3.12+, which changes the last digits.
+    total = math.fsum(weights.values())
     if total <= 0: return None
     if any(not finite(comp.get(k)) for k, w in weights.items() if w > 0): return None
-    return sum(comp[k] * w for k, w in weights.items() if w > 0) / total
+    return math.fsum(comp[k] * w for k, w in weights.items() if w > 0) / total
 
 def _norm_name(text):
     # '+' is part of a model name (Command A+ is not Command A); every other symbol is dropped.
@@ -183,7 +184,7 @@ def primary_rows(models):
         for k, (field, w, _) in BENCHMARKS.items():
             v = ev.get('omniscience' if k in ('accuracy', 'nonhallucination') else field, {}).get('costPerTask')
             cost_parts[k] = v
-        cost = (sum(cost_parts[k] * BENCHMARKS[k][1] for k in BENCHMARKS) / 100
+        cost = (math.fsum(cost_parts[k] * BENCHMARKS[k][1] for k in BENCHMARKS) / 100
                 if all(finite(v) and v >= 0 for v in cost_parts.values()) else None)
         published_cost = ((m.get('intelligenceIndexCostPerTask') or {}).get('cost') or {}).get('total')
         result.append({
@@ -270,11 +271,18 @@ def ledger_refresh(payload):
         for metric,axis,v,aggregate in metrics:
             if not finite(v):continue
             fresh.append({**base,'record_type':'observation','observation_id':'current:'+m['id']+':'+metric,
-                'metric_name':metric,'metric_axis':axis,'raw_value':v,'raw_unit':'USD per task' if axis=='cost' else 'score / 100',
+                'metric_name':metric,'metric_axis':axis,'raw_value':format(v,'.12g'),'raw_unit':'USD per task' if axis=='cost' else 'score / 100',
                 'raw_direction':'lower' if axis=='cost' else 'higher','use_in_aggregate':aggregate,
                 'is_reference_scale':aggregate})
     with p.open('w',newline='') as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(old+fresh)
+
+def _stable(value):
+    """Floats rounded to 12 significant digits for serialization (same rule as calibrate.stable_json_value)."""
+    if isinstance(value, float): return float(format(value, '.12g')) if math.isfinite(value) else value
+    if isinstance(value, dict): return {k: _stable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)): return [_stable(v) for v in value]
+    return value
 
 def write_reports(data):
     def table(rows):
@@ -305,11 +313,11 @@ available model. Prices are benchmark workload estimates, not subscription bills
     text+='\n\n## Priors subscription estimates (different objective)\n\n'+table(data['priors_subscription_frontier'])
     text+='\n\n## Exact matched-row differences\n\n| Model / effort | ARDF score | Priors score | Delta | ARDF API cost | Priors API cost |\n|---|---:|---:|---:|---:|---:|\n'
     for c in data['comparisons']:
-        text+='| '+' | '.join(str(c[k]) for k in ['name','ardf_score','priors_score','score_delta','ardf_cost','priors_cost'])+' |\n'
+        text+='| '+' | '.join(c[k] if k=='name' else ('-' if c[k] is None else f'{c[k]:.6f}') for k in ['name','ardf_score','priors_score','score_delta','ardf_cost','priors_cost'])+' |\n'
     (ROOT/'docs/current-frontier.md').write_text(text)
-    (ROOT/'data/current-frontier.json').write_text(json.dumps(data,indent=2,allow_nan=False))
+    (ROOT/'data/current-frontier.json').write_text(json.dumps(_stable(data),indent=2,allow_nan=False))
     with (ROOT/'data/current-comparison.csv').open('w',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=list(data['comparisons'][0]));w.writeheader();w.writerows(data['comparisons'])
+        w=csv.DictWriter(f,fieldnames=list(data['comparisons'][0]));w.writeheader();w.writerows(_stable(data['comparisons']))
 
 if __name__ == '__main__':
     import argparse

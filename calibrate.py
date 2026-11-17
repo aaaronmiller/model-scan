@@ -36,6 +36,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 import math
+from math import fsum  # exact, correctly rounded sum: unlike sum(), identical on Python 3.11 (naive) and 3.12+ (compensated)
 import statistics
 import tempfile
 from collections import defaultdict
@@ -62,19 +63,19 @@ def truthy(value: Any) -> bool:
 
 def weighted_mean(values: Iterable[tuple[float, float]]) -> float | None:
     pairs=[(v,max(w,0.0)) for v,w in values if math.isfinite(v) and math.isfinite(w) and w>0]
-    total=sum(w for _,w in pairs)
-    return sum(v*w for v,w in pairs)/total if total else None
+    total=fsum(w for _,w in pairs)
+    return fsum(v*w for v,w in pairs)/total if total else None
 
 
 def weighted_geometric_mean(values: Iterable[tuple[float, float]]) -> float | None:
     pairs=[(v,max(w,0.0)) for v,w in values if v>0 and math.isfinite(v) and math.isfinite(w) and w>0]
-    total=sum(w for _,w in pairs)
-    return math.exp(sum(math.log(v)*w for v,w in pairs)/total) if total else None
+    total=fsum(w for _,w in pairs)
+    return math.exp(fsum(math.log(v)*w for v,w in pairs)/total) if total else None
 
 
 def weighted_median(values: list[tuple[float, float]]) -> float:
     ordered=sorted((v,max(w,0.0)) for v,w in values)
-    total=sum(w for _,w in ordered)
+    total=fsum(w for _,w in ordered)
     if total<=0: return statistics.median(v for v,_ in ordered)
     cursor=0.0
     for value,weight in ordered:
@@ -103,13 +104,13 @@ def clip_output(value: float, axis: str, params: dict[str, Any]) -> float:
 
 def solve_weighted_line(points: list[tuple[float,float,float]]) -> tuple[float,float]:
     """Closed-form weighted least-squares line; falls back to a flat median."""
-    sw=sum(w for _,_,w in points)
+    sw=fsum(w for _,_,w in points)
     if sw<=0: return 0.0, statistics.median(y for _,y,_ in points)
-    mx=sum(x*w for x,_,w in points)/sw
-    my=sum(y*w for _,y,w in points)/sw
-    sxx=sum(w*(x-mx)**2 for x,_,w in points)
+    mx=fsum(x*w for x,_,w in points)/sw
+    my=fsum(y*w for _,y,w in points)/sw
+    sxx=fsum(w*(x-mx)**2 for x,_,w in points)
     if sxx <= 1e-18: return 0.0, my
-    slope=sum(w*(x-mx)*(y-my) for x,y,w in points)/sxx
+    slope=fsum(w*(x-mx)*(y-my) for x,y,w in points)/sxx
     return slope, my-slope*mx
 
 
@@ -163,7 +164,7 @@ def isotonic_knots(points: list[tuple[float,float,float]]) -> list[tuple[float,f
     for x,y,w in points: grouped[x].append((y,w))
     blocks=[]
     for x in sorted(grouped):
-        weight=sum(w for _,w in grouped[x])
+        weight=fsum(w for _,w in grouped[x])
         mean=weighted_mean(grouped[x])
         blocks.append({'xs':[x],'weight':weight,'mean':float(mean)})
         while len(blocks)>=2 and blocks[-2]['mean']>blocks[-1]['mean']:
@@ -209,11 +210,27 @@ def read_rows(path: Path) -> tuple[list[dict[str,str]],list[str]]:
         reader=csv.DictReader(f); return list(reader),list(reader.fieldnames or [])
 
 
+SIG_DIGITS=12  # significant digits kept when a computed float is written out (far below the 1e-16 noise, far above any score or price precision)
+
+def stable_float(v: float) -> str:
+    """Stable text for a computed float: rounded to SIG_DIGITS significant digits, so a last-digit difference from
+    another Python version, libm or summation order cannot reach a committed file."""
+    return format(v,f'.{SIG_DIGITS}g')
+
+
+def stable_json_value(value: Any) -> Any:
+    """Copy of a JSON-serialisable structure with every finite float rounded to SIG_DIGITS significant digits."""
+    if isinstance(value,float): return float(stable_float(value)) if math.isfinite(value) else value
+    if isinstance(value,dict): return {k:stable_json_value(v) for k,v in value.items()}
+    if isinstance(value,(list,tuple)): return [stable_json_value(v) for v in value]
+    return value
+
+
 def write_rows_atomic(path: Path, rows: list[dict[str,Any]], fields: list[str]) -> None:
     path.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.NamedTemporaryFile('w',encoding='utf-8',newline='',delete=False,dir=path.parent,suffix='.tmp') as f:
         writer=csv.DictWriter(f,fieldnames=fields,extrasaction='ignore'); writer.writeheader()
-        for row in rows: writer.writerow({k:'' if row.get(k) is None else row.get(k) for k in fields})
+        for row in rows: writer.writerow({k:'' if row.get(k) is None else (stable_float(row[k]) if isinstance(row.get(k),float) else row.get(k)) for k in fields})
         temporary=Path(f.name)
     temporary.replace(path)
 
@@ -239,8 +256,8 @@ def manual_anchor_points(config: dict[str,Any], group_key: str, axis: str) -> li
 
 
 def rmse(points: list[tuple[float,float,float]], predict: Callable[[float],float]) -> float:
-    sw=sum(w for _,_,w in points)
-    return math.sqrt(sum(w*(predict(x)-y)**2 for x,y,w in points)/sw) if sw else float('nan')
+    sw=fsum(w for _,_,w in points)
+    return math.sqrt(fsum(w*(predict(x)-y)**2 for x,y,w in points)/sw) if sw else float('nan')
 
 
 def pareto(models: list[dict[str,Any]], capability_field: str, cost_field: str) -> list[str]:
@@ -298,10 +315,10 @@ def calibrate(input_path: Path, output_path: Path, config_path: Path) -> dict[st
         auto=[]
         if is_identity:
             for key,vals in source_by_model.items():
-                raw=weighted_median(vals); auto.append((raw,raw,sum(w for _,w in vals),key))
+                raw=weighted_median(vals); auto.append((raw,raw,fsum(w for _,w in vals),key))
         else:
             for key,vals in source_by_model.items():
-                if key in refs[axis]: auto.append((weighted_median(vals),refs[axis][key],sum(w for _,w in vals),key))
+                if key in refs[axis]: auto.append((weighted_median(vals),refs[axis][key],fsum(w for _,w in vals),key))
         anchors=auto+manual_anchor_points(config,group_key,axis)
         # Work in transformed space. Invalid nonpositive cost anchors are excluded explicitly.
         transformed=[]
@@ -857,14 +874,14 @@ def ana_truthy(v: Any): return str(v).strip().lower() in {'1','true','yes','y'}
 
 def ana_wmean(items):
     if not items:return None
-    sw=sum(w for v,w in items if v is not None and w>0)
-    return sum(v*w for v,w in items if v is not None and w>0)/sw if sw else None
+    sw=fsum(w for v,w in items if v is not None and w>0)
+    return fsum(v*w for v,w in items if v is not None and w>0)/sw if sw else None
 
 def ana_wgmean(items):
     usable=[(v,w) for v,w in items if v is not None and v>0 and w>0]
     if not usable:return None
-    sw=sum(w for v,w in usable)
-    return math.exp(sum(math.log(v)*w for v,w in usable)/sw)
+    sw=fsum(w for v,w in usable)
+    return math.exp(fsum(math.log(v)*w for v,w in usable)/sw)
 
 def ana_dispersion(values):
     """Spread statistics for one model's calibrated observations.
@@ -887,8 +904,8 @@ def ana_dispersion(values):
     if n == 1:
         return {"n": 1, "std_dev": None, "std_err": None, "spread": 0.0,
                 "provisional": True}
-    mean = sum(vals) / n
-    var = sum((v - mean) ** 2 for v in vals) / (n - 1)
+    mean = fsum(vals) / n
+    var = fsum((v - mean) ** 2 for v in vals) / (n - 1)
     sd = math.sqrt(var)
     return {"n": n, "std_dev": sd, "std_err": sd / math.sqrt(n),
             "spread": max(vals) - min(vals),
@@ -1190,10 +1207,10 @@ def primary_score(components, weights):
 
     Identical rule to current_frontier.score_components and to the dashboard's offline tier weighting.
     """
-    total=sum(w for w in weights.values() if w>0)
+    total=fsum(w for w in weights.values() if w>0)
     if total<=0: return None
     if any(components.get(k) is None for k,w in weights.items() if w>0): return None
-    return sum(components[k]*w for k,w in weights.items() if w>0)/total
+    return fsum(components[k]*w for k,w in weights.items() if w>0)/total
 
 def ana_current_primary(rows):
     """Compact, offline-reweightable view of the primary AA v4.2 recomputation (source aa-primary-current).
@@ -1628,7 +1645,7 @@ def render_routing_docs(routing, cp):
        f"ARDF scores and costs are recomputed from the primary Artificial Analysis snapshot ({str(cp['retrieved_at'])[:10]}, {len(cp['rows'])} configurations preserved, {sum(1 for r in cp['rows'] if r['score'] is not None)} with a complete 10-benchmark score). Priors (API cost basis, snapshot in `sources/current/priors-api.json`) is a cross-check only; no Priors value enters any ARDF score or cost. Delta = ARDF minus Priors.",'',
        f"Matched {D['matched']} of {D['priors_rows']} Priors rows ({D['exact']} by exact identity, {D['matched']-D['exact']} by a flagged loose name-plus-effort pass). Score delta: median |d| {D['median_abs_score_delta']:.6f}, max |d| {D['max_abs_score_delta']:.6f}. Priors publishes two decimals, so a score delta up to 0.005 is rounding. Cost delta (USD per task): median |d| {D['median_abs_cost_delta']:.6f}, max |d| {D['max_abs_cost_delta']:.6f}.",'',
        f"## AA published index versus the ARDF composite: {A['configurations']} configurations, largest divergences",'','| Model / effort | ARDF score | AA published index | ARDF minus AA |','|---|---:|---:|---:|']
-    fmt=lambda v:'-' if v is None else repr(float(v))
+    fmt=lambda v:'-' if v is None else f'{float(v):.6f}'  # fixed 6 decimals: stable text, no 16th-digit noise
     L+=[f"| {d['name']} | {fmt(d['ardf_score'])} | {fmt(d['aa_published'])} | {fmt(d['delta'])} |" for d in A['largest']]
     L+=['','## Matched rows, largest absolute score delta first','','| Model / effort | Match | ARDF score | Priors score | Score delta | ARDF cost | Priors cost | Cost delta | AA published index | ARDF minus AA |','|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
     L+=[f"| {d['name']} | {d['match']} | {fmt(d['ardf_score'])} | {fmt(d['priors_score'])} | {fmt(d['delta'])} | {fmt(d['ardf_cost'])} | {fmt(d['priors_cost'])} | {fmt(d['cost_delta'])} | {fmt(d['aa_published'])} | {fmt(d['aa_delta'])} |" for d in D['rows']]
@@ -1900,8 +1917,8 @@ def embed_dashboard(payload: dict[str,Any], analysis: dict[str,Any]) -> None:
     if begin not in text or end not in text:
         raise RuntimeError('dashboard-template.html is missing ARDF_DATA_BEGIN/END markers')
     block=(begin+'\n<script>\n'
-           'window.ARDF_DATA='+json.dumps(payload,separators=(',',':'))+';\n'
-           'window.ARDF_ANALYSIS='+json.dumps(analysis,separators=(',',':'))+';\n'
+           'window.ARDF_DATA='+json.dumps(stable_json_value(payload),separators=(',',':'))+';\n'
+           'window.ARDF_ANALYSIS='+json.dumps(stable_json_value(analysis),separators=(',',':'))+';\n'
            '</script>\n'+end)
     text=text[:text.index(begin)]+block+text[text.index(end)+len(end):]
     DASHBOARD_PATH.write_text(text,encoding='utf-8')
