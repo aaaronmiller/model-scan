@@ -34,6 +34,7 @@ purpose: Display every model/reasoning configuration and every selected evidence
 <details open><summary>Benchmark tier weighting (offline, from AA components)</summary><p>The tier list is a subjective relevance preference, not a scientific quality score. Each tier multiplier scales its benchmarks&rsquo; AA v4.2 weight, then weights are renormalised. The default is 1 for every tier, which reproduces AA&rsquo;s composite. A multiplier of 0 removes a tier, which can let configurations that lack those benchmarks be scored. Blank or out-of-range values (valid range 0 to 5) are rejected and the previous weights stay in force. This recalculation runs entirely in this page from the embedded per-benchmark scores.</p><div class="chart-controls" id="pc-tiers"></div><p id="pc-weights-note" role="status" style="color:var(--muted);font-size:12px"></p><p style="color:var(--muted);font-size:12px">Tiers: S = Terminal-Bench Science; A = Terminal-Bench 4.0; B = AA-Omniscience accuracy and non-hallucination; C = FrontierCode 2.0, HLE, GDP.pdf, CritPt; Unrated = AA-Briefcase, AutomationBench-AA. No D or F benchmarks appear in this mix.</p></details>
 <p id="pc-counts" role="status" style="font-size:12.5px;color:#cfe0f5"></p>
 <div class="chart-shell" style="min-height:0;max-width:none"><svg id="pc-chart" viewBox="0 0 900 440" class="chart" role="img" aria-label="Primary current frontier: AA v4.2 score versus task cost"></svg></div>
+<div id="pc-label-note" role="note" style="color:var(--muted);font-size:12px;margin:4px 0 6px"></div>
 <div id="pc-legend" class="compare-legend" aria-label="Provider colours"></div>
 <div class="tablewrap" style="max-height:480px"><table><thead><tr><th>Model</th><th>Provider</th><th>Effort</th><th>Track</th><th>Score</th><th>Cost/task</th><th title="Closest frontier configuration that is no more expensive and no lower scoring, then the strongest such configuration when different">Dominance within selection</th><th title="Same, across every configuration regardless of filters">Dominance across all</th><th title="Benchmark components AA published for this configuration. A tier multiplier of 0 can let a configuration with fewer than 10 be scored on the rest.">Components</th></tr></thead><tbody id="pc-table"></tbody></table></div>
 <details id="pc-unscored"><summary id="pc-unscored-summary"></summary><div id="pc-unscored-list" style="columns:3 260px;font-size:11px;color:var(--muted);margin-top:8px"></div></details>
@@ -571,6 +572,37 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
  }
  function fillUnscored(list){const ul=$('pc-unscored-list');ul.replaceChildren();for(const r of list){const d=document.createElement('div');d.textContent=r.name+' · '+Object.values(r.components).filter(finite).length+'/'+P.benchmarks.length+' components';ul.appendChild(d)}}
  $('pc-unscored').addEventListener('toggle',()=>{if($('pc-unscored').open)fillUnscored(state.unscored||[])});
+ /* Frontier label layout. Deterministic and offline: a pure function of the plotted geometry and the names (no randomness,
+    no DOM measurement, no network). Greedy, highest score first, so the dense top-right cluster gets first pick. Each label
+    walks a fixed ladder of slots (right, left, above, below, at growing distance) and must stay inside the plot box and
+    clear of every placed label and every frontier marker. Among free slots it prefers the nearest one that avoids other
+    markers and the frontier line. A label with no free slot is not drawn; its point keeps the hover title. */
+ function layoutLabels(items,markers,segs,box){
+  const pad=1.5,hit=(a,b)=>a.x0<b.x1+pad&&b.x0<a.x1+pad&&a.y0<b.y1+pad&&b.y0<a.y1+pad;
+  const mrect=m=>({x0:m.x-m.rad,y0:m.y-m.rad,x1:m.x+m.rad,y1:m.y+m.rad});
+  const fm=markers.filter(m=>m.f).map(mrect),om=markers.filter(m=>!m.f).map(mrect);
+  const hitSeg=(s,rc)=>{const steps=Math.max(1,Math.ceil(Math.hypot(s.x2-s.x1,s.y2-s.y1)/3));for(let i=0;i<=steps;i++){const x=s.x1+(s.x2-s.x1)*i/steps,y=s.y1+(s.y2-s.y1)*i/steps;if(x>=rc.x0&&x<=rc.x1&&y>=rc.y0&&y<=rc.y1)return true}return false};
+  const onLine=rc=>segs.filter(s=>hitSeg(s,rc)).length;
+  /* A label that is not in its first slot gets a leader from the marker edge to the nearest point of the label. */
+  const leaderOf=(it,rc)=>{const cx=Math.min(Math.max(it.x,rc.x0),rc.x1),cy=Math.min(Math.max(it.y,rc.y0),rc.y1),d=Math.hypot(cx-it.x,cy-it.y);return d>8?{x1:it.x+(cx-it.x)/d*7.5,y1:it.y+(cy-it.y)/d*7.5,x2:cx,y2:cy}:null};
+  const placed=[],dropped=[];
+  for(const it of items.slice().sort((p,q)=>q.s-p.s||p.id.localeCompare(q.id))){
+   const w=Math.ceil(it.text.length*5.1)+2;let best=null;
+   for(let k=0;k<=6;k++){
+    const up=-(8+11*k),dn=14+11*k;
+    for(const [side,dy] of [[1,up],[1,dn],[-1,up],[-1,dn],[0,up-4],[0,dn+6]]){
+     const x0=side>0?it.x+10:side<0?it.x-10-w:it.x-w/2,yb=it.y+dy,rc={x0,y0:yb-8,x1:x0+w,y1:yb+2};
+     if(rc.x0<box.x0||rc.x1>box.x1||rc.y0<box.y0||rc.y1>box.y1)continue;
+     if(placed.some(p=>hit(p.rc,rc))||fm.some(m=>hit(m,rc)))continue;
+     const ld=k>=1?leaderOf(it,rc):null;
+     const cost=k*10+(side===0?2:0)+om.filter(m=>hit(m,rc)).length*15+onLine(rc)*25+(ld?placed.filter(p=>hitSeg(ld,p.rc)).length*30:0)+placed.filter(p=>p.ld&&hitSeg(p.ld,rc)).length*30;
+     if(!best||cost<best.cost)best={it,k,side,rc,yb,cost,ld};
+    }
+   }
+   if(best)placed.push(best);else dropped.push(it);
+  }
+  return {placed,dropped};
+ }
  function drawChart(a,pool){
   const svg=$('pc-chart'),leg=$('pc-legend');svg.replaceChildren();leg.replaceChildren();
   if(!pool.length){svg.appendChild(node('text',{x:30,y:35,fill:'#ddd'},'No configuration with both a score and a known cost matches this selection.'));return}
@@ -588,7 +620,15 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
   svg.appendChild(node('polyline',{points:fr.map(r=>X(r)+','+Y(r)).join(' '),fill:'none',stroke:'#f1b84a','stroke-width':2}));
   const onAll=new Set(state.poolAll.frontier);
   for(const r of pool){const isF=a.notes.get(r)===null,c=node('circle',{cx:X(r),cy:Y(r),r:isF?6:4,fill:colors[r.provider]||'#a4adba',stroke:onAll.has(r)?'#ffffff':isF?'#ffe0a5':'none','stroke-width':onAll.has(r)?2:1.5,'data-id':r.id});c.appendChild(node('title',{},r.name+' · '+r.provider+' · '+r.effort+' · score '+fmtScore(r.s)+' · '+fmtCost(r.cost)+' · '+noteText(a.notes.get(r),r)));svg.appendChild(c)}
-  fr.forEach((r,i)=>svg.appendChild(node('text',{x:Math.min(X(r)+8,R-60),y:Y(r)+(i%2?14:-8),fill:'#ffe1a3','font-size':9},r.name.replace(/\s*\(.*\)$/,'')+(r.effort&&r.effort!=='none'?' '+r.effort:''))));
+  {const items=fr.map(r=>({r,id:r.id,s:r.s,x:X(r),y:Y(r),text:r.name.replace(/\s*\(.*\)$/,'')+(r.effort&&r.effort!=='none'?' '+r.effort:'')}));
+   const markers=pool.map(r=>{const isF=a.notes.get(r)===null;return {x:X(r),y:Y(r),rad:isF?7:4.5,f:isF}});
+   const segs=fr.slice(1).map((r,i)=>({x1:X(fr[i]),y1:Y(fr[i]),x2:X(r),y2:Y(r)}));
+   const lay=layoutLabels(items,markers,segs,{x0:50,y0:34,x1:896,y1:B-3});
+   for(const p of lay.placed){const it=p.it;
+    if(p.ld)svg.appendChild(node('line',{x1:p.ld.x1,y1:p.ld.y1,x2:p.ld.x2,y2:p.ld.y2,stroke:'#c9a95f','stroke-width':.7,class:'pc-leader'}));
+    svg.appendChild(node('text',{x:p.side>0?it.x+10:p.side<0?it.x-10:it.x,y:p.yb,'text-anchor':p.side>0?'start':p.side<0?'end':'middle',fill:'#ffe1a3','font-size':9,stroke:'#050a12','stroke-width':2.5,'paint-order':'stroke',class:'pc-label','data-id':it.id},it.text))}
+   state.labels={shown:lay.placed.length,hidden:lay.dropped.map(it=>it.r.name),frontier:items.length};
+   const note=$('pc-label-note');if(note)note.textContent=lay.dropped.length?lay.placed.length+' of '+items.length+' frontier labels are drawn. '+lay.dropped.length+' had no free space and are left to the hover title: point at the circle to read the name ('+lay.dropped.map(it=>it.r.name).join('; ')+').':'All '+items.length+' frontier labels are drawn. Where two would overlap, one is moved to a free spot nearby, with a thin line back to its point.'}
   svg.appendChild(node('text',{x:L+200,y:B+38,fill:'#b8c5d5','font-size':12},'AA workload cost per task, USD (log scale)'));svg.appendChild(node('text',{x:L-16,y:T-14,fill:'#b8c5d5','font-size':12},'AA v4.2 composite recomputed by ARDF (higher is better) · white ring = frontier across all configurations'));
   for(const p of [...new Set(pool.map(r=>r.provider))].sort()){const s=document.createElement('span');s.style.cssText='margin-right:12px;white-space:nowrap';const dot=document.createElement('span');dot.style.cssText='display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;background:'+(colors[p]||'#a4adba');s.append(dot,p);leg.appendChild(s)}
  }
@@ -624,6 +664,15 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
     chk('Priors chart and table agree on dominance for every plotted configuration',pc.length>0&&bad.length===0,pc.length+' plotted, '+bad.length+' disagree');}
    chk('Priors circularity and AA index divergence are disclosed on the page',/Circularity: .*by construction.*not independent validation.*AA.s own published index.*\d\.\d{4} points/.test($('priors-circularity').textContent),$('priors-circularity').textContent.slice(0,50));
    chk('chart draws one circle per priced-or-zero scored row',$('pc-chart').querySelectorAll('circle').length===state.rows.filter(eligible).length,$('pc-chart').querySelectorAll('circle').length+' circles');
+   /* Label audit uses the browser's own text boxes (getBBox), not the layout's width estimate. */
+   const labelLog=[],labelBad=[],auditLabels=tag=>{const svg=$('pc-chart'),ts=[...svg.querySelectorAll('text.pc-label')].map(t=>{const b=t.getBBox();return {n:t.textContent,x0:b.x,y0:b.y,x1:b.x+b.width,y1:b.y+b.height}});
+    const cs=[...svg.querySelectorAll('circle')].filter(c=>c.getAttribute('r')==='6').map(c=>({x:+c.getAttribute('cx'),y:+c.getAttribute('cy')}));
+    ts.forEach((a,i)=>{if(!(a.x1-a.x0>0))labelBad.push(tag+': '+a.n+' unmeasured');if(a.x0<0||a.x1>900||a.y0<0||a.y1>440)labelBad.push(tag+': '+a.n+' off canvas');
+     for(const b of ts.slice(i+1))if(a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1)labelBad.push(tag+': '+a.n+' overlaps '+b.n);
+     for(const c of cs){const nx=Math.min(Math.max(c.x,a.x0),a.x1),ny=Math.min(Math.max(c.y,a.y0),a.y1);if(Math.hypot(c.x-nx,c.y-ny)<6)labelBad.push(tag+': '+a.n+' covers a frontier marker')}});
+    const L=state.labels||{shown:-1,hidden:[],frontier:-2};if(L.shown!==ts.length||L.shown+L.hidden.length!==L.frontier||L.frontier!==cs.length)labelBad.push(tag+': label count '+ts.length+' + '+L.hidden.length+' hidden does not match '+cs.length+' frontier points');
+    labelLog.push(tag+' '+ts.length+'/'+cs.length+(L.hidden.length?' ('+L.hidden.length+' hidden)':''))};
+   auditLabels('default');
    set('pc-coststate','zero');let z=rows();chk('verified-free filter lists only verified $0 rows',z.length>0&&z.every(r=>r[5]==='$0 (verified free)'),z.length+' rows');out.zero_rows=z.map(r=>r[0]);
    const zeroShelf=$('pc-chart').querySelectorAll('circle').length;chk('verified-free rows are plotted on the $0 shelf',zeroShelf===z.length,zeroShelf+' circles');
    set('pc-coststate','unverified');let uv=rows();chk('unverified-free filter lists only unverified $0 rows, none plotted, evidence shown',uv.length>0&&uv.every(r=>r[5]==='$0 (unverified)'&&/Unverified free/.test(r[6])&&r[6].length>60)&&$('pc-chart').querySelectorAll('circle').length===0,uv.length+' rows');out.unverified_rows=uv.map(r=>r[0]);set('pc-coststate','all');
@@ -631,15 +680,16 @@ scatter('aaCompare',(A.external_frontier_comparisons?.artificial_analysis?.point
    chk('no scored unverified $0 row is eligible for dominance',state.rows.filter(r=>finite(r.s)&&r.cost_state==='zero-unverified').every(r=>!eligible(r)),'');
    set('pc-coststate','unknown');let u=rows();chk('unknown-cost filter lists only unpriced rows, none plotted',u.length>0&&u.every(r=>r[5]==='unknown')&&$('pc-chart').querySelectorAll('circle').length===0,u.length+' rows');out.unknown_rows=u.map(r=>r[0]);
    set('pc-coststate','priced');chk('priced filter excludes $0 and unknown',rows().every(r=>/^\$/.test(r[5])&&!/^\$0 /.test(r[5])),rows().length+' rows');
-   set('pc-coststate','all');set('pc-provider','Anthropic');let an=rows();chk('provider filter',an.length>0&&an.every(r=>r[1]==='Anthropic'),an.length+' rows');out.anthropic_rows=an.length;
+   set('pc-coststate','all');set('pc-provider','Anthropic');let an=rows();chk('provider filter',an.length>0&&an.every(r=>r[1]==='Anthropic'),an.length+' rows');out.anthropic_rows=an.length;auditLabels('Anthropic');
    out.anthropic_frontier=state.pool.frontier.map(r=>r.id);
    set('pc-track','exclude');chk('exclude fallback tracks',rows().every(r=>r[3]==='standard'),rows().length+' rows');set('pc-track','only');chk('fallback only',rows().length>0&&rows().every(r=>r[3]==='default fallback'),rows().length+' rows');
-   set('pc-track','all');set('pc-provider','');set('pc-effort','max');chk('effort filter',rows().length>0&&rows().every(r=>r[2]==='max'),rows().length+' rows');
+   set('pc-track','all');set('pc-provider','');set('pc-effort','max');chk('effort filter',rows().length>0&&rows().every(r=>r[2]==='max'),rows().length+' rows');auditLabels('max effort');
    set('pc-effort','');set('pc-search','fable');chk('search filter',rows().length>0&&rows().every(r=>/fable/i.test(r[0])),rows().length+' rows');set('pc-search','');
    set('pc-provider','Anthropic');const withinOnly=state.pool.frontier.length,across=state.poolAll.frontier.length;chk('frontier is recomputed for the selection, not a static global list',state.pool.frontier.every(r=>r.provider==='Anthropic')&&withinOnly>0,withinOnly+' within, '+across+' across');set('pc-provider','');
    const W={S:2,A:.5,B:1,C:1,Unrated:0};for(const t of tiers)set('pc-tier-'+t,String(W[t]===undefined?1:W[t]));
    out.weighted_case=W;out.weighted_scores=Object.fromEntries(state.rows.filter(r=>finite(r.s)).map(r=>[r.id,r.s]));out.weighted_frontier=state.pool.frontier.map(r=>r.id);
-   chk('tier weighting changes scores offline',state.rows.some(r=>finite(r.s)&&r.score!==null&&Math.abs(r.s-r.score)>1e-6),'');
+   chk('tier weighting changes scores offline',state.rows.some(r=>finite(r.s)&&r.score!==null&&Math.abs(r.s-r.score)>1e-6),'');auditLabels('weighted');
+   chk('frontier labels never overlap each other, leave the chart or cover a frontier marker (browser text boxes, 4 filter states)',labelBad.length===0&&labelLog.length===4,labelBad.length?labelBad.slice(0,4).join(' | '):labelLog.join(', '));
    for(const t of tiers)set('pc-tier-'+t,t==='B'?'1':'0');out.bonly_scored=state.rows.filter(r=>finite(r.s)).length;chk('removing other tiers scores configurations that only have the remaining benchmarks',out.bonly_scored>out.default_scored,out.default_scored+' -> '+out.bonly_scored);
    set('pc-tier-S','');chk('blank multiplier rejected and previous weights kept',/blank is not allowed/.test($('pc-weights-note').textContent)&&out.bonly_scored===state.rows.filter(r=>finite(r.s)).length,$('pc-weights-note').textContent.slice(0,80));
    set('pc-tier-S','7');chk('out-of-range multiplier rejected',/0 to 5/.test($('pc-weights-note').textContent),'');
