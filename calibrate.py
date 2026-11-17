@@ -1233,6 +1233,296 @@ def ana_current_primary(rows):
     return {'source_id':PRIMARY_SOURCE_ID,'retrieved_at':retrieved[-1] if retrieved else None,'benchmarks':benchmarks,'rows':out,
         'note':'Artificial Analysis v4.2 10-benchmark composite recomputed by ARDF from AA components; costs are AA workload costs per task. No Priors value enters this block.'}
 
+# ---------------------------------------------------------------------------
+# ARDF-REC-03: routing rules of thumb, full frontier for all models, free routes.
+# Everything below is computed from the primary AA block and the pinned snapshots
+# in sources/current/; no number in the generated documents is typed by hand.
+# ---------------------------------------------------------------------------
+FREE_ROUTE_ALIASES={'nemotron3ultra':'Nemotron 3 Ultra 550B A55B'}  # route-name key -> primary model-name prefix (identity still flagged)
+MAX_RULES=12
+
+def _norm_key(text: str) -> str:
+    return re.sub(r'[^a-z0-9]','',text.lower())
+
+def _dominates(a,b):
+    return a['cost']<=b['cost'] and a['score']>=b['score'] and (a['cost']<b['cost'] or a['score']>b['score'])
+
+def _frontier(pool):
+    return sorted([r for r in pool if not any(_dominates(o,r) for o in pool if o is not r)],key=lambda r:(r['cost'],-r['score'],r['id']))
+
+def _money(v):
+    if v is None: return 'unknown'
+    if v==0: return '$0'
+    return f'${v:.3g}' if v<1 else f'${v:.2f}'
+
+def _label(r):
+    return r['name']
+
+def _median(vals):
+    vals=sorted(vals); n=len(vals)
+    if not n: return None
+    return vals[n//2] if n%2 else (vals[n//2-1]+vals[n//2])/2
+
+def _read_pinned(name, manifest):
+    p=ROOT/'sources/current'/name
+    expected=manifest.get('sha256',{}).get(name)
+    raw=p.read_bytes()
+    if expected and hashlib.sha256(raw).hexdigest()!=expected: raise RuntimeError('Snapshot checksum mismatch: '+name)
+    import gzip
+    return json.loads(gzip.decompress(raw) if p.suffix=='.gz' else raw.decode('utf-8'))
+
+def ana_free_routes(cp, pool, frontier):
+    """Evaluate zero-price routes listed in the pinned Kilo, OpenRouter and OpenCode Zen catalogs against scored configurations."""
+    manifest=json.loads((ROOT/'sources/current/manifest.json').read_text(encoding='utf-8'))
+    def price0(v):
+        try: return float(v)==0.0
+        except (TypeError,ValueError): return False
+    routes=[]
+    for m in _read_pinned('openrouter-catalog.json.gz',manifest)['data']:
+        p=m.get('pricing',{})
+        if price0(p.get('prompt')) and price0(p.get('completion')): routes.append({'surface':'OpenRouter','route_id':m['id'],'name':m['name'],'may_train':None,'modalities':m.get('architecture',{}).get('output_modalities',[])})
+    for m in _read_pinned('kilo-catalog.json.gz',manifest)['data']:
+        p=m.get('pricing',{})
+        if price0(p.get('prompt')) and price0(p.get('completion')): routes.append({'surface':'Kilo','route_id':m['id'],'name':m['name'],'may_train':m.get('mayTrainOnYourPrompts'),'modalities':m.get('architecture',{}).get('output_modalities',[])})
+    for m in _read_pinned('zen-catalog.json.gz',manifest)['data']:
+        try: c=m['cost']['text']; ok=c['input']['price']==0 and c['output']['price']==0
+        except (KeyError,TypeError): ok=False
+        if ok: routes.append({'surface':'OpenCode Zen','route_id':'opencode/'+m['id'],'name':m['name'],'may_train':None,'modalities':m.get('modalities',{}).get('output',[])})
+    def kind(r):
+        n=r['route_id'].lower()
+        if 'free' in n and ('router' in r['name'].lower() or n in ('openrouter/free','kilo-auto/free')): return 'router (not a stable model)'
+        if n.startswith('stealth/') or 'alpha' in n or 'glyph' in n: return 'stealth or preview (identity unverified)'
+        if 'safety' in n: return 'safety classifier'
+        if any(x in n for x in ('lyria',)) or r['modalities']!=['text'] and r['modalities']: return 'non-text output'
+        return 'chat model'
+    primary_names={}
+    for r in cp['rows']: primary_names.setdefault(_norm_key(re.sub(r'\s*\(.*\)$','',r['name'])),[]).append(r)
+    def clean(n):
+        n=re.sub(r'^[^:]*:\s*','',n); n=re.sub(r'\(free\)|\bfree\b','',n,flags=re.I); return _norm_key(n)
+    def match(route):
+        key=clean(route['name']); hit=[]; how=''
+        for pk,rows in primary_names.items():
+            if pk==key: hit+=rows; how='name match'
+            elif pk.startswith(key) and pk[len(key):].isdigit() and key: hit+=rows; how='name match, snapshot or version suffix ignored (identity unverified)'
+        if not hit and key in FREE_ROUTE_ALIASES:
+            pref=_norm_key(FREE_ROUTE_ALIASES[key]); hit=[r for r in cp['rows'] if _norm_key(r['name']).startswith(pref)]; how='explicit alias (identity unverified)'
+        return hit,how
+    by_model={}; unscored=[]
+    for rt in routes:
+        rt['kind']=kind(rt)
+        hit,how=match(rt)
+        scored=[h for h in hit if h['score'] is not None]
+        if not scored:
+            unscored.append({**rt,'why':'no matching primary configuration' if not hit else 'matching primary configuration has no complete score'}); continue
+        best=max(scored,key=lambda h:(h['score'],h['id']))
+        e=by_model.setdefault(best['family'] or best['name'],{'model':best['name'],'provider':best['provider'],'effort':best['effort'],'score':best['score'],'aa_workload_cost':best['cost'],'how':how,'routes':[]})
+        e['routes'].append({k:rt[k] for k in ('surface','route_id','kind','may_train')})
+    out=[]
+    for e in by_model.values():
+        paid=[r for r in pool if r['cost'] and r['cost']>0 and r['score']>=e['score']-1e-12]
+        cheaper=min(paid,key=lambda r:(r['cost'],-r['score'],r['id'])) if paid else None
+        e['cheapest_paid_at_least']= {'name':cheaper['name'],'cost':cheaper['cost'],'score':cheaper['score']} if cheaper else None
+        e['model_row_on_frontier']=any(f['name']==e['model'] for f in frontier)
+        out.append(e)
+    out.sort(key=lambda e:(-e['score'],e['model']))
+    zero=sorted([r for r in cp['rows'] if r['score'] is not None and r['cost']==0],key=lambda r:(-r['score'],r['id']))
+    top=max((r['score'] for r in pool),default=None)
+    best=out[0] if out else None
+    return {'models':out,'unscored_routes':sorted(unscored,key=lambda r:(r['surface'],r['route_id'])),'route_count':len(routes),
+        'aa_zero_cost':[{'name':r['name'],'score':r['score'],'cost':0} for r in zero],'top_score':top,
+        'best_free_score':best['score'] if best else None,'best_free_share_of_top':(best['score']/top if best and top else None)}
+
+def _prior_ratio_rows():
+    """Per-lab Priors API vs subscription cost ratios for identically named model and effort rows."""
+    sys_path_added=False
+    import sys
+    if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT)); sys_path_added=True
+    try: import current_frontier as cf
+    finally:
+        if sys_path_added: sys.path.remove(str(ROOT))
+    api=cf.priors_rows('api'); sub={r['identity']:r for r in cf.priors_rows('subscription')}
+    by_lab=defaultdict(list)
+    for a in api:
+        s=sub.get(a['identity'])
+        if s and a['cost'] and s['cost'] and a['cost']>0 and s['cost']>0: by_lab[a['lab']].append(a['cost']/s['cost'])
+    return {lab:_median(v) for lab,v in by_lab.items() if len(v)>=3}, cf, api
+
+def ana_routing(cp):
+    """Rules of thumb (at most MAX_RULES), the full all-model frontier and the free-route evaluation."""
+    rows=cp['rows']
+    pool=[r for r in rows if r['score'] is not None and r['cost'] is not None and r['cost']>=0]
+    priced=[r for r in pool if r['cost']>0]
+    frontier=_frontier(pool); fids={r['id'] for r in frontier}
+    dominated=[r for r in pool if r['id'] not in fids]
+    def cheapest_at_least(t,src=priced):
+        c=[r for r in src if r['score']>=t]
+        return min(c,key=lambda r:(r['cost'],-r['score'],r['id'])) if c else None
+    # full frontier: global, and each provider's own frontier
+    by_provider=defaultdict(list)
+    for r in pool: by_provider[r['provider']].append(r)
+    provider_frontiers=[]
+    for prov,items in by_provider.items():
+        pf=_frontier(items)
+        provider_frontiers.append({'provider':prov,'scored_configurations':len(items),'frontier':[{**{k:r[k] for k in ('id','name','effort','score','cost')},'on_global_frontier':r['id'] in fids} for r in pf]})
+    provider_frontiers.sort(key=lambda p:(-p['scored_configurations'],p['provider']))
+    free=ana_free_routes(cp,pool,frontier)
+    rules=[]
+    def rule(text,data): rules.append({'n':len(rules)+1,'rule':text,'data':data})
+    # 1 frontier first
+    worst=max(dominated,key=lambda r:r['cost']) if dominated else None
+    if worst:
+        dom=min([f for f in frontier if _dominates(f,worst)],key=lambda f:(f['cost'],-f['score']))
+        ex=f"{_label(worst)} ({worst['score']:.2f}, {_money(worst['cost'])}) is dominated by {_label(dom)} ({dom['score']:.2f}, {_money(dom['cost'])})."
+    else: ex='no dominated configuration'
+    rule('Choose from the frontier first; a dominated configuration has a cheaper or equal and at least as good alternative.',f"{len(frontier)} of {len(pool)} scored and priced configurations are undominated (full list: docs/full-frontier.md). Example: {ex}")
+    # 2 cheapest to reach a score
+    ts=[20,30,40,50,55,60]; steps=[(t,cheapest_at_least(t)) for t in ts]
+    steps=[(t,c) for t,c in steps if c]
+    rule('To reach a target score, start with the cheapest configuration that clears it.','Cheapest priced configuration at or above each score: '+'; '.join(f"{t}: {_label(c)} {_money(c['cost'])}" for t,c in steps)+'.')
+    # 3 cost of next points
+    lo,hi=cheapest_at_least(40),cheapest_at_least(60)
+    if lo and hi: rule('Each extra point at the top costs far more than at the bottom; buy the top tier only when the task needs it.',f"Cheapest config at 40 or more is {_money(lo['cost'])}; at 60 or more it is {_money(hi['cost'])}, {hi['cost']/lo['cost']:.1f}x as much ({_label(lo)} versus {_label(hi)}).")
+    # 4 max versus xhigh
+    fam=defaultdict(dict)
+    for r in priced:
+        base=re.sub(r'\s*\((?:[^)]*)\)\s*$','',r['name'])
+        fam[(r['provider'],base,r['fallback'])][r['effort']]=r
+    pairs=[(v['xhigh'],v['max']) for v in fam.values() if 'xhigh' in v and 'max' in v]
+    if pairs:
+        ratios=[b['cost']/a['cost'] for a,b in pairs]; gains=[b['score']-a['score'] for a,b in pairs]
+        onf=sum(1 for a,b in pairs if b['id'] in fids)
+        rule('Treat max effort as an exception: price it against xhigh on your task before using it.',f"Across {len(pairs)} families with both settings, max costs a median {_median(ratios):.2f}x xhigh for a median {_median(gains):+.2f} points; {onf} of {len(pairs)} max configurations are on the frontier.")
+    # 5 effort on the frontier
+    eff=defaultdict(int)
+    for r in frontier: eff[r['effort']]+=1
+    order=['none','minimal','low','medium','high','xhigh','max']
+    rule('Effort is not monotone value: the frontier mixes every effort setting, so choose model and effort together.','Frontier members by effort: '+', '.join(f"{e} {eff[e]}" for e in order if eff.get(e))+f' (of {len(frontier)}).')
+    # 6 fallback tracks
+    fb=[r for r in pool if r['fallback']]
+    pairs_fb=[]
+    stdmap={(r['provider'],re.sub(r',?\s*Default Fallback','',r['name']),r['effort']):r for r in pool if not r['fallback']}
+    for r in fb:
+        s=stdmap.get((r['provider'],re.sub(r',?\s*Default Fallback','',r['name']),r['effort']))
+        if s and s['cost'] and r['cost']: pairs_fb.append((s,r))
+    if fb:
+        extra=f" Compared with their standard track ({len(pairs_fb)} pairs) the fallback track costs a median {_median([b['cost']/a['cost'] for a,b in pairs_fb]):.2f}x with a median score difference of {_median([b['score']-a['score'] for a,b in pairs_fb]):+.2f}." if pairs_fb else ''
+        fbprov=defaultdict(int)
+        for r in fb: fbprov[r['provider']]+=1
+        fbfront=defaultdict(int)
+        for r in fb:
+            if r['id'] in fids: fbfront[r['provider']]+=1
+        rule('Treat default-fallback tracks as their own configurations, not as the standalone model; the pinned data does not say what the fallback covers.',f"{len(fb)} scored fallback tracks ({', '.join(f'{p} {n}' for p,n in sorted(fbprov.items()))}); {sum(fbfront.values())} on the frontier ({', '.join(f'{p} {n}' for p,n in sorted(fbfront.items())) or 'none'}); {len(pairs_fb)} have a scored standard-track counterpart.{extra}")
+    # 7 multi-provider
+    provcount=defaultdict(int)
+    for r in frontier: provcount[r['provider']]+=1
+    rule('Do not lock to one vendor: the frontier is multi-provider.','Frontier members by provider: '+', '.join(f"{p} {n}" for p,n in sorted(provcount.items(),key=lambda x:(-x[1],x[0])))+'. Each provider\'s own frontier is in docs/full-frontier.md.')
+    # 8 zero cost
+    zc=free['aa_zero_cost']
+    if zc:
+        top0=zc[0]; paid0=cheapest_at_least(top0['score'])
+        rule('A $0 configuration is a real price but not a free lunch: check rate limits, terms and identity before relying on it.',f"AA lists {len(zc)} scored $0 configurations: "+'; '.join(f"{z['name']} {z['score']:.2f}" for z in zc)+f". The best of them ({top0['score']:.2f}) is matched by a paid configuration at {_money(paid0['cost']) if paid0 else 'n/a'} ({_label(paid0) if paid0 else 'n/a'}).")
+    # 9 free routes
+    fm=free['models']
+    if fm:
+        b=fm[0]; pc=b['cheapest_paid_at_least']
+        rule('Use free routes for bounded, verifiable work; they top out well below the paid frontier.',f"{len(fm)} free-route models have a measured score ({free['route_count']} free catalog entries in total). Best: {b['model']} at {b['score']:.2f}{' (identity unverified)' if 'unverified' in b['how'] else ''} ({free['best_free_share_of_top']*100:.0f}% of the top frontier score {free['top_score']:.2f}); the cheapest paid configuration at or above it is {_label_dict(pc)}. See docs/free-routes.md.")
+    # 10 cost basis
+    ratios,cf,priors_api=_prior_ratio_rows()
+    if ratios:
+        labs=sorted(ratios.items(),key=lambda x:-x[1])
+        rule('Never mix cost bases: Priors subscription-equivalent costs sit below API workload costs by a lab-dependent factor.',"Median Priors API to subscription cost ratio by lab: "+', '.join(f"{l} {v:.1f}x" for l,v in labs)+'. ARDF costs are API workload costs.')
+    # 11 source deltas
+    deltas=ana_priors_deltas(cp,cf,priors_api)
+    if deltas['matched']:
+        rule('Keep each comparison within one source and one cost basis, even though ARDF and Priors scores agree closely.',f"On {deltas['matched']} of {deltas['priors_rows']} Priors API rows the independently recomputed ARDF score differs from Priors by a median {deltas['median_abs_score_delta']:.4f} and at most {deltas['max_abs_score_delta']:.4f} points; API cost differs by a median {deltas['median_abs_cost_delta']:.4f} and at most {deltas['max_abs_cost_delta']:.4f} USD per task. Exact table: docs/priors-deltas.md.")
+    # 12 unscored
+    uns=[r for r in rows if r['score'] is None]
+    rule('No score is not a low score; it means the benchmark set is incomplete.',f"{len(uns)} of {len(rows)} primary configurations have no complete 10-benchmark score and are not ranked; they are listed on the dashboard's unscored shelf.")
+    if len(rules)>MAX_RULES: raise RuntimeError('too many routing rules')
+    return {'rules':rules,'full_frontier':{'frontier':[{**{k:r[k] for k in ('id','name','provider','effort','score','cost')}} for r in frontier],'by_provider':provider_frontiers,'pool_size':len(pool)},'free':free,'priors_deltas':deltas}
+
+def _label_dict(d):
+    return f"{d['name']} at {_money(d['cost'])} ({d['score']:.2f})" if d else 'none (no paid configuration scores that high)'
+
+def ana_priors_deltas(cp, cf, priors_api):
+    """Exact ARDF minus Priors (API basis) score and cost differences, from current_frontier's own identity matching.
+
+    Priors never enters ARDF scores; this only reports how the independent recomputation differs from it.
+    """
+    comps=cf.build()['comparisons']
+    out=[]
+    for c in comps:
+        if not c['matched'] or c['score_delta'] is None: continue
+        out.append({'name':c['name'],'match':'exact identity','ardf_score':c['ardf_score'],'priors_score':c['priors_score'],'delta':c['score_delta'],'ardf_cost':c['ardf_cost'],'priors_cost':c['priors_cost'],'cost_delta':c['cost_delta']})
+    # Second pass, flagged: Priors rows whose model name embeds the effort (for example "Muse Ember (Xhigh)") fail the strict
+    # identity; match them on the name without its trailing parenthetical plus the effort, only when that is unambiguous.
+    strip=lambda s:re.sub(r'\s*\([^)]*\)\s*$','',s)
+    eff=lambda e:'none' if e in (None,'','default') else str(e).lower()
+    loose=defaultdict(list)
+    for r in cp['rows']:
+        if r['score'] is not None: loose[_norm_key(strip(r['name']))+'@'+eff(r['effort'])].append(r)
+    prior_by_name={p['name']:p for p in priors_api}
+    for c in comps:
+        if c['matched']: continue
+        p=prior_by_name.get(c['name'])
+        if not p or p['score'] is None: continue
+        hits=loose.get(_norm_key(strip(p['model']))+'@'+eff(p['effort']),[])
+        if len(hits)!=1: continue
+        a=hits[0]
+        out.append({'name':c['name'],'match':'loose name plus effort (identity unverified)','ardf_score':a['score'],'priors_score':p['score'],'delta':a['score']-p['score'],'ardf_cost':a['cost'],'priors_cost':p['cost'],'cost_delta':(a['cost']-p['cost']) if a['cost'] is not None and p['cost'] is not None else None})
+    out.sort(key=lambda d:(-abs(d['delta']),d['name']))
+    cd=[abs(d['cost_delta']) for d in out if d['cost_delta'] is not None]
+    matched_names={d['name'] for d in out}
+    unmatched=[c['name'] for c in comps if c['name'] not in matched_names]
+    return {'priors_rows':len(comps),'matched':len(out),'exact':sum(1 for d in out if d['match']=='exact identity'),'unmatched':unmatched,'rows':out,
+        'median_abs_score_delta':_median([abs(d['delta']) for d in out]) if out else None,
+        'max_abs_score_delta':max((abs(d['delta']) for d in out),default=None),
+        'median_abs_cost_delta':_median(cd) if cd else None,'max_abs_cost_delta':max(cd,default=None),
+        'largest':out[0] if out else None}
+
+def render_routing_docs(routing, cp):
+    stamp=f"Generated {TODAY} by `calibrate.py` from `sources/current/` (AA snapshot {str(cp['retrieved_at'])[:10]}). Do not edit by hand."
+    L=['# ARDF routing rules of thumb','',stamp,'',
+       'Short list. Every rule cites the data behind it. Scores are the AA v4.2 composite recomputed by ARDF; costs are AA workload costs per task in USD, not subscription bills. Starting hypotheses, not guarantees: verify availability, quota and terms at dispatch, and check a rule on your own task before relying on it.','']
+    for r in routing['rules']:
+        L+=[f"{r['n']}. **{r['rule']}**  ",f"   Data: {r['data']}"]
+    L+=['','Related: `docs/full-frontier.md` (every frontier), `docs/free-routes.md` (free routes), `pareto-frontier-cheatsheet.md` (multi-source ledger frontier), `docs/current-frontier.md` (AA vs Priors).','']
+    (ROOT/'docs/routing-rules.md').write_text('\n'.join(L),encoding='utf-8')
+    F=routing['full_frontier']
+    L=['# Full frontier for all models','',stamp,'',
+       f"Primary AA v4.2 recomputation. Pool: {F['pool_size']} configurations with a complete score and a known cost (zero cost included, unknown cost excluded). A configuration is on the frontier when no other is at least as cheap and at least as good with one strict improvement; exact ties are kept. This is the measured universe, not every model that exists.",'',
+       f"## All providers: {len(F['frontier'])} frontier configurations",'','| Cost / task | Score | Model | Provider | Effort |','|---:|---:|---|---|---|']
+    L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['provider']} | {r['effort']} |" for r in F['frontier']]
+    L+=['','## Each provider\'s own frontier','','A provider\'s frontier is computed over that provider\'s configurations only. "Global" marks members that are also on the all-provider frontier above.','']
+    for p in F['by_provider']:
+        L+=[f"### {p['provider']} ({p['scored_configurations']} scored configurations, {len(p['frontier'])} on its frontier)",'','| Cost / task | Score | Model | Effort | Global |','|---:|---:|---|---|:--:|']
+        L+=[f"| {_money(r['cost'])} | {r['score']:.2f} | {r['name']} | {r['effort']} | {'yes' if r['on_global_frontier'] else ''} |" for r in p['frontier']]
+        L+=['']
+    (ROOT/'docs/full-frontier.md').write_text('\n'.join(L),encoding='utf-8')
+    R=routing['free']
+    L=['# Free-route evaluation','',stamp,'',
+       f"Source: zero-price entries in the pinned OpenRouter, Kilo and OpenCode Zen catalogs ({R['route_count']} entries), matched to the primary AA scores by model name. A match ignores snapshot or version suffixes and is marked unverified when it does; zero listed price does not remove rate limits, privacy terms or availability changes. Scores are the AA v4.2 composite recomputed by ARDF at the model's best measured effort.",'',
+       '## Free routes with a measured score','','| Score | Model (best measured configuration) | Effort | Match | Routes | Cheapest paid configuration at or above this score | Model on frontier at its paid price |','|---:|---|---|---|---|---|:--:|']
+    for e in R['models']:
+        rts='; '.join(f"{x['surface']} `{x['route_id']}`"+(' (may train on prompts)' if x['may_train'] else '') for x in e['routes'])
+        L.append(f"| {e['score']:.2f} | {e['model']} | {e['effort']} | {e['how']} | {rts} | {_label_dict(e['cheapest_paid_at_least'])} | {'yes' if e['model_row_on_frontier'] else 'no'} |")
+    L+=['','The paid price of these models (AA workload cost per task) is: '+'; '.join(f"{e['model']} {_money(e['aa_workload_cost'])}" for e in R['models'])+'.','',
+        '## AA lists a $0 price (route not identified in the three catalogs)','','| Score | Model |','|---:|---|']
+    L+=[f"| {z['score']:.2f} | {z['name']} |" for z in R['aa_zero_cost']]
+    L+=['','## Free routes with no measured score','','No usable score exists in the pinned data, so they are not ranked. Names do not establish identity.','','| Surface | Route | Kind | Why |','|---|---|---|---|']
+    L+=[f"| {r['surface']} | `{r['route_id']}` | {r['kind']} | {r['why']} |" for r in R['unscored_routes']]
+    L+=['']
+    (ROOT/'docs/free-routes.md').write_text('\n'.join(L),encoding='utf-8')
+    D=routing['priors_deltas']
+    L=['# ARDF recomputation versus Priors: exact deltas','',stamp,'',
+       f"ARDF scores and costs are recomputed independently from the primary Artificial Analysis snapshot ({str(cp['retrieved_at'])[:10]}, {len(cp['rows'])} configurations preserved, {sum(1 for r in cp['rows'] if r['score'] is not None)} with a complete 10-benchmark score). Priors (API cost basis, snapshot in `sources/current/priors-api.json`) is a cross-check only; no Priors value enters any ARDF score or cost. Delta = ARDF minus Priors.",'',
+       f"Matched {D['matched']} of {D['priors_rows']} Priors rows ({D['exact']} by exact identity, {D['matched']-D['exact']} by a flagged loose name-plus-effort pass). Score delta: median |d| {D['median_abs_score_delta']:.6f}, max |d| {D['max_abs_score_delta']:.6f}. Priors publishes two decimals, so a score delta up to 0.005 is rounding. Cost delta (USD per task): median |d| {D['median_abs_cost_delta']:.6f}, max |d| {D['max_abs_cost_delta']:.6f}.",'',
+       '## Matched rows, largest absolute score delta first','','| Model / effort | Match | ARDF score | Priors score | Score delta | ARDF cost | Priors cost | Cost delta |','|---|---|---:|---:|---:|---:|---:|---:|']
+    fmt=lambda v:'-' if v is None else repr(float(v))
+    L+=[f"| {d['name']} | {d['match']} | {fmt(d['ardf_score'])} | {fmt(d['priors_score'])} | {fmt(d['delta'])} | {fmt(d['ardf_cost'])} | {fmt(d['priors_cost'])} | {fmt(d['cost_delta'])} |" for d in D['rows']]
+    L+=['','## Priors rows not compared','','No ARDF configuration matched, or the matched ARDF configuration has no complete score.','']+([f"- {n}" for n in D['unmatched']] or ['None.'])+['']
+    (ROOT/'docs/priors-deltas.md').write_text('\n'.join(L),encoding='utf-8')
+
 def ana_build():
     project=json.loads(CONFIG_PATH.read_text(encoding='utf-8')); policy=project['analysis']
     with CSV_PATH.open(newline='',encoding='utf-8-sig') as f:rows=list(csv.DictReader(f))
@@ -1325,6 +1615,8 @@ def ana_build():
     top_end=ana_top_end_analysis(models,rows,policy); external=ana_external_frontier_comparisons(rows)
     data={'generated_at': TODAY,'current_primary':ana_current_primary(rows),'policy':policy,'counts':{'catalog':len(models),'current_paired':sum(1 for m in models if m['current'] and m['capability'] is not None and m['cost'] is not None and m['cost']>0),'frontier':len(frontier),'near_frontier':len(near)},'frontier':frontier,'near_frontier':near,'major_near_frontier':major,'executor_top5':shortlist,'executor_t3_top5':t3_shortlist,'executor_candidates':candidates[:20],'global_value_top20':global_value[:20],'luna_effort_curve':luna_curve,'pinch_points':pinch_points[:20],'top_end':top_end,'external_frontier_comparisons':external}
     PARETO_PATH.write_text(ana_render_md(data),encoding='utf-8')
+    data['routing']=ana_routing(data['current_primary'])
+    render_routing_docs(data['routing'],data['current_primary'])
     print(json.dumps(data['counts'],indent=2))
     print('executor $/cap (unrestricted):',[(x['display_name'],round(x['cost_per_capability'],8)) for x in shortlist])
     print('executor $/cap (T3+ floor>=47):',[(x['display_name'],round(x['cost_per_capability'],8)) for x in t3_shortlist])
@@ -1531,6 +1823,25 @@ def validate_package(cal_result: dict[str,Any], analysis: dict[str,Any]) -> None
     for r in prim:
         if r['cost'] is not None and not (r['cost']>=0): raise RuntimeError('Invalid primary cost for '+r['id'])
         if r['score'] is not None and any(v is None for v in r['components'].values()): raise RuntimeError('Scored row missing a component: '+r['id'])
+    # Routing deliverables: short rules, each citing data; the full frontier must equal an independent recomputation.
+    routing=analysis.get('routing') or {}
+    rl=routing.get('rules') or []
+    if not (1<=len(rl)<=MAX_RULES): raise RuntimeError(f'Routing rules must number 1 to {MAX_RULES}, found {len(rl)}')
+    if any(not r.get('data') for r in rl): raise RuntimeError('Every routing rule must cite data')
+    sys_path_added=False
+    import sys
+    if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT)); sys_path_added=True
+    try: import current_frontier as _cf
+    finally:
+        if sys_path_added: sys.path.remove(str(ROOT))
+    expected={r['id'] for r in _cf.frontier(prim)}
+    got={r['id'] for r in routing.get('full_frontier',{}).get('frontier',[])}
+    if expected!=got: raise RuntimeError('Full frontier differs from current_frontier.frontier(): '+str(sorted(expected^got))[:200])
+    for doc in ('routing-rules.md','full-frontier.md','free-routes.md','priors-deltas.md'):
+        if not (ROOT/'docs'/doc).exists(): raise RuntimeError('Missing generated document docs/'+doc)
+    if not routing.get('free',{}).get('models'): raise RuntimeError('Free-route evaluation matched no scored model')
+    if routing.get('priors_deltas',{}).get('max_abs_score_delta',1)>0.0051:
+        import sys as _s; print('WARNING: ARDF recomputation differs from the pinned Priors snapshot by more than its two-decimal rounding; see docs/priors-deltas.md',file=_s.stderr)
     csv_primary=sum(1 for r in csv.DictReader(CSV_PATH.open(newline='',encoding='utf-8-sig')) if r.get('source_id')==PRIMARY_SOURCE_ID and r.get('record_type')=='catalog')
     if csv_primary!=len(prim): raise RuntimeError(f'Primary catalog rows in CSV ({csv_primary}) differ from the embedded payload ({len(prim)})')
     dash=DASHBOARD_PATH.read_text(encoding='utf-8')
