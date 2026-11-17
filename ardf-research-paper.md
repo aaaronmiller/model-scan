@@ -1853,8 +1853,8 @@ A single model configuration has two distinct marginal cost coordinates dependin
 |---|---|---|---|---|
 | **Architecture, Judicial Audit, Hard Verification** | **T1 (`>= 60`)** | `Claude Fable 5.2 (High)` (`61.82`, `$9.08`) or `Gemini 4 Carbon (High)` (`60.02`, `$7.76`) | `Claude Fable 5.2 (Max)` (`64.56`) / `Claude Fable 5.2 (Xhigh)` (`62.22`) | `Kimi K3.1 Pro` (`46.43`, `$3.68`) + multi-sample verification |
 | **Complex Multi-File Implementation & Refactoring** | **T2 (`56 to 59.9`)** | `Claude Fable 5.2 (Medium)` (`56.37`, `$3.80`) or `Claude Opus 5.5 (Xhigh)` (`57.29`, `$6.05`) | `Claude Opus 5.5 (Max)` (`58.95`) or `GPT-6 Astra (Max)` (`56.85`) | `Kimi K3.1 Pro` (`46.43`) / `Muse Wonder Full (Max)` (`50.08`) |
-| **Autonomous Subagent Fan-Out & Test Generation** | **T3 (`47 to 55.9`)** | `GPT-6.1 Sol (High)` (`50.31`, `$0.591`) or `GPT-6.1 Sol (Xhigh)` (`52.43`, `$0.764`) | `GPT-6.1 Sol (Max)` (`54.54`) or `GPT-6.1 Terra (Max)` (`51.32`, `$0.961`) | `DeepSeek V4.1 Flash 1017 (Max)` (`32.59`, `$0.602`) |
-| **Fast CLI Triage, Schema Extraction, Batch Loops** | **T4 (`< 47`)** | `GPT-6.1 Terra (Medium)` (`38.15`, `$0.169`), `Muse Ember (Max)` (`36.02`, `$0.136`), or `GPT-6 Luna (Low)` (`9.67`, `$0.0051`) | `Claude Haiku 5.5 (Low)` (`18.64`, `$0.044`) or `GPT-6.1 Terra (Low)` (`29.42`, `$0.071`) | `K2 Horizon 375B A23B` (`17.73`, `$0.00`) / `Granite 4.2 8B` (`5.10`, `$0.040`) |
+| **Autonomous Subagent Fan-Out & Test Generation** | **T3 (`47 to 55.9`)** | `GPT-6.1 Sol (High)` (`50.31`, `$0.591`) or `GPT-6.1 Sol (Xhigh)` (`52.43`, `$0.764`) | `GPT-6.1 Sol (Max)` (`54.54`) or `GPT-6.1 Terra (Max)` (`51.32`, `$0.961`) | `DeepSeek V4.1 Flash 1017 (Max)` (`32.59` is a ceiling, `18.51` to `32.59` by effort, `$0.602` metered; the free-route catalog states no default effort, see `docs/free-routes.md`) |
+| **Fast CLI Triage, Schema Extraction, Batch Loops** | **T4 (`< 47`)** | `GPT-6.1 Terra (Medium)` (`38.15`, `$0.169`), `Muse Ember (Max)` (`36.02`, `$0.136`), or `GPT-6 Luna (Low)` (`9.67`, `$0.0051`) | `Claude Haiku 5.5 (Low)` (`18.64`, `$0.044`) or `GPT-6.1 Terra (Low)` (`29.42`, `$0.071`) | `Granite 4.2 8B` (`5.10`, `$0.040`); `K2 Horizon 375B A23B` (`17.73`) only if you can confirm its price, because AA's `$0` is unverified (no route in the pinned catalogs) |
 
 ## D.3 Zero-Cost and Provisional Free-Tier Candidates
 
@@ -1862,8 +1862,8 @@ The ARDF ledger separates **verified v4.2 `$0`-cost models** from **provisional 
 
 | Candidate Model | Provider / Route | Verified v4.2 Capability | Task Cost | Status & Routing Guidance |
 |---|---|---:|---:|---|
-| `K2 Horizon 375B A23B` | Moonshot / Open-weights | `17.73` | `$0.00` | **Verified v4.2 `$0` point** (`docs/current-frontier.md`). High-capacity MoE (`375B` total, `23B` active) suitable for zero-spend batch synthesis. |
-| `North Mini Code` | Cohere / North | `3.42` | `$0.00` | **Verified v4.2 `$0` point** (`docs/current-frontier.md`). Lightweight code completion utility. |
+| `K2 Horizon 375B A23B` | Moonshot / Open-weights | `17.73` | AA lists `$0` | **Unverified `$0`** (REC-04 finding 1): no route with this name exists in the pinned OpenRouter, Kilo or OpenCode Zen catalogs, so it is held out of dominance and listed in its own band (`docs/current-frontier.md`, `docs/free-routes.md`). Do not plan zero-spend work on it until a price or route is confirmed. |
+| `North Mini Code` | Cohere / North | `3.42` | `$0.00` | **Verified free**: a same-name free route is listed (`cohere/north-mini-code:free` on OpenRouter and Kilo), so the `$0` counts in dominance and it is on the all-provider frontier (`docs/full-frontier.md`). The score assumes the route runs AA's measured configuration. Lightweight code completion utility. |
 | `Muse Wonder Full (Max)` | Meta (Open-weights preview) | `50.08` | Unpriced | **Verified v4.2 T3 capability (`50.08`)** on the unpriced shelf; top candidate when hosted on flat-rate or internal GPU capacity. |
 | `Nanbeige4.3-33B` | Nanbeige (Open-weights) | `20.41` | Unpriced | **Verified v4.2 T4 capability (`20.41`)** on the unpriced shelf; compact 33B open-weights model. |
 | `Gemini 3.8 Flash (Low)` | Google AI Studio | `22.55` (AA Index) | Free tier / API | Published AA Intelligence Index `22.55`; fast multimodal triage fallback. |
