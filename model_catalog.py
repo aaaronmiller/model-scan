@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -71,8 +72,16 @@ def load_cache() -> dict:
     if CACHE_PATH.exists():
         try:
             return json.loads(CACHE_PATH.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            # Keep the unreadable file for inspection instead of letting the next save
+            # overwrite it (model-scraper's rule; version-ledger idea SD-033).
+            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+            aside = CACHE_PATH.with_name(f"{CACHE_PATH.name}.corrupt.{stamp}")
+            try:
+                shutil.copy2(CACHE_PATH, aside)
+                print(f"model_catalog: unreadable cache ({exc}); kept a copy at {aside}", file=sys.stderr)
+            except OSError:
+                print(f"model_catalog: unreadable cache ({exc}); could not copy it aside", file=sys.stderr)
     return {"models": {}, "refreshed_at": None}
 
 

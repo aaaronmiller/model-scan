@@ -166,7 +166,18 @@ def _price_value(record: Mapping[str, Any], direction: str) -> Any:
     return record.get("pricing", {}).get(direction, {}).get("value")
 
 
-def diff_source_observations(previous: Mapping[str, Any], current: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _relative_change(before: Any, after: Any) -> float | None:
+    if isinstance(before, (int, float)) and isinstance(after, (int, float)) and before > 0:
+        return (after - before) / before
+    return None
+
+
+def diff_source_observations(
+    previous: Mapping[str, Any], current: Mapping[str, Any], *, significant_threshold: float = 0.10
+) -> list[dict[str, Any]]:
+    """Added, removed and price-changed events. A price change carries its relative size and is
+    significant at or above significant_threshold, or whenever a price appears, disappears or
+    leaves zero (no relative size exists then). The 10% default is model-scraper's scout rule."""
     validate_observations(previous)
     validate_observations(current)
     old = {record["api_model"]: record for record in previous["records"]}
@@ -188,6 +199,8 @@ def diff_source_observations(previous: Mapping[str, Any], current: Mapping[str, 
                         "direction": direction,
                         "before": before,
                         "after": after,
+                        "relative_change": (rel := _relative_change(before, after)),
+                        "significant": rel is None or abs(rel) >= significant_threshold,
                     }
                 )
     return events

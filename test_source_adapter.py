@@ -128,3 +128,14 @@ def test_variable_price_sentinel_is_unknown_not_a_rejected_catalog():
     with pytest.raises(SourceAdapterRejected):
         build_source_observations({"data": [{"id": "x/y", "pricing": {"prompt": "-2"}}]}, serving_provider="p",
                                   source_id="s", retrieved_at="t", source_sha256="a" * 64)
+
+
+def test_price_change_carries_relative_size_and_significance():
+    first = _document(_payload(price="1.0"))
+    small = diff_source_observations(first, _document(_payload(price="1.05"), retrieved_at="2026-08-16T12:00:00Z"))
+    big = diff_source_observations(first, _document(_payload(price="1.5"), retrieved_at="2026-08-16T12:00:00Z"))
+    assert small and all(e["significant"] is False and abs(e["relative_change"] - 0.05) < 1e-9 for e in small)
+    assert big and all(e["significant"] is True for e in big)
+    from_zero = diff_source_observations(_document(_payload(price="0")), _document(_payload(price="0.1"),
+                                         retrieved_at="2026-08-16T12:00:00Z"))
+    assert from_zero and all(e["relative_change"] is None and e["significant"] for e in from_zero)
