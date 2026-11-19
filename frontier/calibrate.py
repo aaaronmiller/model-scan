@@ -74,13 +74,19 @@ def weighted_geometric_mean(values: Iterable[tuple[float, float]]) -> float | No
 
 
 def weighted_median(values: list[tuple[float, float]]) -> float:
+    """Weighted median. When the cumulative weight lands exactly on half the total, the median
+    lies between two values and is their midpoint (the standard definition; calibration audit
+    defect 5). Prefix sums use fsum so the tie test is exact and identical on every Python."""
     ordered=sorted((v,max(w,0.0)) for v,w in values)
     total=fsum(w for _,w in ordered)
     if total<=0: return statistics.median(v for v,_ in ordered)
-    cursor=0.0
-    for value,weight in ordered:
-        cursor += weight
-        if cursor >= total/2: return value
+    weights=[w for _,w in ordered]
+    for i,(value,_) in enumerate(ordered):
+        cursor=fsum(weights[:i+1])
+        if cursor*2 == total:
+            later=[v for v,w in ordered[i+1:] if w>0]
+            return (value+later[0])/2 if later else value
+        if cursor*2 > total: return value
     return ordered[-1][0]
 
 
