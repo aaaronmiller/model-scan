@@ -101,9 +101,32 @@ No fifth state, no silent `None`. Predecessor deadlocked here.
 
 These are `unknown` explicitly, never fabricated (D2.1).
 
+## Frontier (ARDF, folded in 2026-11-19)
+
+`frontier/` is the cost-capability frontier, formerly the separate ARDF repository at
+`/home/cheta/code/ardf/ardf`. It came in with its git history (`git log -- frontier/`); the old
+repository stays in place as an archive and nothing reads it any more. Build, dashboard and
+readers are in `frontier/README.md`:
+
+```bash
+cd /home/cheta/code/model-scan/frontier && python3 calibrate.py && python3 current_frontier.py
+python3 -m http.server 8789 --bind 127.0.0.1 --directory /home/cheta/code/model-scan/frontier
+# then open http://127.0.0.1:8789/dashboard.html
+```
+
+`ardf_roles.py` and `ardf_export.py` read it; so does the capacity-watch skill
+(`frontier/data/current-comparison.csv`). The free-model ranking seam is `ardf_roles.py`
+(`NAME_TO_ID`, a name-to-route map); a later formula-only ranking should replace that map, not
+add names to it.
+
+Every earlier version of this project (model-scan-new, ARDF and its archive, model-scraper,
+MODEL-DASHOARD, the classifier papers, the v4/v5 docs) was audited on 2026-11-19: each file has
+a disposition and each idea a category in
+`/home/cheta/LIVING_DOCUMENTS/projects/model-scan/version-ledger.md`.
+
 ## Migration Note
 
-Older v5 scoring, web UI (SvelteKit), gateway, ARDF, and 33-command CLI remain in checkout as **migration evidence** but are not authority to apply a route. The new registry is the authority. Do not add model names/prices/quotas to prompts — add them to `registry.json`.
+Older v5 scoring, web UI (SvelteKit), gateway, and 33-command CLI remain in checkout as **migration evidence** but are not authority to apply a route. The new registry is the authority. Do not add model names/prices/quotas to prompts — add them to `registry.json`.
 
 ## Use When
 
