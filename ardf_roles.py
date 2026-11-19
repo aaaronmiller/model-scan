@@ -63,7 +63,8 @@ import json
 import re
 from pathlib import Path
 
-ARDF_ROOT = Path("/home/cheta/code/ardf/ardf")
+# ARDF was folded into model-scan as frontier/ on 2026-11-19.
+ARDF_ROOT = Path(__file__).resolve().parent / "frontier"
 CHEATSHEET = ARDF_ROOT / "pareto-frontier-cheatsheet.md"
 
 # Provider registry snapshot: {provider: [{id, name, vision, ...}, ...]}
@@ -147,9 +148,10 @@ def parse_frontier(path: Path = CHEATSHEET) -> list[dict]:
     """Read the strict Pareto frontier table out of the generated cheatsheet."""
     if not path.exists():
         raise SystemExit(f"ARDF cheatsheet not found: {path}\n"
-                         "Run calibrate.py in the ARDF project first.")
+                         "Run calibrate.py in model-scan/frontier first.")
     text = path.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"^## Strict current Pareto frontier\s*$(.*?)^## ",
+    # The heading gained a point count in ARDF v7.5.0 ("... frontier (21 points)").
+    m = re.search(r"^## Strict current Pareto frontier(?: \(\d+ points?\))?\s*$(.*?)^## ",
                   text, re.M | re.S)
     if not m:
         raise SystemExit("could not locate the frontier section in the cheatsheet")

@@ -67,7 +67,7 @@
     }
   },
   "x-grain": "model_key\u00d7effort\u00d7harness\u00d7source_id\u00d7metric_name\u00d7source_date",
-  "x-row-count": 5180,
+  "x-row-count": 7775,
   "x-columns": [
     "record_type",
     "observation_id",

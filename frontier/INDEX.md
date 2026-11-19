@@ -1,6 +1,6 @@
 # ARDF Consolidated Working-Set Index (v7.5.0)
 
-This is the **current canonical working package** (`/home/cheta/code/ardf/ardf`, version **7.5.0**, updated **2026-11-09**). Its immutable authoritative core contains nine required files plus the tracked presentation template (`dashboard-template.html`), the primary AA/Priors refresh utility (`current_frontier.py`), the AA vs. Priors verification ledger (`docs/current-frontier.md`), and the errata/judicial audit log (`ERRATA-and-findings.md`). All superseded historical folders, August backups, and duplicate drafts have been staged in `/home/cheta/code/ardf/ardf-archive/ready-for-deletion/`.
+This is the **current canonical working package** (`/home/cheta/code/model-scan/frontier`, version **7.5.0**, updated **2026-11-09**; folded into model-scan from `/home/cheta/code/ardf/ardf` on 2026-11-19, where the old repository stays as an archive). Its immutable authoritative core contains nine required files plus the tracked presentation template (`dashboard-template.html`), the primary AA/Priors refresh utility (`current_frontier.py`), the AA vs. Priors verification ledger (`docs/current-frontier.md`), and the errata/judicial audit log (`ERRATA-and-findings.md`). All superseded historical folders, August backups, and duplicate drafts have been staged in `/home/cheta/code/ardf/ardf-archive/ready-for-deletion/`.
 
 The governing rule for the authoritative export is one file per irreducible responsibility. An exported file exists only if merging it would blur an important boundary between evidence, executable method, machine-editable policy, visualization, operational decision output, accumulated user intent, research documentation, or package navigation.
 
@@ -18,7 +18,7 @@ The governing rule for the authoritative export is one file per irreducible resp
 | `ardf-research-paper.md` | **CURRENT RESEARCH DOCUMENT** | Overall project paper containing rationale, evidence model, calibration methodology, dispersion/6-MAD outlier handling, cost model, operational routing matrix, provisional free candidates, source acquisition manual, and release history. | Human-facing methodology/provenance belongs in a research document, not in config or code comments. |
 | `INDEX.md` | **CURRENT PACKAGE MAP** | This file. Defines the nine-file contract and maps every former v7.3 and archived artifact to its surviving responsibility. | A compact package still needs an explicit authority/status map so it does not re-fragment later. |
 
-### Supporting tracked files in `/home/cheta/code/ardf/ardf`
+### Supporting tracked files in `/home/cheta/code/model-scan/frontier`
 
 | File | Role |
 |---|---|
@@ -41,13 +41,13 @@ When artifacts disagree, use this order:
 
 ## Normal workflow
 
-Run `python3 calibrate.py` from `/home/cheta/code/ardf/ardf` after changing evidence, prices, calibration policy, or analysis policy. It updates the standardized cost fallback, calibrated columns, Pareto/tier documents, dashboard embedded payloads, and performs structural validation. `python3 calibrate.py --no-docs` recalibrates the CSV without rebuilding the human/dashboard outputs. The script is standard-library-only.
+Run `python3 calibrate.py` from `/home/cheta/code/model-scan/frontier` after changing evidence, prices, calibration policy, or analysis policy. It updates the standardized cost fallback, calibrated columns, Pareto/tier documents, dashboard embedded payloads, and performs structural validation. `python3 calibrate.py --no-docs` recalibrates the CSV without rebuilding the human/dashboard outputs. The script is standard-library-only.
 
 The rendered `dashboard.html` is rebuilt on every `python3 calibrate.py` run from `dashboard-template.html`. Presentation and integrated content edits belong in `dashboard-template.html`, never in `dashboard.html` directly.
 
 ## Disposition of the former 40-file v7.3 tree and 21 archive snapshots
 
-All historical material from `/home/cheta/code/ardf/` and `/home/cheta/code/ardf/ardf/docs/` was audited against the canonical v7.5.0 files and staged in `/home/cheta/code/ardf/ardf-archive/ready-for-deletion/` (documented in `/home/cheta/code/ardf/ardf-archive/README.md`).
+All historical material from `/home/cheta/code/ardf/` and `/home/cheta/code/ardf/ardf/docs/` (before the fold) was audited against the canonical v7.5.0 files and staged in `/home/cheta/code/ardf/ardf-archive/ready-for-deletion/` (documented in `/home/cheta/code/ardf/ardf-archive/README.md`).
 
 | Former v7.3 / Archive file | Disposition in v7.5.0 canonical package | Rationale |
 |---|---|---|
