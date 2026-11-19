@@ -1923,18 +1923,48 @@ def embed_dashboard(payload: dict[str,Any], analysis: dict[str,Any]) -> None:
     if begin not in text or end not in text:
         raise RuntimeError('dashboard-template.html is missing ARDF_DATA_BEGIN/END markers')
     block=(begin+'\n<script>\n'
-           'window.ARDF_DATA='+json.dumps(stable_json_value(payload),separators=(',',':'))+';\n'
-           'window.ARDF_ANALYSIS='+json.dumps(stable_json_value(analysis),separators=(',',':'))+';\n'
+           'window.ARDF_DATA='+script_json(stable_json_value(payload))+';\n'
+           'window.ARDF_ANALYSIS='+script_json(stable_json_value(analysis))+';\n'
            '</script>\n'+end)
     text=text[:text.index(begin)]+block+text[text.index(end)+len(end):]
     DASHBOARD_PATH.write_text(text,encoding='utf-8')
 
+
+def script_json(value) -> str:
+    """JSON safe to place inside an HTML <script> element.
+
+    The payload carries scraped model names and descriptions, so a value holding
+    '</script>' or '<!--' must not end the element early. Escaping <, > and & as
+    \\u escapes keeps the text valid JSON and valid JavaScript with the same value;
+    U+2028 and U+2029 are escaped because older JavaScript engines treat them as line ends.
+    """
+    text=json.dumps(value,separators=(',',':'))
+    return (text.replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
+                .replace('\u2028','\\u2028').replace('\u2029','\\u2029'))
+
+def embedded_dashboard_values(text: str) -> dict[str,Any]:
+    """Parse the ARDF_DATA and ARDF_ANALYSIS values back out of a rendered dashboard."""
+    begin='<!-- ARDF_DATA_BEGIN -->'; end='<!-- ARDF_DATA_END -->'
+    block=text[text.index(begin)+len(begin):text.index(end)]
+    inner=block.strip()
+    if not (inner.startswith('<script>') and inner.endswith('</script>')):
+        raise RuntimeError('embedded dashboard data is not one script element')
+    body=inner[len('<script>'):-len('</script>')]
+    if '<' in body or '>' in body:
+        raise RuntimeError('embedded dashboard data contains a raw < or >')
+    values={}
+    for line in body.strip().split('\n'):
+        name,_,rest=line.partition('=')
+        values[name.removeprefix('window.')]=json.loads(rest.rstrip(';'))
+    return values
 
 def _validate_embedded_dashboard(html_path):
     text=html_path.read_text(encoding='utf-8')
     assert 'window.ARDF_DATA' in text, 'dashboard must embed ARDF_DATA'
     assert 'window.ARDF_ANALYSIS' in text, 'dashboard must embed ARDF_ANALYSIS'
     assert 'generated/dashboard-data.js' not in text, 'refined dashboard must not depend on external generated/'
+    values=embedded_dashboard_values(text)
+    assert set(values)=={'ARDF_DATA','ARDF_ANALYSIS'}, 'dashboard must embed exactly ARDF_DATA and ARDF_ANALYSIS'
     return True
 
 def validate_package(cal_result: dict[str,Any], analysis: dict[str,Any]) -> None:
@@ -2031,6 +2061,7 @@ def main() -> None:
         analysis=ana_build()
         TIERS_PATH.write_text(render_tiers_document(analysis,result['payload']),encoding='utf-8')
         embed_dashboard(result['payload'],analysis)
+        _validate_embedded_dashboard(DASHBOARD_PATH)
         validate_package(result,analysis)
         summary.update({'frontier_count':len(analysis['frontier']),'near_frontier_count':len(analysis['near_frontier']),'working_files':9})
     print(json.dumps(summary,indent=2))
