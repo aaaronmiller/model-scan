@@ -181,3 +181,20 @@ def test_utilization_handles_an_empty_ledger(tmp_path):
     assert stats["spent"] == 0.0
     assert stats["projected_waste"] == 1.0
     assert stats["resets_at"].endswith("Z")
+
+
+def test_utilization_projects_exhaustion_before_reset(tmp_path):
+    path = tmp_path / "spend.jsonl"
+    # 2h into a 5h, 12 USD window with 9 spent: 4.5/h, so the last 3 run out 40 minutes from now.
+    sl.record_spend(ev(9.0, EPOCH + timedelta(minutes=5)), path)
+    stats = sl.utilization(WINDOW, now=NOW, epoch=EPOCH, path=path)
+    assert stats["exhausts_before_reset"] is True
+    expected = (NOW + timedelta(minutes=40)).isoformat().replace("+00:00", "Z")
+    assert stats["exhausts_at"] == expected
+
+
+def test_utilization_has_no_exhaustion_when_on_or_below_pace(tmp_path):
+    path = tmp_path / "spend.jsonl"
+    sl.record_spend(ev(0.5, EPOCH + timedelta(minutes=10)), path)
+    assert sl.utilization(WINDOW, now=NOW, epoch=EPOCH, path=path)["exhausts_at"] is None
+    assert sl.utilization(WINDOW, now=NOW, epoch=EPOCH, path=tmp_path / "none.jsonl")["exhausts_at"] is None

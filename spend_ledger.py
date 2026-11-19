@@ -310,6 +310,12 @@ def utilization(
     if window.budget > 0:
         projected_waste = max(0.0, (window.budget - projected_total) / window.budget)
 
+    exhausts_at = None
+    if rate > 0 and window.budget > 0:
+        to_empty = max(window.budget - spent, 0.0) / rate
+        if to_empty < remaining_time:
+            exhausts_at = (now + timedelta(seconds=to_empty)).isoformat().replace("+00:00", "Z")
+
     return {
         "provider": window.provider,
         "window": window.label,
@@ -322,6 +328,10 @@ def utilization(
         # is on track to be left on the table.
         "pace": round(used_fraction - time_fraction, 6),
         "projected_waste": round(projected_waste, 6),
+        # When the budget runs out at the present rate, if that is before the reset;
+        # None when nothing is being spent or the window will reset first (idea DS-048).
+        "exhausts_at": exhausts_at,
+        "exhausts_before_reset": exhausts_at is not None,
         "window_started_at": started.isoformat().replace("+00:00", "Z"),
         "resets_at": (started + window.period).isoformat().replace("+00:00", "Z"),
     }
