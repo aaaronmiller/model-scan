@@ -63,6 +63,8 @@ import json
 import re
 from pathlib import Path
 
+from free_rank.matcher import Identity, best_matches, tokens
+
 # ARDF was folded into model-scan as frontier/ on 2026-11-19.
 ARDF_ROOT = Path(__file__).resolve().parent / "frontier"
 CHEATSHEET = ARDF_ROOT / "pareto-frontier-cheatsheet.md"
@@ -80,7 +82,7 @@ AVAILABLE = Path("/home/cheta/.cache/agent-staging/available-models.json")
 #                  401 CreditsError.
 #
 # Treating the whole of opencode-zen as free was the first version's bug: it
-# made gpt-5.6-sol look free and let it win every role including the ones that
+# made a paid zen model look free and let it win every role including the ones that
 # must not carry per-call cost.
 SUBSCRIPTION_PROVIDERS = {"opencode-go"}
 
@@ -92,34 +94,40 @@ def _free_at_margin(provider: str, model_id: str) -> bool:
         return model_id.endswith("-free")
     return False
 
-# ARDF names models for publication; providers use short ids. This maps the
-# frontier's display names onto ids we can actually route to. Keep it small and
-# explicit: a fuzzy matcher here would silently mis-route a role.
-NAME_TO_ID = {
-    "MiMo-V2.5": "mimo-v2.5",
-    "GLM-5.2 (max)": "glm-5.2",
-    "GLM-4.7-Flash (Reasoning)": None,          # not carried by our providers
-    "GLM-4.7-Flash (Non-reasoning)": None,
-    "Muse Spark 1.2 (xhigh, Contributor pricing)": "muse-spark-1.2-contributor",
-    "GPT-5.6 Sol (xhigh)": "gpt-5.6-sol",
-    "GPT-5.6 Sol (max)": "gpt-5.6-sol",
-    "GPT-5.6 Luna (medium)": "gpt-5.6-luna",
-    "Kimi K3 (max)": "kimi-k3",
-    "Claude Opus 5 (medium)": None,             # reached through Claude Code, not a provider here
-    "Claude Opus 5 (xhigh)": None,
-    "GPT-5.5 (high)": None,
-    "Qwen3.5 0.8B (Non-reasoning)": None,
-    "Granite 4.0 H Small": None,
-}
+# ARDF names models for publication; providers use short ids. The frontier's display
+# names are matched onto registry ids by free_rank.matcher, from the data alone: the same
+# normalisation the free-model ranking uses (version numbers kept, effort qualifiers and
+# vendor names dropped). A name that matches no id is reported as unroutable instead of
+# guessed. The hand-kept name map this replaces went stale with each frontier release: on
+# 2026-11-19 all 21 frontier points reported "no id mapping".
+POLICY = Path(__file__).resolve().parent / "role_policy.json"
+_POLICY = json.loads(POLICY.read_text())
 
-# Subscription quota is not consumed uniformly. The provider registry labels
-# some models "(2x usage)", so they burn quota twice as fast for the same call.
-# ARDF's task_price is a dollar figure and does not capture this, so it is
-# applied on top for subscription routes.
-USAGE_MULTIPLIER = {
-    "deepseek-v4-flash": 2.0,
-    "gpt-5.6-luna": 2.0,
-}
+# Models never to assign, with the reason, so the exclusion is auditable. Data, not code.
+NEVER = _POLICY["never"]
+# Vendors whose models are reached through another harness rather than a provider route.
+NOT_ROUTED_VENDORS = _POLICY["not_routed_vendors"]
+
+# Subscription quota is not consumed uniformly. The provider registry labels some models
+# "(2x usage)", so they burn quota twice as fast for the same call. ARDF's task_price is a
+# dollar figure and does not capture this, so it is applied on top for subscription routes.
+_USAGE_LABEL = re.compile(r"\((\d+(?:\.\d+)?)x usage\)", re.I)
+
+
+def usage_multipliers(path: Path = AVAILABLE) -> dict[str, float]:
+    """model id -> quota multiplier, read from the registry's own "(Nx usage)" labels."""
+    if not path.exists():
+        return {}
+    out = {}
+    for models in json.loads(path.read_text()).values():
+        for entry in models:
+            m = _USAGE_LABEL.search(entry.get("name") or "")
+            if m and entry.get("id"):
+                out[entry["id"]] = float(m.group(1))
+    return out
+
+
+USAGE_MULTIPLIER = usage_multipliers()
 
 
 def _effective_cost(row: dict) -> float:
@@ -128,10 +136,29 @@ def _effective_cost(row: dict) -> float:
     return row["task_price"] * mult
 
 
-# Models never to assign, with the reason, so the exclusion is auditable.
-NEVER = {
-    "llama": "excluded by standing policy",
-}
+def _vendor_of(model_id: str) -> str:
+    return model_id.split("/", 1)[0] if "/" in model_id else ""
+
+
+def match_ids(name: str, vendor: str, ids) -> tuple[list[str], str]:
+    """Registry ids that name the frontier entry ``name``, with the matcher's evidence.
+
+    A candidate also matches when its only extra tokens come from the name's parenthetical
+    qualifiers (a "(... Contributor pricing)" entry matches a "-contributor" id).
+    """
+    target = [Identity(name, "name", vendor)]
+    candidates = {mid: [Identity(mid, "id", _vendor_of(mid))] for mid in ids}
+    keys, evidence = best_matches(target, candidates)
+    base = set(tokens(target[0]))
+    quals = {t for q in re.findall(r"\(([^)]*)\)", name) for t in re.split(r"[^a-z0-9]+", q.lower()) if t}
+    for mid, cand in candidates.items():
+        ct = set(tokens(cand[0], vendor))
+        if base and base < ct and (ct - base) <= quals and mid not in keys:
+            keys.append(mid)
+            evidence[mid] = (None, "qualifier", name, mid)
+    why = "; ".join(f"{k} ({evidence[k][1]})" for k in sorted(keys))
+    return sorted(keys), why
+
 
 ROLES = [
     # (role, economic class, what it does, minimum capability)
@@ -150,7 +177,7 @@ def parse_frontier(path: Path = CHEATSHEET) -> list[dict]:
         raise SystemExit(f"ARDF cheatsheet not found: {path}\n"
                          "Run calibrate.py in model-scan/frontier first.")
     text = path.read_text(encoding="utf-8", errors="replace")
-    # The heading gained a point count in ARDF v7.5.0 ("... frontier (21 points)").
+    # A later ARDF release added a point count to the heading ("... frontier (21 points)").
     m = re.search(r"^## Strict current Pareto frontier(?: \(\d+ points?\))?\s*$(.*?)^## ",
                   text, re.M | re.S)
     if not m:
@@ -198,30 +225,29 @@ def routable(frontier: list[dict], available: dict[str, list[str]]) -> list[dict
     """Keep only frontier entries we can actually reach, and attach routing."""
     out = []
     for row in frontier:
-        mid = NAME_TO_ID.get(row["name"], "__unmapped__")
-        if mid is None:
-            row["skip"] = "not carried by any configured provider"
+        if row.get("vendor") in NOT_ROUTED_VENDORS:
+            row["skip"] = NOT_ROUTED_VENDORS[row["vendor"]]
             out.append(row)
             continue
-        if mid == "__unmapped__":
-            row["skip"] = "no id mapping; add one to NAME_TO_ID"
+        ids, why = match_ids(row["name"], row.get("vendor", ""), available)
+        row["match"] = why
+        if not ids:
+            row["skip"] = "no registry id matches this name"
             out.append(row)
             continue
-        if any(bad in mid.lower() for bad in NEVER):
-            row["skip"] = NEVER[next(b for b in NEVER if b in mid.lower())]
+        banned = [b for b in NEVER if any(b in i.lower() for i in ids)]
+        if banned:
+            row["skip"] = NEVER[banned[0]]
             out.append(row)
             continue
-        providers = available.get(mid, [])
-        if not providers:
-            row["skip"] = f"id {mid} absent from the provider registry"
-            out.append(row)
-            continue
-        # Prefer a route that is free at the margin.
-        free_routes = [p for p in providers if _free_at_margin(p, mid)]
-        chosen = (free_routes or providers)[0]
-        row["model_id"] = mid
-        row["providers"] = providers
-        row["route"] = f"{chosen}/{mid}"
+        # Several ids can name one release (org/model and model, :free and plain). Prefer a
+        # route that is free at the margin, then an id without a :variant suffix.
+        pairs = [(p, i) for i in ids for p in available[i]]
+        free_routes = [(p, i) for p, i in pairs if _free_at_margin(p, i)]
+        chosen = sorted(free_routes or pairs, key=lambda pi: (":" in pi[1], len(pi[1]), pi))[0]
+        row["model_id"] = chosen[1]
+        row["providers"] = sorted({p for p, _ in pairs})
+        row["route"] = f"{chosen[0]}/{chosen[1]}"
         row["free_at_margin"] = bool(free_routes)
         row["skip"] = None
         out.append(row)

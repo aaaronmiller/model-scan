@@ -41,9 +41,9 @@ Then open `http://127.0.0.1:8789/dashboard.html`. The page embeds its data and w
 | `../ardf_export.py`, `../test_ardf_export.py` | the authoritative files and schemas, as a bound export |
 | `capacity-watch` skill, `scripts/free-catalog.py` | `data/current-comparison.csv` |
 
-Model names in `../ardf_roles.py` (`NAME_TO_ID`) and in `project-config.json` are data the
-ranking reads, not formula. The later formula-only free-model ranking (masterplan packet L5)
-should replace the name map with matching from the provider catalogs.
+Model names in `project-config.json` are data the ranking reads, not formula. `../ardf_roles.py`
+no longer keeps a name map: it matches frontier names to registry ids with
+`../free_rank/matcher.py`, the matcher of the formula-only free-model ranking.
 
 ## Layout
 

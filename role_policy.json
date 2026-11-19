@@ -1,0 +1,9 @@
+{
+  "_comment": "Role-assignment policy read by ardf_roles.py. Moved out of code on 2026-11-19 so ardf_roles.py holds no model names. not_routed_vendors carries the reason the retired NAME_TO_ID map gave for mapping every Claude entry to no route.",
+  "never": {
+    "llama": "excluded by standing policy"
+  },
+  "not_routed_vendors": {
+    "Anthropic": "reached through Claude Code, not a provider here"
+  }
+}
