@@ -1,0 +1,14 @@
+{
+  "retrieved_at": "2026-11-10T00:14:51.281186+00:00",
+  "primary_url": "https://artificialanalysis.ai/models",
+  "primary_method": "Public page model payload; same manifest decoder as the public browser client. No Priors data used to produce primary scores.",
+  "priors_url": "https://mypriors.com/api/tools/query_data",
+  "sha256": {
+    "priors-api.json": "2cf9da47d766f14164ce4d604d1118fb8f1a620fccb6c98437c5dd39c675d16a",
+    "priors-subscription.json": "9275effd7e96bb9bc2230c75ec389a8eff04fb67e0726b5df134b9d7e0e6aaba",
+    "openrouter-catalog.json.gz": "e7be88f45430933213f68edd639e3898844197b3bcad6f3e5d9563325d65a1b2",
+    "kilo-catalog.json.gz": "28a413d8ff26726561414022d61b181b062b1cf5c9377ba1831517ba3e1904f6",
+    "zen-catalog.json.gz": "3d28db48989b5918f705631ac6e934e23da5628a5e654722db4700510ca5a4ed",
+    "aa-primary.json.gz": "b3df7f21f2ae855586393d696c1c54199e90b1e11c2e9813f0368ba3d5058a0e"
+  }
+}
