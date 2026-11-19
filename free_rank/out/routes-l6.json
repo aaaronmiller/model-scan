@@ -1,0 +1,461 @@
+[
+  {
+    "rank": 1,
+    "tier": 1,
+    "model": "DeepSeek V4.1 Flash Free",
+    "gateway": "opencode-zen",
+    "route_id": "deepseek-v4.1-flash-free",
+    "omp": "opencode-zen/deepseek-v4.1-flash-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/deepseek-v4.1-flash-free",
+    "kilo": null,
+    "limit_tags": []
+  },
+  {
+    "rank": 2,
+    "tier": 1,
+    "model": "Baidu: ERNIE-5.5-Flash-Preview (free)",
+    "gateway": "kilo",
+    "route_id": "baidu/ernie-5.5-flash-preview:free",
+    "omp": "kilo/baidu/ernie-5.5-flash-preview:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "baidu/ernie-5.5-flash-preview:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 2,
+    "tier": 1,
+    "model": "Baidu: ERNIE-5.5-Flash-Preview (free)",
+    "gateway": "openrouter",
+    "route_id": "baidu/ernie-5.5-flash-preview:free",
+    "omp": "openrouter/baidu/ernie-5.5-flash-preview:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/baidu/ernie-5.5-flash-preview:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 3,
+    "tier": 1,
+    "model": "Inkling 2 Small Free",
+    "gateway": "opencode-zen",
+    "route_id": "inkling-2-small-free",
+    "omp": "opencode-zen/inkling-2-small-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/inkling-2-small-free",
+    "kilo": null,
+    "limit_tags": [
+      "limited"
+    ]
+  },
+  {
+    "rank": 4,
+    "tier": 1,
+    "model": "MiMo-V2.6-Flash Free",
+    "gateway": "opencode-zen",
+    "route_id": "mimo-v2.6-flash-free",
+    "omp": "opencode-zen/mimo-v2.6-flash-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/mimo-v2.6-flash-free",
+    "kilo": null,
+    "limit_tags": []
+  },
+  {
+    "rank": 5,
+    "tier": 1,
+    "model": "LongCat 2.5 Free",
+    "gateway": "opencode-go",
+    "route_id": "longcat-2.5-free",
+    "omp": "opencode-go/longcat-2.5-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode-go/longcat-2.5-free",
+    "kilo": null,
+    "limit_tags": [
+      "zero-retention"
+    ]
+  },
+  {
+    "rank": 5,
+    "tier": 1,
+    "model": "LongCat 2.5 Free",
+    "gateway": "opencode-zen",
+    "route_id": "longcat-2.5-free",
+    "omp": "opencode-zen/longcat-2.5-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/longcat-2.5-free",
+    "kilo": null,
+    "limit_tags": [
+      "zero-retention"
+    ]
+  },
+  {
+    "rank": 6,
+    "tier": 2,
+    "model": "Hy4 flash Free",
+    "gateway": "opencode-go",
+    "route_id": "hy4-flash-free",
+    "omp": "opencode-go/hy4-flash-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode-go/hy4-flash-free",
+    "kilo": null,
+    "limit_tags": [
+      "zero-retention"
+    ]
+  },
+  {
+    "rank": 6,
+    "tier": 2,
+    "model": "Hy4 flash Free",
+    "gateway": "opencode-zen",
+    "route_id": "hy4-flash-free",
+    "omp": "opencode-zen/hy4-flash-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/hy4-flash-free",
+    "kilo": null,
+    "limit_tags": [
+      "zero-retention"
+    ]
+  },
+  {
+    "rank": 7,
+    "tier": 2,
+    "model": "Beam Free",
+    "gateway": "kilo",
+    "route_id": "reflection/beam-free",
+    "omp": "kilo/reflection/beam-free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "reflection/beam-free",
+    "limit_tags": [
+      "region-restricted",
+      "sharing"
+    ]
+  },
+  {
+    "rank": 7,
+    "tier": 2,
+    "model": "Beam Free",
+    "gateway": "opencode-go",
+    "route_id": "beam-free",
+    "omp": "opencode-go/beam-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode-go/beam-free",
+    "kilo": null,
+    "limit_tags": [
+      "region-restricted",
+      "sharing"
+    ]
+  },
+  {
+    "rank": 7,
+    "tier": 2,
+    "model": "Beam Free",
+    "gateway": "opencode-zen",
+    "route_id": "beam-free",
+    "omp": "opencode-zen/beam-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/beam-free",
+    "kilo": null,
+    "limit_tags": [
+      "region-restricted",
+      "sharing"
+    ]
+  },
+  {
+    "rank": 8,
+    "tier": 2,
+    "model": "Dots Studio: Dots3-Note Preview (free)",
+    "gateway": "kilo",
+    "route_id": "dots-studio/dots-3-note-preview:free",
+    "omp": "kilo/dots-studio/dots-3-note-preview:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "dots-studio/dots-3-note-preview:free",
+    "limit_tags": [
+      "expires",
+      "sharing"
+    ]
+  },
+  {
+    "rank": 8,
+    "tier": 2,
+    "model": "Dots Studio: Dots3-Note Preview (free)",
+    "gateway": "openrouter",
+    "route_id": "dots-studio/dots-3-note-preview:free",
+    "omp": "openrouter/dots-studio/dots-3-note-preview:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/dots-studio/dots-3-note-preview:free",
+    "kilo": null,
+    "limit_tags": [
+      "expires",
+      "sharing"
+    ]
+  },
+  {
+    "rank": 9,
+    "tier": 2,
+    "model": "Flint 40B Free",
+    "gateway": "kilo",
+    "route_id": "recursive/flint-v1.0:free",
+    "omp": "kilo/recursive/flint-v1.0:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "recursive/flint-v1.0:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 9,
+    "tier": 2,
+    "model": "Flint 40B Free",
+    "gateway": "opencode-zen",
+    "route_id": "flint-40b-free",
+    "omp": "opencode-zen/flint-40b-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/flint-40b-free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 9,
+    "tier": 2,
+    "model": "Flint 40B Free",
+    "gateway": "openrouter",
+    "route_id": "recursive/flint-v1.0:free",
+    "omp": "openrouter/recursive/flint-v1.0:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/recursive/flint-v1.0:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 10,
+    "tier": 2,
+    "model": "NVIDIA: Nemotron 3 Ultra (free)",
+    "gateway": "kilo",
+    "route_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "omp": "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 10,
+    "tier": 2,
+    "model": "NVIDIA: Nemotron 3 Ultra (free)",
+    "gateway": "openrouter",
+    "route_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "omp": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 11,
+    "tier": 2,
+    "model": "Google: Gemma 4 26B A4B  (free)",
+    "gateway": "openrouter",
+    "route_id": "google/gemma-4-26b-a4b-it:free",
+    "omp": "openrouter/google/gemma-4-26b-a4b-it:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/google/gemma-4-26b-a4b-it:free",
+    "kilo": null,
+    "limit_tags": []
+  },
+  {
+    "rank": 12,
+    "tier": 2,
+    "model": "Nemotron 3.5 Super VL Free",
+    "gateway": "kilo",
+    "route_id": "nvidia/nemotron-3.5-super-vl:free",
+    "omp": "kilo/nvidia/nemotron-3.5-super-vl:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "nvidia/nemotron-3.5-super-vl:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 12,
+    "tier": 2,
+    "model": "Nemotron 3.5 Super VL Free",
+    "gateway": "opencode-zen",
+    "route_id": "nemotron-3.5-super-vl-free",
+    "omp": "opencode-zen/nemotron-3.5-super-vl-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/nemotron-3.5-super-vl-free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 12,
+    "tier": 2,
+    "model": "Nemotron 3.5 Super VL Free",
+    "gateway": "openrouter",
+    "route_id": "nvidia/nemotron-3.5-super-vl:free",
+    "omp": "openrouter/nvidia/nemotron-3.5-super-vl:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/nvidia/nemotron-3.5-super-vl:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 13,
+    "tier": 3,
+    "model": "NVIDIA: Nemotron 3 Nano Omni (free)",
+    "gateway": "kilo",
+    "route_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "omp": "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 13,
+    "tier": 3,
+    "model": "NVIDIA: Nemotron 3 Nano Omni (free)",
+    "gateway": "openrouter",
+    "route_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "omp": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 14,
+    "tier": 3,
+    "model": "Google: Gemma 4 31B (free)",
+    "gateway": "openrouter",
+    "route_id": "google/gemma-4-31b-it:free",
+    "omp": "openrouter/google/gemma-4-31b-it:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/google/gemma-4-31b-it:free",
+    "kilo": null,
+    "limit_tags": []
+  },
+  {
+    "rank": 15,
+    "tier": 3,
+    "model": "Nemotron 3.5 Lightning Free",
+    "gateway": "kilo",
+    "route_id": "nvidia/nemotron-3.5-lightning:free",
+    "omp": "kilo/nvidia/nemotron-3.5-lightning:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "nvidia/nemotron-3.5-lightning:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 15,
+    "tier": 3,
+    "model": "Nemotron 3.5 Lightning Free",
+    "gateway": "opencode-zen",
+    "route_id": "nemotron-3.5-lightning-free",
+    "omp": "opencode-zen/nemotron-3.5-lightning-free",
+    "omp_provider_configured": true,
+    "opencode": "opencode/nemotron-3.5-lightning-free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 15,
+    "tier": 3,
+    "model": "Nemotron 3.5 Lightning Free",
+    "gateway": "openrouter",
+    "route_id": "nvidia/nemotron-3.5-lightning:free",
+    "omp": "openrouter/nvidia/nemotron-3.5-lightning:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/nvidia/nemotron-3.5-lightning:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 16,
+    "tier": 4,
+    "model": "Cohere: North Mini Code (free)",
+    "gateway": "kilo",
+    "route_id": "cohere/north-mini-code:free",
+    "omp": "kilo/cohere/north-mini-code:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "cohere/north-mini-code:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 16,
+    "tier": 4,
+    "model": "Cohere: North Mini Code (free)",
+    "gateway": "openrouter",
+    "route_id": "cohere/north-mini-code:free",
+    "omp": "openrouter/cohere/north-mini-code:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/cohere/north-mini-code:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 17,
+    "tier": 4,
+    "model": "LiquidAI: LFM3-1.7B (free)",
+    "gateway": "kilo",
+    "route_id": "liquid/lfm-3-1.7b:free",
+    "omp": "kilo/liquid/lfm-3-1.7b:free",
+    "omp_provider_configured": false,
+    "opencode": null,
+    "kilo": "liquid/lfm-3-1.7b:free",
+    "limit_tags": [
+      "sharing"
+    ]
+  },
+  {
+    "rank": 17,
+    "tier": 4,
+    "model": "LiquidAI: LFM3-1.7B (free)",
+    "gateway": "openrouter",
+    "route_id": "liquid/lfm-3-1.7b:free",
+    "omp": "openrouter/liquid/lfm-3-1.7b:free",
+    "omp_provider_configured": true,
+    "opencode": "openrouter/liquid/lfm-3-1.7b:free",
+    "kilo": null,
+    "limit_tags": [
+      "sharing"
+    ]
+  }
+]

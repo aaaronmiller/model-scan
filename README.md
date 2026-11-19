@@ -115,9 +115,51 @@ python3 -m http.server 8789 --bind 127.0.0.1 --directory /home/cheta/code/model-
 ```
 
 `ardf_roles.py` and `ardf_export.py` read it; so does the capacity-watch skill
-(`frontier/data/current-comparison.csv`). The free-model ranking seam is `ardf_roles.py`
-(`NAME_TO_ID`, a name-to-route map); a later formula-only ranking should replace that map, not
-add names to it.
+(`frontier/data/current-comparison.csv`). `ardf_roles.py` matches frontier names to registry
+ids with `free_rank.matcher` (no name map); its exclusions live in `role_policy.json` and its
+quota multipliers come from the registry's own "(Nx usage)" labels.
+
+## Free model ranking
+
+`free_rank/` ranks the free models on OpenCode Zen, OpenCode Go, Kilo and OpenRouter purely
+by formula from benchmark data. One command fetches a dated snapshot and writes the ranking:
+
+```bash
+cd /home/cheta/code/model-scan
+python3 -m free_rank --refresh          # fetch catalogues and benchmark pages, then rank
+python3 -m free_rank                    # rank from the latest snapshot, no network
+python3 -m free_rank --compare /home/cheta/LIVING_DOCUMENTS/projects/masterplan/sources/free-model-tiers-2026-11-19/tiers.md \
+  --change "what changed in config.json"   # also measure agreement and log the iteration
+```
+
+How it works, with every constant in `free_rank/config.json`:
+
+1. **Discovery.** Each catalogue's own pricing fields decide "free": Zen and Go price every
+   `cost` field at zero; Kilo sets `isFree` and zero prompt and completion prices; OpenRouter
+   (all modalities) prices every `pricing` field at zero. Non-chat routes (video, rerank,
+   embeddings, decisions) and routers are inventoried but not ranked.
+2. **Benchmarks.** Live adapters read Artificial Analysis (leaderboard and coding-agent index),
+   Vals Terminal-Bench 4, the Terminal-Bench board and KiloBench. Raw fetches are cached gzip
+   in `free_rank/snapshots/<date>/` with URL, time, status and sha256. Publisher tables that
+   exist only as images come from the transcribed evidence file
+   `free_rank/evidence/l1-free-models-2026-11-19.json` (benchmark records only; its tiers are
+   never read). A source host already read live for a model is not counted twice.
+3. **Matching.** `free_rank/matcher.py` matches catalogue ids, canonical ids, weights repos and
+   names after one normalisation; version numbers are kept, so different versions never match.
+4. **Score.** Independent results win over publisher results; publisher-only values are
+   discounted and count less as evidence. Each benchmark is normalised across the ranked pool,
+   each family (agentic coding, repository repair, general agent) is a weighted mean shrunk
+   toward a prior, so a missing benchmark lowers confidence instead of scoring zero, and the
+   families are mixed by fixed weights plus a small log-scaled context bonus. Tiers are shares
+   of the top score with minimum evidence and tool support. Limit tags (limited, sharing,
+   region, expiry, zero retention) are reported, never scored.
+
+Outputs in `free_rank/out/`: `ranking.json` and `ranking.md` (tiers, order, per-model score
+breakdown with sources), `routes-l6.json` and `routes-l6.md` (omp, OpenCode and Kilo selectors
+per route), and with `--compare`, `agreement.md` plus the iteration log
+`agreement-iterations.jsonl` / `.md`. `tests/test_free_rank.py` fails if any module in
+`free_rank/` or `ardf_roles.py` contains a model name from the evidence inventory or a
+version-like literal.
 
 Every earlier version of this project (model-scan-new, ARDF and its archive, model-scraper,
 MODEL-DASHOARD, the classifier papers, the v4/v5 docs) was audited on 2026-11-19: each file has

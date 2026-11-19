@@ -1,0 +1,74 @@
+{
+  "catalogue-kilo": {
+    "bytes": 633900,
+    "fetched_at": "2026-11-19T16:31:13+00:00",
+    "file": "catalogue-kilo.gz",
+    "sha256": "e33ed6232a16fb82a6e9881f5ac9e8e08a9bdb501e39252353a8dddb5142a570",
+    "status": 200,
+    "url": "https://ai-gateway.kilo.ai/api/v1/models"
+  },
+  "catalogue-opencode-go": {
+    "bytes": 42054,
+    "fetched_at": "2026-11-19T16:31:13+00:00",
+    "file": "catalogue-opencode-go.gz",
+    "sha256": "5cafe42ac6179a8e758ea09ec312835a18a04b3c0e2cb7fea6ff0bcef43a451d",
+    "status": 200,
+    "url": "https://opencode.ai/inference/go/v1/models"
+  },
+  "catalogue-opencode-zen": {
+    "bytes": 119660,
+    "fetched_at": "2026-11-19T16:31:12+00:00",
+    "file": "catalogue-opencode-zen.gz",
+    "sha256": "db22c81e2661ad02538052de90d10102883fb8c537dfc5db9735f19189f511b9",
+    "status": 200,
+    "url": "https://opencode.ai/inference/openai/v1/models"
+  },
+  "catalogue-openrouter": {
+    "bytes": 1222165,
+    "fetched_at": "2026-11-19T16:31:14+00:00",
+    "file": "catalogue-openrouter.gz",
+    "sha256": "f49e7fc3831f399f023548fc9dcd1e76d7eceab098b53ae686c83340f1f1ff4b",
+    "status": 200,
+    "url": "https://openrouter.ai/api/v1/models?output_modalities=all"
+  },
+  "source-aa-coding-agents": {
+    "bytes": 978275,
+    "fetched_at": "2026-11-19T16:31:14+00:00",
+    "file": "source-aa-coding-agents.gz",
+    "sha256": "a531507ff18b045c891008a65af25ad91004a8ff80510bf3814533a8e83eeb8e",
+    "status": 200,
+    "url": "https://artificialanalysis.ai/agents/coding-agents?routers=true"
+  },
+  "source-aa-leaderboard": {
+    "bytes": 1433095,
+    "fetched_at": "2026-11-19T16:31:14+00:00",
+    "file": "source-aa-leaderboard.gz",
+    "sha256": "5a5f0921849775bc2f9bdcb211428ff35537dc98188b202e0e596b81715eda90",
+    "status": 200,
+    "url": "https://artificialanalysis.ai/leaderboards/models"
+  },
+  "source-kilobench": {
+    "bytes": 602809,
+    "fetched_at": "2026-11-19T16:31:17+00:00",
+    "file": "source-kilobench.gz",
+    "sha256": "01f53bf0ea600b7456ffb4320ab09a2e66767032756a2036c6a9a9b9d2928b96",
+    "status": 200,
+    "url": "https://kilo.ai/kilobench"
+  },
+  "source-tbench-leaderboard": {
+    "bytes": 347636,
+    "fetched_at": "2026-11-19T16:31:15+00:00",
+    "file": "source-tbench-leaderboard.gz",
+    "sha256": "2bbebbba7a5e7ceeb091e2400b52465cc951824095a49ea61373f29230c61e41",
+    "status": 200,
+    "url": "https://www.tbench.ai/"
+  },
+  "source-vals-terminal-bench-4": {
+    "bytes": 194662,
+    "fetched_at": "2026-11-19T16:31:15+00:00",
+    "file": "source-vals-terminal-bench-4.gz",
+    "sha256": "2a88e6af0c3c96ca9fc45585713c9d44d32cff72a3166e26de04a5b7c4b9e7c6",
+    "status": 200,
+    "url": "https://www.vals.ai/benchmarks/terminal-bench-4"
+  }
+}

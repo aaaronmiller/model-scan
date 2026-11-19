@@ -1,0 +1,94 @@
+{
+  "models_compared": 11,
+  "kendall_tau": 0.8545454545454545,
+  "spearman_rho": 0.9454545454545454,
+  "tier_agreement": "31/36",
+  "tier_agreement_fraction": 0.8611111111111112,
+  "tier1_same_set": true,
+  "tier1_missing": [],
+  "tier1_extra": [],
+  "formula_order_t1_t2": [
+    "DeepSeek V4.1 Flash 1017",
+    "ERNIE 5.5 Flash Preview",
+    "Inkling 2 Small",
+    "MiMo-V2.6-Flash",
+    "LongCat-2.5",
+    "Hy4 Flash",
+    "Beam 1.0 501B A23B",
+    "Dots3-Note Preview",
+    "Flint 40B / Flint v1.0",
+    "Nemotron 3 Ultra 550B A55B",
+    "Nemotron 3.5 Super VL"
+  ],
+  "reference_order_t1_t2": [
+    "DeepSeek V4.1 Flash 1017",
+    "Inkling 2 Small",
+    "LongCat-2.5",
+    "ERNIE 5.5 Flash Preview",
+    "MiMo-V2.6-Flash",
+    "Hy4 Flash",
+    "Beam 1.0 501B A23B",
+    "Dots3-Note Preview",
+    "Flint 40B / Flint v1.0",
+    "Nemotron 3.5 Super VL",
+    "Nemotron 3 Ultra 550B A55B",
+    "Particle-1"
+  ],
+  "disagreements": [
+    {
+      "name": "Particle-1",
+      "ref_tier": 2,
+      "ref_position": 7,
+      "model": "kilo:particle-ai/particle-1:free",
+      "split_across_models": false,
+      "tier": null,
+      "score": 0.23,
+      "evidence": 0.0,
+      "reason": "no matched benchmark evidence"
+    },
+    {
+      "name": "Ling 3.2 Flash",
+      "ref_tier": 3,
+      "ref_position": 1,
+      "model": "kilo:inclusionai/ling-3.2-flash:free",
+      "split_across_models": false,
+      "tier": null,
+      "score": 0.23,
+      "evidence": 0.0,
+      "reason": "no matched benchmark evidence"
+    },
+    {
+      "name": "Gemma 4 26B A4B Instruct",
+      "ref_tier": 3,
+      "ref_position": 3,
+      "model": "openrouter:google/gemma-4-26b-a4b-it:free",
+      "split_across_models": false,
+      "tier": 2,
+      "score": 0.26298,
+      "evidence": 5.5,
+      "reason": ""
+    },
+    {
+      "name": "North Mini Code",
+      "ref_tier": 3,
+      "ref_position": 5,
+      "model": "kilo:cohere/north-mini-code:free",
+      "split_across_models": false,
+      "tier": 4,
+      "score": 0.1375747057079725,
+      "evidence": 12.0,
+      "reason": ""
+    },
+    {
+      "name": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+      "ref_tier": 4,
+      "ref_position": 2,
+      "model": "kilo:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "split_across_models": false,
+      "tier": 3,
+      "score": 0.2049897057079725,
+      "evidence": 3.625,
+      "reason": ""
+    }
+  ]
+}

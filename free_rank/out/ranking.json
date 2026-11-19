@@ -1,0 +1,5321 @@
+{
+  "generated_at": "2026-11-19T16:36:57+00:00",
+  "snapshot": "/home/cheta/code/model-scan/free_rank/snapshots/2026-11-19",
+  "snapshot_sources": {
+    "catalogue-kilo": {
+      "url": "https://ai-gateway.kilo.ai/api/v1/models",
+      "fetched_at": "2026-11-19T16:31:13+00:00",
+      "status": 200,
+      "sha256": "e33ed6232a16fb82a6e9881f5ac9e8e08a9bdb501e39252353a8dddb5142a570"
+    },
+    "catalogue-opencode-go": {
+      "url": "https://opencode.ai/inference/go/v1/models",
+      "fetched_at": "2026-11-19T16:31:13+00:00",
+      "status": 200,
+      "sha256": "5cafe42ac6179a8e758ea09ec312835a18a04b3c0e2cb7fea6ff0bcef43a451d"
+    },
+    "catalogue-opencode-zen": {
+      "url": "https://opencode.ai/inference/openai/v1/models",
+      "fetched_at": "2026-11-19T16:31:12+00:00",
+      "status": 200,
+      "sha256": "db22c81e2661ad02538052de90d10102883fb8c537dfc5db9735f19189f511b9"
+    },
+    "catalogue-openrouter": {
+      "url": "https://openrouter.ai/api/v1/models?output_modalities=all",
+      "fetched_at": "2026-11-19T16:31:14+00:00",
+      "status": 200,
+      "sha256": "f49e7fc3831f399f023548fc9dcd1e76d7eceab098b53ae686c83340f1f1ff4b"
+    },
+    "source-aa-coding-agents": {
+      "url": "https://artificialanalysis.ai/agents/coding-agents?routers=true",
+      "fetched_at": "2026-11-19T16:31:14+00:00",
+      "status": 200,
+      "sha256": "a531507ff18b045c891008a65af25ad91004a8ff80510bf3814533a8e83eeb8e"
+    },
+    "source-aa-leaderboard": {
+      "url": "https://artificialanalysis.ai/leaderboards/models",
+      "fetched_at": "2026-11-19T16:31:14+00:00",
+      "status": 200,
+      "sha256": "5a5f0921849775bc2f9bdcb211428ff35537dc98188b202e0e596b81715eda90"
+    },
+    "source-kilobench": {
+      "url": "https://kilo.ai/kilobench",
+      "fetched_at": "2026-11-19T16:31:17+00:00",
+      "status": 200,
+      "sha256": "01f53bf0ea600b7456ffb4320ab09a2e66767032756a2036c6a9a9b9d2928b96"
+    },
+    "source-tbench-leaderboard": {
+      "url": "https://www.tbench.ai/",
+      "fetched_at": "2026-11-19T16:31:15+00:00",
+      "status": 200,
+      "sha256": "2bbebbba7a5e7ceeb091e2400b52465cc951824095a49ea61373f29230c61e41"
+    },
+    "source-vals-terminal-bench-4": {
+      "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+      "fetched_at": "2026-11-19T16:31:15+00:00",
+      "status": 200,
+      "sha256": "2a88e6af0c3c96ca9fc45585713c9d44d32cff72a3166e26de04a5b7c4b9e7c6"
+    }
+  },
+  "config_sha256_12": "a24ed3e021d0",
+  "scoring": {
+    "normalisation": "minmax",
+    "publisher_discount": 0.85,
+    "publisher_confidence": 0.75,
+    "shrinkage_weight": 2.0,
+    "shrinkage_prior": 0.2,
+    "family_weights": {
+      "agentic coding": 0.6,
+      "repository repair": 0.15,
+      "general agent": 0.25
+    },
+    "context_bonus_weight": 0.03,
+    "context_floor_tokens": 32768,
+    "context_full_tokens": 1048576,
+    "aa_variant_choice": "highest intelligence index among matched variants"
+  },
+  "benchmark_weights": {
+    "aa_coding_agent_index": {
+      "family": "agentic coding",
+      "weight": 3.0
+    },
+    "terminal_bench_4": {
+      "family": "agentic coding",
+      "weight": 3.0
+    },
+    "deepswe": {
+      "family": "agentic coding",
+      "weight": 2.0
+    },
+    "kilobench": {
+      "family": "agentic coding",
+      "weight": 1.5
+    },
+    "frontiercode": {
+      "family": "agentic coding",
+      "weight": 1.5
+    },
+    "swe_bench_verified": {
+      "family": "repository repair",
+      "weight": 1.5
+    },
+    "swe_bench_pro": {
+      "family": "repository repair",
+      "weight": 1.0
+    },
+    "terminal_bench_2": {
+      "family": "repository repair",
+      "weight": 1.0
+    },
+    "aa_intelligence": {
+      "family": "general agent",
+      "weight": 2.0
+    },
+    "mcp_tools": {
+      "family": "general agent",
+      "weight": 1.0
+    },
+    "tau_bench": {
+      "family": "general agent",
+      "weight": 0.5
+    },
+    "osworld": {
+      "family": "general agent",
+      "weight": 0.5
+    },
+    "long_context": {
+      "family": "general agent",
+      "weight": 1.0
+    },
+    "ifbench": {
+      "family": "general agent",
+      "weight": 0.75
+    },
+    "livecodebench": {
+      "family": "general agent",
+      "weight": 0.5
+    }
+  },
+  "tiers": {
+    "thresholds": [
+      {
+        "tier": 1,
+        "min_score_of_top": 0.75,
+        "min_evidence": 3.0,
+        "requires_tools": true
+      },
+      {
+        "tier": 2,
+        "min_score_of_top": 0.3,
+        "min_evidence": 2.0,
+        "requires_tools": true
+      },
+      {
+        "tier": 3,
+        "min_score_of_top": 0.2,
+        "min_evidence": 0.5,
+        "requires_tools": false
+      },
+      {
+        "tier": 4,
+        "min_score_of_top": 0.0,
+        "min_evidence": 0.1,
+        "requires_tools": false
+      }
+    ],
+    "unplaced_below_evidence": 0.1
+  },
+  "notes": [],
+  "ranked": [
+    {
+      "rank": 1,
+      "tier": 1,
+      "name": "DeepSeek V4.1 Flash Free",
+      "model_key": "opencode-zen:deepseek-v4.1-flash-free",
+      "score": 0.7194,
+      "share_of_top": 1.0,
+      "evidence": 14.625,
+      "family_scores": {
+        "agentic coding": 0.8375,
+        "repository repair": 0.2,
+        "general agent": 0.685
+      },
+      "context_component": 0.0157,
+      "context_tokens": 200000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {},
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "deepseek-v4.1-flash-free",
+          "name": "DeepSeek V4.1 Flash Free",
+          "omp": "opencode-zen/deepseek-v4.1-flash-free",
+          "opencode": "opencode/deepseek-v4.1-flash-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "aa_coding_agent_index",
+          "family": "agentic coding",
+          "raw": 36.834,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 3.0,
+          "sources": [
+            {
+              "value": 36.8337115781471,
+              "host": "artificialanalysis.ai",
+              "setting": "DeepSeek Harness - DeepSeek V4.1 Flash 1017 (Max)",
+              "url": "https://artificialanalysis.ai/agents/coding-agents?routers=true",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 33.838,
+          "independent": true,
+          "normalised": 0.8561,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 2.5684,
+          "sources": [
+            {
+              "value": 33.8383838383838,
+              "host": "artificialanalysis.ai",
+              "setting": "DeepSeek V4.1 Flash 1017 (Max)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 31.82,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 38.48,
+              "host": "www.tbench.ai",
+              "setting": "Claude Code, effort max",
+              "url": "https://www.tbench.ai/",
+              "date": "2026-10-17"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 65.45,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.5,
+          "sources": [
+            {
+              "value": 77.0,
+              "host": "thinkingmachines.ai",
+              "setting": "Thinking Machines evaluation or comparator; see matching task harness in source.",
+              "url": "https://thinkingmachines.ai/news/inkling-2-small/",
+              "date": "2026-11-05"
+            },
+            {
+              "value": 77.0,
+              "host": "huggingface.co",
+              "setting": "deepseek-ai model card, DS-V4.1-Flash-1017 column.",
+              "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 77.0,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu comparator, max reasoning; cited comparator result.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        },
+        {
+          "benchmark": "kilobench",
+          "family": "agentic coding",
+          "raw": 75.281,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 1.5,
+          "sources": [
+            {
+              "value": 75.280899,
+              "host": "kilo.ai",
+              "setting": "Terminal Bench 2.0",
+              "url": "https://kilo.ai/kilobench",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 28.471,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 1.5,
+          "sources": [
+            {
+              "value": 28.4711616161616,
+              "host": "artificialanalysis.ai",
+              "setting": "DeepSeek V4.1 Flash 1017 (Max)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 32.59,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 2.0,
+          "sources": [
+            {
+              "value": 32.5896393532027,
+              "host": "artificialanalysis.ai",
+              "setting": "DeepSeek V4.1 Flash 1017 (Max)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 66.13,
+          "independent": false,
+          "normalised": 0.7655,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.5741,
+          "sources": [
+            {
+              "value": 77.8,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu comparator, max reasoning; Baidu rerun.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        },
+        {
+          "benchmark": "osworld",
+          "family": "general agent",
+          "raw": 58.14,
+          "independent": false,
+          "normalised": 0.6287,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.2358,
+          "sources": [
+            {
+              "value": 68.4,
+              "host": "huggingface.co",
+              "setting": "Tencent model-card comparator, DeepSeek V4.1 Flash 1017 at highest effort.",
+              "url": "https://huggingface.co/tencent/Hy4-flash/resolve/main/assets/benchmark.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 82.667,
+          "independent": true,
+          "normalised": 0.9855,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.9855,
+          "sources": [
+            {
+              "value": 82.6666666666667,
+              "host": "artificialanalysis.ai",
+              "setting": "DeepSeek V4.1 Flash 1017 (Max)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "tier": 1,
+      "name": "Baidu: ERNIE-5.5-Flash-Preview (free)",
+      "model_key": "kilo:baidu/ernie-5.5-flash-preview:free",
+      "score": 0.5923,
+      "share_of_top": 0.8234,
+      "evidence": 5.25,
+      "family_scores": {
+        "agentic coding": 0.6928,
+        "repository repair": 0.2,
+        "general agent": 0.4675
+      },
+      "context_component": 0.0298,
+      "context_tokens": 1024000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo baidu/ernie-5.5-flash-preview:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "baidu/ernie-5.5-flash-preview:free",
+          "name": "Baidu: ERNIE-5.5-Flash-Preview (free)",
+          "omp": "kilo/baidu/ernie-5.5-flash-preview:free",
+          "kilo": "baidu/ernie-5.5-flash-preview:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "baidu/ernie-5.5-flash-preview:free",
+          "name": "Baidu: ERNIE-5.5-Flash-Preview (free)",
+          "omp": "openrouter/baidu/ernie-5.5-flash-preview:free",
+          "opencode": "openrouter/baidu/ernie-5.5-flash-preview:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 39.525,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 3.0,
+          "confidence": 0.75,
+          "contribution": 2.25,
+          "sources": [
+            {
+              "value": 46.5,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu release, highest available reasoning; see chart notes.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 60.52,
+          "independent": false,
+          "normalised": 0.8892,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.3338,
+          "sources": [
+            {
+              "value": 71.2,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu release, highest available reasoning; see chart notes.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 71.91,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.75,
+          "sources": [
+            {
+              "value": 84.6,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu release, highest available reasoning; see chart notes.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 67.15,
+          "independent": false,
+          "normalised": 0.6482,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4861,
+          "sources": [
+            {
+              "value": 79.0,
+              "host": "ernie.baidu.com",
+              "setting": "Baidu release, highest available reasoning; see chart notes.",
+              "url": "https://ernie.baidu.com/research-assets/ernie-5-5-flash-preview/benchmark-table-final.png",
+              "date": "2026-11-11"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "tier": 1,
+      "name": "Inkling 2 Small Free",
+      "model_key": "opencode-zen:inkling-2-small-free",
+      "score": 0.5644,
+      "share_of_top": 0.7845,
+      "evidence": 10.5,
+      "family_scores": {
+        "agentic coding": 0.5105,
+        "repository repair": 0.4667,
+        "general agent": 0.6322
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "limited": [
+          "opencode-zen inkling-2-small-free: catalogue description"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "inkling-2-small-free",
+          "name": "Inkling 2 Small Free",
+          "omp": "opencode-zen/inkling-2-small-free",
+          "opencode": "opencode/inkling-2-small-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 13.03,
+          "independent": true,
+          "normalised": 0.3297,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.989,
+          "sources": [
+            {
+              "value": 13.1313131313131,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 12.63,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 13.03,
+              "host": "www.tbench.ai",
+              "setting": "mini-swe-agent, effort xhigh",
+              "url": "https://www.tbench.ai/",
+              "date": "2026-11-05"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 61.285,
+          "independent": false,
+          "normalised": 0.9064,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.3596,
+          "sources": [
+            {
+              "value": 72.1,
+              "host": "thinkingmachines.ai",
+              "setting": "Thinking Machines evaluation or comparator; see matching task harness in source.",
+              "url": "https://thinkingmachines.ai/news/inkling-2-small/",
+              "date": "2026-11-05"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 25.353,
+          "independent": true,
+          "normalised": 0.8905,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 1.3357,
+          "sources": [
+            {
+              "value": 25.352601010101,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 81.273,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 1.0,
+          "sources": [
+            {
+              "value": 81.2734082397004,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 30.629,
+          "independent": true,
+          "normalised": 0.9328,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 1.8655,
+          "sources": [
+            {
+              "value": 30.6286781498958,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 40.412,
+          "independent": true,
+          "normalised": 0.4236,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.2118,
+          "sources": [
+            {
+              "value": 40.4123711340206,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 83.333,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 1.0,
+          "sources": [
+            {
+              "value": 83.3333333333333,
+              "host": "artificialanalysis.ai",
+              "setting": "Inkling 2 Small",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "tier": 1,
+      "name": "MiMo-V2.6-Flash Free",
+      "model_key": "opencode-zen:mimo-v2.6-flash-free",
+      "score": 0.5611,
+      "share_of_top": 0.7799,
+      "evidence": 10.875,
+      "family_scores": {
+        "agentic coding": 0.5629,
+        "repository repair": 0.3932,
+        "general agent": 0.5947
+      },
+      "context_component": 0.0157,
+      "context_tokens": 200000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {},
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "mimo-v2.6-flash-free",
+          "name": "MiMo-V2.6-Flash Free",
+          "omp": "opencode-zen/mimo-v2.6-flash-free",
+          "opencode": "opencode/mimo-v2.6-flash-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 22.727,
+          "independent": true,
+          "normalised": 0.575,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 1.725,
+          "sources": [
+            {
+              "value": 22.727272727272698,
+              "host": "artificialanalysis.ai",
+              "setting": "MiMo-V2.6-Flash",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 24.24,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 16.06,
+              "host": "www.tbench.ai",
+              "setting": "mini-swe-agent, effort none",
+              "url": "https://www.tbench.ai/",
+              "date": "2026-09-22"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 57.715,
+          "independent": false,
+          "normalised": 0.8262,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.2393,
+          "sources": [
+            {
+              "value": 67.9,
+              "host": "huggingface.co",
+              "setting": "XiaomiMiMo model card, MiMo-V2.6 Flash column.",
+              "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 21.615,
+          "independent": true,
+          "normalised": 0.7592,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 1.1388,
+          "sources": [
+            {
+              "value": 21.6152272727273,
+              "host": "artificialanalysis.ai",
+              "setting": "MiMo-V2.6-Flash",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 74.46,
+          "independent": false,
+          "normalised": 0.9086,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.6814,
+          "sources": [
+            {
+              "value": 87.6,
+              "host": "huggingface.co",
+              "setting": "XiaomiMiMo model card, MiMo-V2.6 Flash column.",
+              "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 26.728,
+          "independent": true,
+          "normalised": 0.799,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 1.598,
+          "sources": [
+            {
+              "value": 26.7276981444568,
+              "host": "artificialanalysis.ai",
+              "setting": "MiMo-V2.6-Flash",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 62.56,
+          "independent": false,
+          "normalised": 0.6207,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4655,
+          "sources": [
+            {
+              "value": 73.6,
+              "host": "huggingface.co",
+              "setting": "XiaomiMiMo model card, MiMo-V2.6 Flash column.",
+              "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "osworld",
+          "family": "general agent",
+          "raw": 68.68,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.375,
+          "sources": [
+            {
+              "value": 80.8,
+              "host": "huggingface.co",
+              "setting": "XiaomiMiMo model card, MiMo-V2.6 Flash column.",
+              "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 74.333,
+          "independent": true,
+          "normalised": 0.8043,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.8043,
+          "sources": [
+            {
+              "value": 74.3333333333333,
+              "host": "artificialanalysis.ai",
+              "setting": "MiMo-V2.6-Flash",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "tier": 1,
+      "name": "LongCat 2.5 Free",
+      "model_key": "opencode-go:longcat-2.5-free",
+      "score": 0.5455,
+      "share_of_top": 0.7583,
+      "evidence": 5.25,
+      "family_scores": {
+        "agentic coding": 0.5926,
+        "repository repair": 0.3957,
+        "general agent": 0.4041
+      },
+      "context_component": 0.0296,
+      "context_tokens": 1000000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "zero-retention": [
+          "opencode-go longcat-2.5-free: catalogue: go.zdr"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "opencode-go",
+          "route_id": "longcat-2.5-free",
+          "name": "LongCat 2.5 Free",
+          "omp": "opencode-go/longcat-2.5-free",
+          "opencode": "opencode-go/longcat-2.5-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "longcat-2.5-free",
+          "name": "LongCat 2.5 Free",
+          "omp": "opencode-zen/longcat-2.5-free",
+          "opencode": "opencode/longcat-2.5-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 32.725,
+          "independent": false,
+          "normalised": 0.828,
+          "weight": 3.0,
+          "confidence": 0.75,
+          "contribution": 1.8629,
+          "sources": [
+            {
+              "value": 38.5,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LongCat-2.5 column.",
+              "url": "https://huggingface.co/meituan-longcat/LongCat-2.5",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 54.91,
+          "independent": false,
+          "normalised": 0.7631,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.1447,
+          "sources": [
+            {
+              "value": 64.6,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LongCat-2.5 column.",
+              "url": "https://huggingface.co/meituan-longcat/LongCat-2.5",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 75.14,
+          "independent": false,
+          "normalised": 0.9177,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.6883,
+          "sources": [
+            {
+              "value": 88.4,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LongCat-2.5 column.",
+              "url": "https://huggingface.co/meituan-longcat/LongCat-2.5",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 70.635,
+          "independent": false,
+          "normalised": 0.9483,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.7112,
+          "sources": [
+            {
+              "value": 83.1,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LongCat-2.5 column.",
+              "url": "https://huggingface.co/meituan-longcat/LongCat-2.5",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "tier": 2,
+      "name": "Hy4 flash Free",
+      "model_key": "opencode-go:hy4-flash-free",
+      "score": 0.3753,
+      "share_of_top": 0.5217,
+      "evidence": 4.875,
+      "family_scores": {
+        "agentic coding": 0.4146,
+        "repository repair": 0.2,
+        "general agent": 0.2663
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "zero-retention": [
+          "opencode-go hy4-flash-free: catalogue: go.zdr"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "opencode-go",
+          "route_id": "hy4-flash-free",
+          "name": "Hy4 flash Free",
+          "omp": "opencode-go/hy4-flash-free",
+          "opencode": "opencode-go/hy4-flash-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "hy4-flash-free",
+          "name": "Hy4 flash Free",
+          "omp": "opencode-zen/hy4-flash-free",
+          "opencode": "opencode/hy4-flash-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 15.15,
+          "independent": true,
+          "normalised": 0.3833,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 1.1499,
+          "sources": [
+            {
+              "value": 15.15,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 54.91,
+          "independent": false,
+          "normalised": 0.7631,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 1.1447,
+          "sources": [
+            {
+              "value": 64.6,
+              "host": "huggingface.co",
+              "setting": "Tencent model-card evaluation, highest reasoning effort. mini-SWE-Agent harness.",
+              "url": "https://huggingface.co/tencent/Hy4-flash/resolve/main/assets/benchmark.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "osworld",
+          "family": "general agent",
+          "raw": 57.885,
+          "independent": false,
+          "normalised": 0.6198,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.2324,
+          "sources": [
+            {
+              "value": 68.1,
+              "host": "huggingface.co",
+              "setting": "Tencent model-card evaluation, highest reasoning effort.",
+              "url": "https://huggingface.co/tencent/Hy4-flash/resolve/main/assets/benchmark.png",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "tier": 2,
+      "name": "Beam Free",
+      "model_key": "kilo:reflection/beam-free",
+      "score": 0.3301,
+      "share_of_top": 0.4588,
+      "evidence": 16.688,
+      "family_scores": {
+        "agentic coding": 0.1393,
+        "repository repair": 0.5974,
+        "general agent": 0.5075
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo reflection/beam-free: catalogue: mayTrainOnYourPrompts"
+        ],
+        "region-restricted": [
+          "opencode-go beam-free: catalogue: go.limited_regions"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "reflection/beam-free",
+          "name": "Reflection: Beam 1.0 (Free)",
+          "omp": "kilo/reflection/beam-free",
+          "kilo": "reflection/beam-free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "opencode-go",
+          "route_id": "beam-free",
+          "name": "Beam Free",
+          "omp": "opencode-go/beam-free",
+          "opencode": "opencode-go/beam-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "beam-free",
+          "name": "Beam Free",
+          "omp": "opencode-zen/beam-free",
+          "opencode": "opencode/beam-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "aa_coding_agent_index",
+          "family": "agentic coding",
+          "raw": 15.477,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 15.4770250896058,
+              "host": "artificialanalysis.ai",
+              "setting": "Mirror - Beam 1.0",
+              "url": "https://artificialanalysis.ai/agents/coding-agents?routers=true",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 4.04,
+          "independent": true,
+          "normalised": 0.1022,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.3066,
+          "sources": [
+            {
+              "value": 3.03030303030303,
+              "host": "artificialanalysis.ai",
+              "setting": "Beam 1.0",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 4.04,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 6.36,
+              "host": "www.tbench.ai",
+              "setting": "mini-swe-agent, effort none",
+              "url": "https://www.tbench.ai/",
+              "date": "2026-10-16"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 36.805,
+          "independent": false,
+          "normalised": 0.3563,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 0.5344,
+          "sources": [
+            {
+              "value": 43.3,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 5.531,
+          "independent": true,
+          "normalised": 0.1943,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.2914,
+          "sources": [
+            {
+              "value": 5.53143939393939,
+              "host": "artificialanalysis.ai",
+              "setting": "Beam 1.0",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 69.36,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 1.125,
+          "sources": [
+            {
+              "value": 81.6,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 65.025,
+          "independent": false,
+          "normalised": 0.8279,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.6209,
+          "sources": [
+            {
+              "value": 76.5,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 68.085,
+          "independent": false,
+          "normalised": 0.823,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.6173,
+          "sources": [
+            {
+              "value": 80.1,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 17.731,
+          "independent": true,
+          "normalised": 0.4905,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.981,
+          "sources": [
+            {
+              "value": 17.7307282547205,
+              "host": "artificialanalysis.ai",
+              "setting": "Beam 1.0",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 68.68,
+          "independent": false,
+          "normalised": 0.869,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.6517,
+          "sources": [
+            {
+              "value": 80.8,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 30.685,
+          "independent": false,
+          "normalised": 0.293,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.1099,
+          "sources": [
+            {
+              "value": 36.1,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 78.0,
+          "independent": true,
+          "normalised": 0.8841,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.8841,
+          "sources": [
+            {
+              "value": 78.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Beam 1.0",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 67.66,
+          "independent": false,
+          "normalised": 0.4246,
+          "weight": 0.75,
+          "confidence": 0.75,
+          "contribution": 0.2388,
+          "sources": [
+            {
+              "value": 79.6,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 75.055,
+          "independent": false,
+          "normalised": 0.8491,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.3184,
+          "sources": [
+            {
+              "value": 88.3,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, Beam (BF16) column.",
+              "url": "https://huggingface.co/reflection/Beam-1.0-501B-A23B",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "tier": 2,
+      "name": "Dots Studio: Dots3-Note Preview (free)",
+      "model_key": "kilo:dots-studio/dots-3-note-preview:free",
+      "score": 0.2943,
+      "share_of_top": 0.4091,
+      "evidence": 4.312,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.5378,
+        "general agent": 0.2793
+      },
+      "context_component": 0.0238,
+      "context_tokens": 512000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo dots-studio/dots-3-note-preview:free: catalogue: mayTrainOnYourPrompts"
+        ],
+        "expires": [
+          "kilo dots-studio/dots-3-note-preview:free: 2026-12-31",
+          "openrouter dots-studio/dots-3-note-preview:free: 2026-12-31"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "dots-studio/dots-3-note-preview:free",
+          "name": "Dots Studio: Dots3-Note Preview (free)",
+          "omp": "kilo/dots-studio/dots-3-note-preview:free",
+          "kilo": "dots-studio/dots-3-note-preview:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "dots-studio/dots-3-note-preview:free",
+          "name": "Dots Studio: Dots3-Note Preview (free)",
+          "omp": "openrouter/dots-studio/dots-3-note-preview:free",
+          "opencode": "openrouter/dots-studio/dots-3-note-preview:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 66.64,
+          "independent": false,
+          "normalised": 0.9276,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 1.0436,
+          "sources": [
+            {
+              "value": 78.4,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation. live-swe-agent, 384K context.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 51.85,
+          "independent": false,
+          "normalised": 0.6258,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4694,
+          "sources": [
+            {
+              "value": 61.0,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 63.835,
+          "independent": false,
+          "normalised": 0.766,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.5745,
+          "sources": [
+            {
+              "value": 75.1,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation. Terminus-2, 256K context.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 47.26,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 55.6,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 68.34,
+          "independent": false,
+          "normalised": 0.4531,
+          "weight": 0.75,
+          "confidence": 0.75,
+          "contribution": 0.2549,
+          "sources": [
+            {
+              "value": 80.4,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 77.775,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.375,
+          "sources": [
+            {
+              "value": 91.5,
+              "host": "huggingface.co",
+              "setting": "Dots Studio reasoning-mode evaluation.",
+              "url": "https://huggingface.co/dots-studio/dots3-note-prev/resolve/main/assets/benchmark_appendix_en_reasoning.png",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "tier": 2,
+      "name": "Flint 40B Free",
+      "model_key": "kilo:recursive/flint-v1.0:free",
+      "score": 0.2687,
+      "share_of_top": 0.3735,
+      "evidence": 2.625,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.538,
+        "general agent": 0.2
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo recursive/flint-v1.0:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "recursive/flint-v1.0:free",
+          "name": "Recursive: Flint (free)",
+          "omp": "kilo/recursive/flint-v1.0:free",
+          "kilo": "recursive/flint-v1.0:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "flint-40b-free",
+          "name": "Flint 40B Free",
+          "omp": "opencode-zen/flint-40b-free",
+          "opencode": "opencode/flint-40b-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "recursive/flint-v1.0:free",
+          "name": "Recursive: Flint (free)",
+          "omp": "openrouter/recursive/flint-v1.0:free",
+          "opencode": "openrouter/recursive/flint-v1.0:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 63.07,
+          "independent": false,
+          "normalised": 0.8326,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.9367,
+          "sources": [
+            {
+              "value": 74.2,
+              "host": "huggingface.co",
+              "setting": "Recursive BF16 release; Terminus 2 for terminal, mini-swe-agent for SWE; mean pass@1, at least five attempts.",
+              "url": "https://huggingface.co/RecursiveSI/flint",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 76.245,
+          "independent": false,
+          "normalised": 1.0,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.75,
+          "sources": [
+            {
+              "value": 89.7,
+              "host": "huggingface.co",
+              "setting": "Recursive BF16 release; Terminus 2 for terminal, mini-swe-agent for SWE; mean pass@1, at least five attempts.",
+              "url": "https://huggingface.co/RecursiveSI/flint",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 46.665,
+          "independent": false,
+          "normalised": 0.5357,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4017,
+          "sources": [
+            {
+              "value": 54.9,
+              "host": "huggingface.co",
+              "setting": "Recursive BF16 release; Terminus 2 for terminal, mini-swe-agent for SWE; mean pass@1, at least five attempts.",
+              "url": "https://huggingface.co/RecursiveSI/flint",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "tier": 2,
+      "name": "NVIDIA: Nemotron 3 Ultra (free)",
+      "model_key": "kilo:nvidia/nemotron-3-ultra-550b-a55b:free",
+      "score": 0.266,
+      "share_of_top": 0.3697,
+      "evidence": 12.75,
+      "family_scores": {
+        "agentic coding": 0.062,
+        "repository repair": 0.456,
+        "general agent": 0.5231
+      },
+      "context_component": 0.0296,
+      "context_tokens": 1000000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo nvidia/nemotron-3-ultra-550b-a55b:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "name": "NVIDIA: Nemotron 3 Ultra (free)",
+          "omp": "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+          "kilo": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "name": "NVIDIA: Nemotron 3 Ultra (free)",
+          "omp": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+          "opencode": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.505,
+          "independent": true,
+          "normalised": 0.0128,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0383,
+          "sources": [
+            {
+              "value": 0.505050505050505,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "kilobench",
+          "family": "agentic coding",
+          "raw": 19.101,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 19.101124,
+              "host": "kilo.ai",
+              "setting": "Terminal Bench 2.0",
+              "url": "https://kilo.ai/kilobench",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 1.09,
+          "independent": true,
+          "normalised": 0.0383,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0574,
+          "sources": [
+            {
+              "value": 1.09007575757576,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 60.095,
+          "independent": false,
+          "normalised": 0.7534,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.8476,
+          "sources": [
+            {
+              "value": 70.7,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, N-3-Ultra 550B-A55B column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 53.933,
+          "independent": true,
+          "normalised": 0.6332,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.6332,
+          "sources": [
+            {
+              "value": 53.9325842696629,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 11.759,
+          "independent": true,
+          "normalised": 0.2858,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.5715,
+          "sources": [
+            {
+              "value": 11.7592726308177,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 83.333,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.5,
+          "sources": [
+            {
+              "value": 83.3333333333333,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 79.333,
+          "independent": true,
+          "normalised": 0.913,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.913,
+          "sources": [
+            {
+              "value": 79.3333333333333,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 81.361,
+          "independent": true,
+          "normalised": 1.0,
+          "weight": 0.75,
+          "confidence": 1.0,
+          "contribution": 0.75,
+          "sources": [
+            {
+              "value": 81.3605442176871,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Ultra 550B A55B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 75.65,
+          "independent": false,
+          "normalised": 0.8821,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.3308,
+          "sources": [
+            {
+              "value": 89.0,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, N-3-Ultra 550B-A55B column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 11,
+      "tier": 2,
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "model_key": "openrouter:google/gemma-4-26b-a4b-it:free",
+      "score": 0.263,
+      "share_of_top": 0.3656,
+      "evidence": 5.5,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.1707,
+        "general agent": 0.3975
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {},
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/gemma-4-26b-a4b-it:free",
+          "name": "Google: Gemma 4 26B A4B  (free)",
+          "omp": "openrouter/google/gemma-4-26b-a4b-it:free",
+          "opencode": "openrouter/google/gemma-4-26b-a4b-it:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 31.79,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 57.4,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Gemma 4 26B A4B column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 17.4,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Gemma 4 26B A4B comparator in the Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 11.05,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 13.0,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Gemma 4 26B A4B comparator in the Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 38.951,
+          "independent": true,
+          "normalised": 0.4322,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.4322,
+          "sources": [
+            {
+              "value": 38.9513108614232,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 26B A4B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 43.567,
+          "independent": true,
+          "normalised": 0.466,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.233,
+          "sources": [
+            {
+              "value": 43.5672514619883,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 26B A4B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 65.667,
+          "independent": true,
+          "normalised": 0.6159,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.6159,
+          "sources": [
+            {
+              "value": 65.6666666666667,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 26B A4B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 72.449,
+          "independent": true,
+          "normalised": 0.6257,
+          "weight": 0.75,
+          "confidence": 1.0,
+          "contribution": 0.4693,
+          "sources": [
+            {
+              "value": 72.4489795918367,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 26B A4B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 65.535,
+          "independent": false,
+          "normalised": 0.3208,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.1203,
+          "sources": [
+            {
+              "value": 77.1,
+              "host": "huggingface.co",
+              "setting": "google model card, Gemma 4  26B A4B column.",
+              "url": "https://huggingface.co/google/gemma-4-31B-it",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 77.1,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Gemma 4 26B A4B comparator in the Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 12,
+      "tier": 2,
+      "name": "Nemotron 3.5 Super VL Free",
+      "model_key": "kilo:nvidia/nemotron-3.5-super-vl:free",
+      "score": 0.245,
+      "share_of_top": 0.3406,
+      "evidence": 13.312,
+      "family_scores": {
+        "agentic coding": 0.0902,
+        "repository repair": 0.4515,
+        "general agent": 0.3727
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo nvidia/nemotron-3.5-super-vl:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "nvidia/nemotron-3.5-super-vl:free",
+          "name": "NVIDIA: Nemotron 3.5 Super VL (free)",
+          "omp": "kilo/nvidia/nemotron-3.5-super-vl:free",
+          "kilo": "nvidia/nemotron-3.5-super-vl:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "nemotron-3.5-super-vl-free",
+          "name": "Nemotron 3.5 Super VL Free",
+          "omp": "opencode-zen/nemotron-3.5-super-vl-free",
+          "opencode": "opencode/nemotron-3.5-super-vl-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3.5-super-vl:free",
+          "name": "NVIDIA: Nemotron 3.5 Super VL (free)",
+          "omp": "openrouter/nvidia/nemotron-3.5-super-vl:free",
+          "opencode": "openrouter/nvidia/nemotron-3.5-super-vl:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Super VL",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 0.0,
+              "host": "www.vals.ai",
+              "setting": "Mini-SWE-agent",
+              "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+              "date": "2026-11-19"
+            },
+            {
+              "value": 0.3,
+              "host": "www.tbench.ai",
+              "setting": "mini-swe-agent, effort none",
+              "url": "https://www.tbench.ai/",
+              "date": "2026-10-15"
+            }
+          ]
+        },
+        {
+          "benchmark": "deepswe",
+          "family": "agentic coding",
+          "raw": 20.952,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 2.0,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 24.65,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 6.109,
+          "independent": true,
+          "normalised": 0.2146,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.3219,
+          "sources": [
+            {
+              "value": 6.10914141414141,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Super VL",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 60.435,
+          "independent": false,
+          "normalised": 0.7624,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.8577,
+          "sources": [
+            {
+              "value": 71.1,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 44.013,
+          "independent": false,
+          "normalised": 0.5056,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.3792,
+          "sources": [
+            {
+              "value": 51.78,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 51.569,
+          "independent": false,
+          "normalised": 0.6015,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4511,
+          "sources": [
+            {
+              "value": 60.67,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 13.62,
+          "independent": true,
+          "normalised": 0.3496,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.6992,
+          "sources": [
+            {
+              "value": 13.6203422723141,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Super VL",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 65.025,
+          "independent": false,
+          "normalised": 0.7541,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.2828,
+          "sources": [
+            {
+              "value": 76.5,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "osworld",
+          "family": "general agent",
+          "raw": 43.469,
+          "independent": false,
+          "normalised": 0.112,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.042,
+          "sources": [
+            {
+              "value": 51.14,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 69.0,
+          "independent": true,
+          "normalised": 0.6884,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.6884,
+          "sources": [
+            {
+              "value": 69.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Super VL",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 60.231,
+          "independent": false,
+          "normalised": 0.1126,
+          "weight": 0.75,
+          "confidence": 0.75,
+          "contribution": 0.0633,
+          "sources": [
+            {
+              "value": 70.86,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 74.987,
+          "independent": false,
+          "normalised": 0.8453,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.317,
+          "sources": [
+            {
+              "value": 88.22,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron 3.5 SuperGA BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 13,
+      "tier": 3,
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "model_key": "kilo:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "score": 0.205,
+      "share_of_top": 0.2849,
+      "evidence": 3.625,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.1333,
+        "general agent": 0.1888
+      },
+      "context_component": 0.0178,
+      "context_tokens": 256000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+          "omp": "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "kilo": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+          "omp": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "opencode": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 6.742,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 6.741573033707859,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 45.322,
+          "independent": true,
+          "normalised": 0.4896,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.2448,
+          "sources": [
+            {
+              "value": 45.3216374269006,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "osworld",
+          "family": "general agent",
+          "raw": 40.29,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 47.4,
+              "host": "research.nvidia.com",
+              "setting": "NVIDIA technical report, reasoning enabled.",
+              "url": "https://research.nvidia.com/labs/nemotron/files/NVIDIA-Nemotron-3-Omni-report.pdf",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 39.667,
+          "independent": true,
+          "normalised": 0.0507,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.0507,
+          "sources": [
+            {
+              "value": 39.6666666666667,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 63.197,
+          "independent": true,
+          "normalised": 0.2371,
+          "weight": 0.75,
+          "confidence": 1.0,
+          "contribution": 0.1779,
+          "sources": [
+            {
+              "value": 63.1972789115646,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 14,
+      "tier": 3,
+      "name": "Google: Gemma 4 31B (free)",
+      "model_key": "openrouter:google/gemma-4-31b-it:free",
+      "score": 0.1845,
+      "share_of_top": 0.2564,
+      "evidence": 10.125,
+      "family_scores": {
+        "agentic coding": 0.0615,
+        "repository repair": 0.2975,
+        "general agent": 0.3398
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {},
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/gemma-4-31b-it:free",
+          "name": "Google: Gemma 4 31B (free)",
+          "omp": "openrouter/google/gemma-4-31b-it:free",
+          "opencode": "openrouter/google/gemma-4-31b-it:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 43.446,
+          "independent": true,
+          "normalised": 0.4925,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.4925,
+          "sources": [
+            {
+              "value": 43.4456928838951,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 4.384,
+          "independent": true,
+          "normalised": 0.0329,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.0658,
+          "sources": [
+            {
+              "value": 4.38438284215374,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 59.942,
+          "independent": true,
+          "normalised": 0.6859,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.3429,
+          "sources": [
+            {
+              "value": 59.9415204678363,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 69.667,
+          "independent": true,
+          "normalised": 0.7029,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.7029,
+          "sources": [
+            {
+              "value": 69.6666666666667,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 75.578,
+          "independent": true,
+          "normalised": 0.7571,
+          "weight": 0.75,
+          "confidence": 1.0,
+          "contribution": 0.5679,
+          "sources": [
+            {
+              "value": 75.57823129251699,
+              "host": "artificialanalysis.ai",
+              "setting": "Gemma 4 31B (Reasoning)",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 68.0,
+          "independent": false,
+          "normalised": 0.4575,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.1716,
+          "sources": [
+            {
+              "value": 80.0,
+              "host": "huggingface.co",
+              "setting": "google model card, Gemma 4  31B column.",
+              "url": "https://huggingface.co/google/gemma-4-31B-it",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 15,
+      "tier": 3,
+      "name": "Nemotron 3.5 Lightning Free",
+      "model_key": "kilo:nvidia/nemotron-3.5-lightning:free",
+      "score": 0.1528,
+      "share_of_top": 0.2124,
+      "evidence": 10.688,
+      "family_scores": {
+        "agentic coding": 0.0674,
+        "repository repair": 0.2416,
+        "general agent": 0.1861
+      },
+      "context_component": 0.0296,
+      "context_tokens": 1000000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo nvidia/nemotron-3.5-lightning:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "nvidia/nemotron-3.5-lightning:free",
+          "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
+          "omp": "kilo/nvidia/nemotron-3.5-lightning:free",
+          "kilo": "nvidia/nemotron-3.5-lightning:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "opencode-zen",
+          "route_id": "nemotron-3.5-lightning-free",
+          "name": "Nemotron 3.5 Lightning Free",
+          "omp": "opencode-zen/nemotron-3.5-lightning-free",
+          "opencode": "opencode/nemotron-3.5-lightning-free",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3.5-lightning:free",
+          "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
+          "omp": "openrouter/nvidia/nemotron-3.5-lightning:free",
+          "opencode": "openrouter/nvidia/nemotron-3.5-lightning:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.505,
+          "independent": true,
+          "normalised": 0.0128,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0383,
+          "sources": [
+            {
+              "value": 0.505050505050505,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 43.826,
+          "independent": false,
+          "normalised": 0.3204,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.3604,
+          "sources": [
+            {
+              "value": 51.56,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron-3.5-Lightning-30B-A3B-BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 24.345,
+          "independent": true,
+          "normalised": 0.2362,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.2362,
+          "sources": [
+            {
+              "value": 24.3445692883895,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 5.535,
+          "independent": true,
+          "normalised": 0.0723,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.1447,
+          "sources": [
+            {
+              "value": 5.5346663903388,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 8.866,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 8.8659793814433,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 60.333,
+          "independent": true,
+          "normalised": 0.5,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.5,
+          "sources": [
+            {
+              "value": 60.33333333333331,
+              "host": "artificialanalysis.ai",
+              "setting": "Nemotron 3.5 Lightning",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 61.098,
+          "independent": false,
+          "normalised": 0.149,
+          "weight": 0.75,
+          "confidence": 0.75,
+          "contribution": 0.0838,
+          "sources": [
+            {
+              "value": 71.88,
+              "host": "huggingface.co",
+              "setting": "nvidia model card, Nemotron-3.5-Lightning-30B-A3B-BF16 column.",
+              "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 16,
+      "tier": 4,
+      "name": "Cohere: North Mini Code (free)",
+      "model_key": "kilo:cohere/north-mini-code:free",
+      "score": 0.1376,
+      "share_of_top": 0.1912,
+      "evidence": 12.0,
+      "family_scores": {
+        "agentic coding": 0.069,
+        "repository repair": 0.3737,
+        "general agent": 0.0893
+      },
+      "context_component": 0.0178,
+      "context_tokens": 256000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo cohere/north-mini-code:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "cohere/north-mini-code:free",
+          "name": "Cohere: North Mini Code (free)",
+          "omp": "kilo/cohere/north-mini-code:free",
+          "kilo": "cohere/north-mini-code:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/north-mini-code:free",
+          "name": "Cohere: North Mini Code (free)",
+          "omp": "openrouter/cohere/north-mini-code:free",
+          "opencode": "openrouter/cohere/north-mini-code:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.505,
+          "independent": true,
+          "normalised": 0.0128,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0383,
+          "sources": [
+            {
+              "value": 0.505050505050505,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 0.188,
+          "independent": true,
+          "normalised": 0.0066,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0099,
+          "sources": [
+            {
+              "value": 0.18760101010101,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 57.46,
+          "independent": false,
+          "normalised": 0.6833,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.7687,
+          "sources": [
+            {
+              "value": 67.6,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_pro",
+          "family": "repository repair",
+          "raw": 34.17,
+          "independent": false,
+          "normalised": 0.3546,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.266,
+          "sources": [
+            {
+              "value": 40.2,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 35.581,
+          "independent": true,
+          "normalised": 0.3869,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.3869,
+          "sources": [
+            {
+              "value": 35.5805243445693,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 3.425,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 3.42470262148493,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 37.427,
+          "independent": true,
+          "normalised": 0.3835,
+          "weight": 0.5,
+          "confidence": 1.0,
+          "contribution": 0.1918,
+          "sources": [
+            {
+              "value": 37.4269005847953,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 37.333,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 37.3333333333333,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 57.551,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 0.75,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 57.5510204081633,
+              "host": "artificialanalysis.ai",
+              "setting": "North Mini Code",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 59.755,
+          "independent": false,
+          "normalised": 0.0,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 70.3,
+              "host": "cdn-uploads.huggingface.co",
+              "setting": "Cohere evaluation.",
+              "url": "https://cdn-uploads.huggingface.co/production/uploads/62668f725fb8d521d94d8451/xR7kZ3X9RKEZrbgD6hpG1.png",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 17,
+      "tier": 4,
+      "name": "LiquidAI: LFM3-1.7B (free)",
+      "model_key": "kilo:liquid/lfm-3-1.7b:free",
+      "score": 0.1336,
+      "share_of_top": 0.1857,
+      "evidence": 11.188,
+      "family_scores": {
+        "agentic coding": 0.0615,
+        "repository repair": 0.1537,
+        "general agent": 0.2227
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo liquid/lfm-3-1.7b:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": null,
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "liquid/lfm-3-1.7b:free",
+          "name": "LiquidAI: LFM3-1.7B (free)",
+          "omp": "kilo/liquid/lfm-3-1.7b:free",
+          "kilo": "liquid/lfm-3-1.7b:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "liquid/lfm-3-1.7b:free",
+          "name": "LiquidAI: LFM3-1.7B (free)",
+          "omp": "openrouter/liquid/lfm-3-1.7b:free",
+          "opencode": "openrouter/liquid/lfm-3-1.7b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": [
+        {
+          "benchmark": "terminal_bench_4",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 3.0,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "LFM3-1.7B",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "frontiercode",
+          "family": "agentic coding",
+          "raw": 0.0,
+          "independent": true,
+          "normalised": 0.0,
+          "weight": 1.5,
+          "confidence": 1.0,
+          "contribution": 0.0,
+          "sources": [
+            {
+              "value": 0.0,
+              "host": "artificialanalysis.ai",
+              "setting": "LFM3-1.7B",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "swe_bench_verified",
+          "family": "repository repair",
+          "raw": 36.89,
+          "independent": false,
+          "normalised": 0.1357,
+          "weight": 1.5,
+          "confidence": 0.75,
+          "contribution": 0.1527,
+          "sources": [
+            {
+              "value": 43.4,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "terminal_bench_2",
+          "family": "repository repair",
+          "raw": 10.982,
+          "independent": false,
+          "normalised": 0.0569,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.0427,
+          "sources": [
+            {
+              "value": 12.92,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "aa_intelligence",
+          "family": "general agent",
+          "raw": 5.994,
+          "independent": true,
+          "normalised": 0.0881,
+          "weight": 2.0,
+          "confidence": 1.0,
+          "contribution": 0.1762,
+          "sources": [
+            {
+              "value": 5.99389916662478,
+              "host": "artificialanalysis.ai",
+              "setting": "LFM3-1.7B",
+              "url": "https://artificialanalysis.ai/leaderboards/models",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "mcp_tools",
+          "family": "general agent",
+          "raw": 60.681,
+          "independent": false,
+          "normalised": 0.5445,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.4084,
+          "sources": [
+            {
+              "value": 71.39,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "tau_bench",
+          "family": "general agent",
+          "raw": 57.809,
+          "independent": false,
+          "normalised": 0.6572,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.2465,
+          "sources": [
+            {
+              "value": 68.01,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "long_context",
+          "family": "general agent",
+          "raw": 44.905,
+          "independent": false,
+          "normalised": 0.1646,
+          "weight": 1.0,
+          "confidence": 0.75,
+          "contribution": 0.1235,
+          "sources": [
+            {
+              "value": 52.83,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "ifbench",
+          "family": "general agent",
+          "raw": 62.075,
+          "independent": false,
+          "normalised": 0.19,
+          "weight": 0.75,
+          "confidence": 0.75,
+          "contribution": 0.1069,
+          "sources": [
+            {
+              "value": 73.03,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        },
+        {
+          "benchmark": "livecodebench",
+          "family": "general agent",
+          "raw": 62.441,
+          "independent": false,
+          "normalised": 0.1491,
+          "weight": 0.5,
+          "confidence": 0.75,
+          "contribution": 0.0559,
+          "sources": [
+            {
+              "value": 73.46,
+              "host": "huggingface.co",
+              "setting": "Publisher model card, LFM3 1.7B column.",
+              "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+              "date": "2026-11-19"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "unplaced": [
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Big Pickle",
+      "model_key": "opencode-zen:big-pickle",
+      "score": 0.2157,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.0157,
+      "context_tokens": 200000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {},
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "big-pickle",
+          "name": "Big Pickle",
+          "omp": "opencode-zen/big-pickle",
+          "opencode": "opencode/big-pickle",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Glyph Cluster",
+      "model_key": "kilo:stealth/glyph-cluster",
+      "score": 0.2178,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.0178,
+      "context_tokens": 256000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "undisclosed": [
+          "kilo stealth/glyph-cluster: catalogue description"
+        ],
+        "sharing": [
+          "kilo stealth/glyph-cluster: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "stealth/glyph-cluster",
+          "name": "Glyph Cluster",
+          "omp": "kilo/stealth/glyph-cluster",
+          "kilo": "stealth/glyph-cluster",
+          "omp_provider_configured": false
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Iceman Contributor Free",
+      "model_key": "opencode-go:iceman-contributor-free",
+      "score": 0.218,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "limited": [
+          "opencode-go iceman-contributor-free: catalogue description"
+        ],
+        "undisclosed": [
+          "opencode-go iceman-contributor-free: catalogue description"
+        ],
+        "sharing": [
+          "opencode-go iceman-contributor-free: catalogue: go.training"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "opencode-go",
+          "route_id": "iceman-contributor-free",
+          "name": "Iceman Contributor Free",
+          "omp": "opencode-go/iceman-contributor-free",
+          "opencode": "opencode-go/iceman-contributor-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Iceman Free",
+      "model_key": "opencode-zen:iceman-free",
+      "score": 0.218,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.018,
+      "context_tokens": 262144,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "limited": [
+          "opencode-zen iceman-free: catalogue description"
+        ],
+        "undisclosed": [
+          "opencode-zen iceman-free: catalogue description"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "iceman-free",
+          "name": "Iceman Free",
+          "omp": "opencode-zen/iceman-free",
+          "opencode": "opencode/iceman-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "inclusionAI: Ling 3.2 Flash (free)",
+      "model_key": "kilo:inclusionai/ling-3.2-flash:free",
+      "score": 0.23,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo inclusionai/ling-3.2-flash:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "inclusionai/ling-3.2-flash:free",
+          "name": "inclusionAI: Ling 3.2 Flash (free)",
+          "omp": "kilo/inclusionai/ling-3.2-flash:free",
+          "kilo": "inclusionai/ling-3.2-flash:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "inclusionai/ling-3.2-flash:free",
+          "name": "inclusionAI: Ling 3.2 Flash (free)",
+          "omp": "openrouter/inclusionai/ling-3.2-flash:free",
+          "opencode": "openrouter/inclusionai/ling-3.2-flash:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Particle AI: Particle-1 (free)",
+      "model_key": "kilo:particle-ai/particle-1:free",
+      "score": 0.23,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "sharing": [
+          "kilo particle-ai/particle-1:free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "particle-ai/particle-1:free",
+          "name": "Particle AI: Particle-1 (free)",
+          "omp": "kilo/particle-ai/particle-1:free",
+          "kilo": "particle-ai/particle-1:free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "particle-ai/particle-1:free",
+          "name": "Particle AI: Particle-1 (free)",
+          "omp": "openrouter/particle-ai/particle-1:free",
+          "opencode": "openrouter/particle-ai/particle-1:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Tidepool Alpha Free",
+      "model_key": "opencode-zen:tidepool-alpha-free",
+      "score": 0.23,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": {
+        "agentic coding": 0.2,
+        "repository repair": 0.2,
+        "general agent": 0.2
+      },
+      "context_component": 0.03,
+      "context_tokens": 1048576,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "limited": [
+          "opencode-zen tidepool-alpha-free: catalogue description"
+        ],
+        "undisclosed": [
+          "opencode-zen tidepool-alpha-free: catalogue description"
+        ]
+      },
+      "reason": "no matched benchmark evidence",
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "tidepool-alpha-free",
+          "name": "Tidepool Alpha Free",
+          "omp": "opencode-zen/tidepool-alpha-free",
+          "opencode": "opencode/tidepool-alpha-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    }
+  ],
+  "not_ranked": [
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Auto Free",
+      "model_key": "kilo:kilo-auto/free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 256000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "router": [
+          "kilo kilo-auto/free: catalogue: autoRouting"
+        ],
+        "sharing": [
+          "kilo kilo-auto/free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": "router: picks among other models, so one rank would hide the routing",
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "kilo-auto/free",
+          "name": "Auto Free",
+          "omp": "kilo/kilo-auto/free",
+          "kilo": "kilo-auto/free",
+          "omp_provider_configured": false
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Free Models Router",
+      "model_key": "kilo:openrouter/free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 200000,
+      "tools": true,
+      "kind": "chat",
+      "limit_tags": {
+        "router": [
+          "kilo openrouter/free: catalogue description",
+          "openrouter openrouter/free: catalogue description"
+        ],
+        "sharing": [
+          "kilo openrouter/free: catalogue: mayTrainOnYourPrompts"
+        ]
+      },
+      "reason": "router: picks among other models, so one rank would hide the routing",
+      "routes": [
+        {
+          "gateway": "kilo",
+          "route_id": "openrouter/free",
+          "name": "OpenRouter Free Models Router",
+          "omp": "kilo/openrouter/free",
+          "kilo": "openrouter/free",
+          "omp_provider_configured": false
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "openrouter/free",
+          "name": "Free Models Router",
+          "omp": "openrouter/openrouter/free",
+          "opencode": "openrouter/openrouter/free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Jev 1.13 Free",
+      "model_key": "opencode-zen:jev-1.13-free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 64000,
+      "tools": false,
+      "kind": "decision",
+      "limit_tags": {},
+      "reason": "interface is decision, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "opencode-zen",
+          "route_id": "jev-1.13-free",
+          "name": "Jev 1.13 Free",
+          "omp": "opencode-zen/jev-1.13-free",
+          "opencode": "opencode/jev-1.13-free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Perplexity: Decider Flash V1.3 (free)",
+      "model_key": "openrouter:perplexity/pplx-decider-flash-v1.3:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 262144,
+      "tools": false,
+      "kind": "decisions",
+      "limit_tags": {},
+      "reason": "interface is decisions, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "perplexity/pplx-decider-flash-v1.3:free",
+          "name": "Perplexity: Decider Flash V1.3 (free)",
+          "omp": "openrouter/perplexity/pplx-decider-flash-v1.3:free",
+          "opencode": "openrouter/perplexity/pplx-decider-flash-v1.3:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Perplexity: Decider V1.3 (free)",
+      "model_key": "openrouter:perplexity/pplx-decider-v1.3:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 262144,
+      "tools": false,
+      "kind": "decisions",
+      "limit_tags": {},
+      "reason": "interface is decisions, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "perplexity/pplx-decider-v1.3:free",
+          "name": "Perplexity: Decider V1.3 (free)",
+          "omp": "openrouter/perplexity/pplx-decider-v1.3:free",
+          "opencode": "openrouter/perplexity/pplx-decider-v1.3:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Respan: Span-01 Lite",
+      "model_key": "openrouter:respan/span-01-lite",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "decisions",
+      "limit_tags": {},
+      "reason": "interface is decisions, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "respan/span-01-lite",
+          "name": "Respan: Span-01 Lite",
+          "omp": "openrouter/respan/span-01-lite",
+          "opencode": "openrouter/respan/span-01-lite",
+          "omp_provider_configured": true
+        },
+        {
+          "gateway": "openrouter",
+          "route_id": "respan/span-01-lite:free",
+          "name": "Respan: Span-01 Lite (free)",
+          "omp": "openrouter/respan/span-01-lite:free",
+          "opencode": "openrouter/respan/span-01-lite:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "NVIDIA: Nemotron 3 Embed 1B (free)",
+      "model_key": "openrouter:nvidia/nemotron-3-embed-1b:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 4096,
+      "tools": false,
+      "kind": "embeddings",
+      "limit_tags": {},
+      "reason": "interface is embeddings, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3-embed-1b:free",
+          "name": "NVIDIA: Nemotron 3 Embed 1B (free)",
+          "omp": "openrouter/nvidia/nemotron-3-embed-1b:free",
+          "opencode": "openrouter/nvidia/nemotron-3-embed-1b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "NVIDIA: Nemotron 3.5 Embed 1B (free)",
+      "model_key": "openrouter:nvidia/nemotron-3.5-embed-1b:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "embeddings",
+      "limit_tags": {},
+      "reason": "interface is embeddings, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3.5-embed-1b:free",
+          "name": "NVIDIA: Nemotron 3.5 Embed 1B (free)",
+          "omp": "openrouter/nvidia/nemotron-3.5-embed-1b:free",
+          "opencode": "openrouter/nvidia/nemotron-3.5-embed-1b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "NVIDIA: Nemotron 3.5 Embed 8B (free)",
+      "model_key": "openrouter:nvidia/nemotron-3.5-embed-8b:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "embeddings",
+      "limit_tags": {},
+      "reason": "interface is embeddings, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3.5-embed-8b:free",
+          "name": "NVIDIA: Nemotron 3.5 Embed 8B (free)",
+          "omp": "openrouter/nvidia/nemotron-3.5-embed-8b:free",
+          "opencode": "openrouter/nvidia/nemotron-3.5-embed-8b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Recraft: Recraft V4.1 Flash V2 (free)",
+      "model_key": "openrouter:recraft/recraft-v4.1-flash-v2:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 65536,
+      "tools": false,
+      "kind": "image",
+      "limit_tags": {
+        "expires": [
+          "openrouter recraft/recraft-v4.1-flash-v2:free: 2026-11-28"
+        ]
+      },
+      "reason": "interface is image, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "recraft/recraft-v4.1-flash-v2:free",
+          "name": "Recraft: Recraft V4.1 Flash V2 (free)",
+          "omp": "openrouter/recraft/recraft-v4.1-flash-v2:free",
+          "opencode": "openrouter/recraft/recraft-v4.1-flash-v2:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Cohere: Rerank 4 Fast",
+      "model_key": "openrouter:cohere/rerank-4-fast",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/rerank-4-fast",
+          "name": "Cohere: Rerank 4 Fast",
+          "omp": "openrouter/cohere/rerank-4-fast",
+          "opencode": "openrouter/cohere/rerank-4-fast",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Cohere: Rerank 4 Pro",
+      "model_key": "openrouter:cohere/rerank-4-pro",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/rerank-4-pro",
+          "name": "Cohere: Rerank 4 Pro",
+          "omp": "openrouter/cohere/rerank-4-pro",
+          "opencode": "openrouter/cohere/rerank-4-pro",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Cohere: Rerank 5 Fast",
+      "model_key": "openrouter:cohere/rerank-5-fast",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/rerank-5-fast",
+          "name": "Cohere: Rerank 5 Fast",
+          "omp": "openrouter/cohere/rerank-5-fast",
+          "opencode": "openrouter/cohere/rerank-5-fast",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Cohere: Rerank 5 Pro",
+      "model_key": "openrouter:cohere/rerank-5-pro",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/rerank-5-pro",
+          "name": "Cohere: Rerank 5 Pro",
+          "omp": "openrouter/cohere/rerank-5-pro",
+          "opencode": "openrouter/cohere/rerank-5-pro",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Cohere: Rerank v3.5",
+      "model_key": "openrouter:cohere/rerank-v3.5",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 4096,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "cohere/rerank-v3.5",
+          "name": "Cohere: Rerank v3.5",
+          "omp": "openrouter/cohere/rerank-v3.5",
+          "opencode": "openrouter/cohere/rerank-v3.5",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "NVIDIA: Nemotron 3.5 Rerank 8B (free)",
+      "model_key": "openrouter:nvidia/nemotron-3.5-rerank-8b:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "nvidia/nemotron-3.5-rerank-8b:free",
+          "name": "NVIDIA: Nemotron 3.5 Rerank 8B (free)",
+          "omp": "openrouter/nvidia/nemotron-3.5-rerank-8b:free",
+          "opencode": "openrouter/nvidia/nemotron-3.5-rerank-8b:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Qwen3 Reranker 0.6B",
+      "model_key": "openrouter:qwen/qwen3-reranker-0.6b",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32768,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "qwen/qwen3-reranker-0.6b",
+          "name": "Qwen3 Reranker 0.6B",
+          "omp": "openrouter/qwen/qwen3-reranker-0.6b",
+          "opencode": "openrouter/qwen/qwen3-reranker-0.6b",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Qwen3 Reranker 8B",
+      "model_key": "openrouter:qwen/qwen3-reranker-8b",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 40960,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "qwen/qwen3-reranker-8b",
+          "name": "Qwen3 Reranker 8B",
+          "omp": "openrouter/qwen/qwen3-reranker-8b",
+          "opencode": "openrouter/qwen/qwen3-reranker-8b",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "VoyageAI by MongoDB: rerank-2.5",
+      "model_key": "openrouter:mongodb/rerank-2.5",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32000,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "mongodb/rerank-2.5",
+          "name": "VoyageAI by MongoDB: rerank-2.5",
+          "omp": "openrouter/mongodb/rerank-2.5",
+          "opencode": "openrouter/mongodb/rerank-2.5",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "VoyageAI by MongoDB: rerank-2.5-lite",
+      "model_key": "openrouter:mongodb/rerank-2.5-lite",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32000,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "mongodb/rerank-2.5-lite",
+          "name": "VoyageAI by MongoDB: rerank-2.5-lite",
+          "omp": "openrouter/mongodb/rerank-2.5-lite",
+          "opencode": "openrouter/mongodb/rerank-2.5-lite",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "VoyageAI by MongoDB: rerank-3",
+      "model_key": "openrouter:mongodb/rerank-3",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32000,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "mongodb/rerank-3",
+          "name": "VoyageAI by MongoDB: rerank-3",
+          "omp": "openrouter/mongodb/rerank-3",
+          "opencode": "openrouter/mongodb/rerank-3",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "VoyageAI by MongoDB: rerank-3-lite",
+      "model_key": "openrouter:mongodb/rerank-3-lite",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 32000,
+      "tools": false,
+      "kind": "rerank",
+      "limit_tags": {},
+      "reason": "interface is rerank, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "mongodb/rerank-3-lite",
+          "name": "VoyageAI by MongoDB: rerank-3-lite",
+          "omp": "openrouter/mongodb/rerank-3-lite",
+          "opencode": "openrouter/mongodb/rerank-3-lite",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Fish Audio: S2.1 Pro Free (free)",
+      "model_key": "openrouter:fish-audio/s2.1-pro-free:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "speech",
+      "limit_tags": {},
+      "reason": "interface is speech, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "fish-audio/s2.1-pro-free:free",
+          "name": "Fish Audio: S2.1 Pro Free (free)",
+          "omp": "openrouter/fish-audio/s2.1-pro-free:free",
+          "opencode": "openrouter/fish-audio/s2.1-pro-free:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "HeyGen: HeyGen Voice Turbo (free)",
+      "model_key": "openrouter:heygen/heygen-voice-1-turbo:free",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "speech",
+      "limit_tags": {
+        "expires": [
+          "openrouter heygen/heygen-voice-1-turbo:free: 2026-11-30"
+        ]
+      },
+      "reason": "interface is speech, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "heygen/heygen-voice-1-turbo:free",
+          "name": "HeyGen: HeyGen Voice Turbo (free)",
+          "omp": "openrouter/heygen/heygen-voice-1-turbo:free",
+          "opencode": "openrouter/heygen/heygen-voice-1-turbo:free",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Google: Lyria 3 Clip Preview",
+      "model_key": "openrouter:google/lyria-3-clip-preview",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 1048576,
+      "tools": false,
+      "kind": "text+audio",
+      "limit_tags": {},
+      "reason": "interface is text+audio, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/lyria-3-clip-preview",
+          "name": "Google: Lyria 3 Clip Preview",
+          "omp": "openrouter/google/lyria-3-clip-preview",
+          "opencode": "openrouter/google/lyria-3-clip-preview",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Google: Lyria 3 Pro Preview",
+      "model_key": "openrouter:google/lyria-3-pro-preview",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": 1048576,
+      "tools": false,
+      "kind": "text+audio",
+      "limit_tags": {},
+      "reason": "interface is text+audio, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/lyria-3-pro-preview",
+          "name": "Google: Lyria 3 Pro Preview",
+          "omp": "openrouter/google/lyria-3-pro-preview",
+          "opencode": "openrouter/google/lyria-3-pro-preview",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: HappyHorse 1.0",
+      "model_key": "openrouter:alibaba/happyhorse-1.0",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/happyhorse-1.0",
+          "name": "Alibaba: HappyHorse 1.0",
+          "omp": "openrouter/alibaba/happyhorse-1.0",
+          "opencode": "openrouter/alibaba/happyhorse-1.0",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: HappyHorse 1.1",
+      "model_key": "openrouter:alibaba/happyhorse-1.1",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/happyhorse-1.1",
+          "name": "Alibaba: HappyHorse 1.1",
+          "omp": "openrouter/alibaba/happyhorse-1.1",
+          "opencode": "openrouter/alibaba/happyhorse-1.1",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: Wan 2.6",
+      "model_key": "openrouter:alibaba/wan-2.6",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/wan-2.6",
+          "name": "Alibaba: Wan 2.6",
+          "omp": "openrouter/alibaba/wan-2.6",
+          "opencode": "openrouter/alibaba/wan-2.6",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: Wan 2.7",
+      "model_key": "openrouter:alibaba/wan-2.7",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/wan-2.7",
+          "name": "Alibaba: Wan 2.7",
+          "omp": "openrouter/alibaba/wan-2.7",
+          "opencode": "openrouter/alibaba/wan-2.7",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: Wan 3.0",
+      "model_key": "openrouter:alibaba/wan-3.0",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/wan-3.0",
+          "name": "Alibaba: Wan 3.0",
+          "omp": "openrouter/alibaba/wan-3.0",
+          "opencode": "openrouter/alibaba/wan-3.0",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Alibaba: Wan 3.0 Prime",
+      "model_key": "openrouter:alibaba/wan-3.0-prime",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "alibaba/wan-3.0-prime",
+          "name": "Alibaba: Wan 3.0 Prime",
+          "omp": "openrouter/alibaba/wan-3.0-prime",
+          "opencode": "openrouter/alibaba/wan-3.0-prime",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Black Forest Labs: FLUX 3 Video",
+      "model_key": "openrouter:black-forest-labs/flux-3-video",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "black-forest-labs/flux-3-video",
+          "name": "Black Forest Labs: FLUX 3 Video",
+          "omp": "openrouter/black-forest-labs/flux-3-video",
+          "opencode": "openrouter/black-forest-labs/flux-3-video",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Black Forest Labs: FLUX Video Edit",
+      "model_key": "openrouter:black-forest-labs/flux-video-edit",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "black-forest-labs/flux-video-edit",
+          "name": "Black Forest Labs: FLUX Video Edit",
+          "omp": "openrouter/black-forest-labs/flux-video-edit",
+          "opencode": "openrouter/black-forest-labs/flux-video-edit",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Black Forest Labs: FLUX Video Upscale",
+      "model_key": "openrouter:black-forest-labs/flux-video-upscale",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "black-forest-labs/flux-video-upscale",
+          "name": "Black Forest Labs: FLUX Video Upscale",
+          "omp": "openrouter/black-forest-labs/flux-video-upscale",
+          "opencode": "openrouter/black-forest-labs/flux-video-upscale",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "ByteDance: Seedance 2.0",
+      "model_key": "openrouter:bytedance/seedance-2.0",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "bytedance/seedance-2.0",
+          "name": "ByteDance: Seedance 2.0",
+          "omp": "openrouter/bytedance/seedance-2.0",
+          "opencode": "openrouter/bytedance/seedance-2.0",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "ByteDance: Seedance 2.0 Fast",
+      "model_key": "openrouter:bytedance/seedance-2.0-fast",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "bytedance/seedance-2.0-fast",
+          "name": "ByteDance: Seedance 2.0 Fast",
+          "omp": "openrouter/bytedance/seedance-2.0-fast",
+          "opencode": "openrouter/bytedance/seedance-2.0-fast",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "ByteDance: Seedance 2.0 Mini",
+      "model_key": "openrouter:bytedance/seedance-2.0-mini",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "bytedance/seedance-2.0-mini",
+          "name": "ByteDance: Seedance 2.0 Mini",
+          "omp": "openrouter/bytedance/seedance-2.0-mini",
+          "opencode": "openrouter/bytedance/seedance-2.0-mini",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "ByteDance: Seedance 2.5",
+      "model_key": "openrouter:bytedance/seedance-2.5",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "bytedance/seedance-2.5",
+          "name": "ByteDance: Seedance 2.5",
+          "omp": "openrouter/bytedance/seedance-2.5",
+          "opencode": "openrouter/bytedance/seedance-2.5",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "ByteDance: Seedance 2.5 Flash",
+      "model_key": "openrouter:bytedance/seedance-2.5-flash",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "bytedance/seedance-2.5-flash",
+          "name": "ByteDance: Seedance 2.5 Flash",
+          "omp": "openrouter/bytedance/seedance-2.5-flash",
+          "opencode": "openrouter/bytedance/seedance-2.5-flash",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Google: Veo 3.1",
+      "model_key": "openrouter:google/veo-3.1",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/veo-3.1",
+          "name": "Google: Veo 3.1",
+          "omp": "openrouter/google/veo-3.1",
+          "opencode": "openrouter/google/veo-3.1",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Google: Veo 3.1 Fast",
+      "model_key": "openrouter:google/veo-3.1-fast",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/veo-3.1-fast",
+          "name": "Google: Veo 3.1 Fast",
+          "omp": "openrouter/google/veo-3.1-fast",
+          "opencode": "openrouter/google/veo-3.1-fast",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Google: Veo 3.1 Lite",
+      "model_key": "openrouter:google/veo-3.1-lite",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "google/veo-3.1-lite",
+          "name": "Google: Veo 3.1 Lite",
+          "omp": "openrouter/google/veo-3.1-lite",
+          "opencode": "openrouter/google/veo-3.1-lite",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "HeyGen: Avatar 6",
+      "model_key": "openrouter:heygen/heygen-avatar-6",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "heygen/heygen-avatar-6",
+          "name": "HeyGen: Avatar 6",
+          "omp": "openrouter/heygen/heygen-avatar-6",
+          "opencode": "openrouter/heygen/heygen-avatar-6",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "HeyGen: Avatar 6 Turbo",
+      "model_key": "openrouter:heygen/heygen-avatar-6-turbo",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "heygen/heygen-avatar-6-turbo",
+          "name": "HeyGen: Avatar 6 Turbo",
+          "omp": "openrouter/heygen/heygen-avatar-6-turbo",
+          "opencode": "openrouter/heygen/heygen-avatar-6-turbo",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "HeyGen: Avatar IV",
+      "model_key": "openrouter:heygen/avatar-iv",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "heygen/avatar-iv",
+          "name": "HeyGen: Avatar IV",
+          "omp": "openrouter/heygen/avatar-iv",
+          "opencode": "openrouter/heygen/avatar-iv",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "HeyGen: HeyGen Video",
+      "model_key": "openrouter:heygen/heygen-video-1",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "heygen/heygen-video-1",
+          "name": "HeyGen: HeyGen Video",
+          "omp": "openrouter/heygen/heygen-video-1",
+          "opencode": "openrouter/heygen/heygen-video-1",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Kling: Video O1",
+      "model_key": "openrouter:kwaivgi/kling-video-o1",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "kwaivgi/kling-video-o1",
+          "name": "Kling: Video O1",
+          "omp": "openrouter/kwaivgi/kling-video-o1",
+          "opencode": "openrouter/kwaivgi/kling-video-o1",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Kling: Video v3.0 Pro",
+      "model_key": "openrouter:kwaivgi/kling-v3.0-pro",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "kwaivgi/kling-v3.0-pro",
+          "name": "Kling: Video v3.0 Pro",
+          "omp": "openrouter/kwaivgi/kling-v3.0-pro",
+          "opencode": "openrouter/kwaivgi/kling-v3.0-pro",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Kling: Video v3.0 Standard",
+      "model_key": "openrouter:kwaivgi/kling-v3.0-std",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "kwaivgi/kling-v3.0-std",
+          "name": "Kling: Video v3.0 Standard",
+          "omp": "openrouter/kwaivgi/kling-v3.0-std",
+          "opencode": "openrouter/kwaivgi/kling-v3.0-std",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "MiniMax: H3",
+      "model_key": "openrouter:minimax/hailuo-3",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "minimax/hailuo-3",
+          "name": "MiniMax: H3",
+          "omp": "openrouter/minimax/hailuo-3",
+          "opencode": "openrouter/minimax/hailuo-3",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "MiniMax: H3 Max",
+      "model_key": "openrouter:minimax/hailuo-3-max",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "minimax/hailuo-3-max",
+          "name": "MiniMax: H3 Max",
+          "omp": "openrouter/minimax/hailuo-3-max",
+          "opencode": "openrouter/minimax/hailuo-3-max",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "MiniMax: Hailuo 2.3",
+      "model_key": "openrouter:minimax/hailuo-2.3",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "minimax/hailuo-2.3",
+          "name": "MiniMax: Hailuo 2.3",
+          "omp": "openrouter/minimax/hailuo-2.3",
+          "opencode": "openrouter/minimax/hailuo-2.3",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Runway: Aleph 2.0",
+      "model_key": "openrouter:runway/aleph-2",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "runway/aleph-2",
+          "name": "Runway: Aleph 2.0",
+          "omp": "openrouter/runway/aleph-2",
+          "opencode": "openrouter/runway/aleph-2",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "Runway: Gen-4.5",
+      "model_key": "openrouter:runway/gen-4.5",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "runway/gen-4.5",
+          "name": "Runway: Gen-4.5",
+          "omp": "openrouter/runway/gen-4.5",
+          "opencode": "openrouter/runway/gen-4.5",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "SpaceXAI: Grok Imagine Video",
+      "model_key": "openrouter:x-ai/grok-imagine-video",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "x-ai/grok-imagine-video",
+          "name": "SpaceXAI: Grok Imagine Video",
+          "omp": "openrouter/x-ai/grok-imagine-video",
+          "opencode": "openrouter/x-ai/grok-imagine-video",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "SpaceXAI: Grok Imagine Video 1.5",
+      "model_key": "openrouter:x-ai/grok-imagine-video-1.5",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "x-ai/grok-imagine-video-1.5",
+          "name": "SpaceXAI: Grok Imagine Video 1.5",
+          "omp": "openrouter/x-ai/grok-imagine-video-1.5",
+          "opencode": "openrouter/x-ai/grok-imagine-video-1.5",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "SpaceXAI: Grok Imagine Video 1.5 Lite",
+      "model_key": "openrouter:x-ai/grok-imagine-video-1.5-lite",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "x-ai/grok-imagine-video-1.5-lite",
+          "name": "SpaceXAI: Grok Imagine Video 1.5 Lite",
+          "omp": "openrouter/x-ai/grok-imagine-video-1.5-lite",
+          "opencode": "openrouter/x-ai/grok-imagine-video-1.5-lite",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    },
+    {
+      "rank": null,
+      "tier": null,
+      "name": "TBC: mischief 1",
+      "model_key": "openrouter:tbc/mischief-1",
+      "score": null,
+      "share_of_top": null,
+      "evidence": 0.0,
+      "family_scores": null,
+      "context_component": null,
+      "context_tokens": null,
+      "tools": false,
+      "kind": "video",
+      "limit_tags": {},
+      "reason": "interface is video, not a tool-using chat model",
+      "routes": [
+        {
+          "gateway": "openrouter",
+          "route_id": "tbc/mischief-1",
+          "name": "TBC: mischief 1",
+          "omp": "openrouter/tbc/mischief-1",
+          "opencode": "openrouter/tbc/mischief-1",
+          "omp_provider_configured": true
+        }
+      ],
+      "breakdown": []
+    }
+  ]
+}
