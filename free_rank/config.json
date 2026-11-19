@@ -1,0 +1,161 @@
+{
+  "_comment": "Every constant the free-model ranking uses. Code reads this file and holds no model names, versions or route ids. Change weights here, never in code.",
+  "version": 1,
+
+  "catalogues": {
+    "opencode-zen": {
+      "label": "OpenCode Zen",
+      "url": "https://opencode.ai/inference/openai/v1/models",
+      "format": "opencode",
+      "free_rule": "every listed text price is zero",
+      "selectors": {"omp": "opencode-zen/{id}", "opencode": "opencode/{id}"}
+    },
+    "opencode-go": {
+      "label": "OpenCode Go",
+      "url": "https://opencode.ai/inference/go/v1/models",
+      "format": "opencode",
+      "free_rule": "every listed text price is zero (outside the plan's metered allowance)",
+      "selectors": {"omp": "opencode-go/{id}", "opencode": "opencode-go/{id}"}
+    },
+    "kilo": {
+      "label": "Kilo Code",
+      "url": "https://ai-gateway.kilo.ai/api/v1/models",
+      "format": "kilo",
+      "free_rule": "isFree is true and prompt and completion prices are zero",
+      "selectors": {"omp": "kilo/{id}", "kilo": "{id}"}
+    },
+    "openrouter": {
+      "label": "OpenRouter",
+      "url": "https://openrouter.ai/api/v1/models?output_modalities=all",
+      "format": "openrouter",
+      "free_rule": "every listed pricing field is zero",
+      "selectors": {"omp": "openrouter/{id}", "opencode": "openrouter/{id}"}
+    }
+  },
+
+  "omp_configured_providers": ["opencode-zen", "opencode-go", "openrouter"],
+
+  "benchmark_sources": {
+    "aa-leaderboard": {
+      "url": "https://artificialanalysis.ai/leaderboards/models",
+      "host": "artificialanalysis.ai",
+      "independent": true,
+      "fallback_snapshot": "frontier/sources/current/aa-primary.json.gz"
+    },
+    "aa-coding-agents": {
+      "url": "https://artificialanalysis.ai/agents/coding-agents?routers=true",
+      "host": "artificialanalysis.ai",
+      "independent": true
+    },
+    "vals-terminal-bench-4": {
+      "url": "https://www.vals.ai/benchmarks/terminal-bench-4",
+      "host": "www.vals.ai",
+      "independent": true,
+      "benchmark": "terminal_bench_4"
+    },
+    "tbench-leaderboard": {
+      "url": "https://www.tbench.ai/",
+      "host": "www.tbench.ai",
+      "independent": true,
+      "benchmark": "terminal_bench_4"
+    },
+    "kilobench": {
+      "url": "https://kilo.ai/kilobench",
+      "host": "kilo.ai",
+      "independent": true,
+      "benchmark": "kilobench"
+    }
+  },
+
+  "evidence_files": [
+    {
+      "path": "free_rank/evidence/l1-free-models-2026-11-19.json",
+      "source": "Masterplan packet L1 (2026-11-19): hand-transcribed benchmark records, one source URL and date per number. Used for publisher tables that are published as images and cannot be scraped. Its tier placements are not in this file and are never read by the ranking.",
+      "gateway_names": {"OpenCode Zen": "opencode-zen", "OpenCode Go": "opencode-go", "Kilo Code": "kilo", "OpenRouter": "openrouter"}
+    }
+  ],
+
+  "independent_hosts": ["artificialanalysis.ai", "www.vals.ai", "vals.ai", "www.tbench.ai", "tbench.ai", "kilo.ai", "www.swebench.com", "swebench.com", "arena.ai", "livecodebench.github.io"],
+  "host_aliases": {"openrouter.ai": "artificialanalysis.ai"},
+  "_host_aliases_note": "OpenRouter model pages mirror Artificial Analysis indices; those records count as AA observations.",
+
+  "evidence_unit_scale": {"0 to 1": 100, "fraction": 100},
+  "evidence_skip_units": ["Elo", "rank", "milliseconds", "seconds", "rating points"],
+  "exclude_record_if_setting_matches": ["excluded from ranking", "simulated"],
+  "exclude_benchmark_name_matches": ["token reduction", "latency", "cost", "\\brank\\b", "win_rate", "\\belo\\b"],
+
+  "aa_fields": {
+    "intelligenceIndex": {"benchmark": "aa_intelligence", "scale": 1},
+    "terminalbench-4-0": {"benchmark": "terminal_bench_4", "scale": 100},
+    "terminalbench-2-1": {"benchmark": "terminal_bench_2", "scale": 100},
+    "frontiercode-2-0": {"benchmark": "frontiercode", "scale": 100},
+    "artificial-analysis-long-context-reasoning": {"benchmark": "long_context", "scale": 100},
+    "ifbench": {"benchmark": "ifbench", "scale": 100},
+    "tau3-banking": {"benchmark": "tau_bench", "scale": 100},
+    "tau2-bench": {"benchmark": "tau_bench", "scale": 100},
+    "livecodebench": {"benchmark": "livecodebench", "scale": 100}
+  },
+
+  "benchmarks": {
+    "aa_coding_agent_index": {"family": "agentic coding", "weight": 3.0, "patterns": ["coding agent index"]},
+    "terminal_bench_4":      {"family": "agentic coding", "weight": 3.0, "patterns": ["terminal[- ]?bench[^a-z0-9]*v?4(\\.0)?(?![.\\d])(?!.*science)"]},
+    "deepswe":               {"family": "agentic coding", "weight": 2.0, "patterns": ["deep[- ]?swe"]},
+    "kilobench":             {"family": "agentic coding", "weight": 1.5, "patterns": ["kilobench"]},
+    "frontiercode":          {"family": "agentic coding", "weight": 1.5, "patterns": ["frontiercode"]},
+    "swe_bench_verified":    {"family": "repository repair", "weight": 1.5, "patterns": ["swe[- ]?bench[^a-z]*verified"]},
+    "swe_bench_pro":         {"family": "repository repair", "weight": 1.0, "patterns": ["swe[- ]?bench[^a-z]*pro"]},
+    "terminal_bench_2":      {"family": "repository repair", "weight": 1.0, "patterns": ["terminal[- ]?bench[^a-z0-9]*v?2(\\.\\d)?(?![.\\d])(?!.*(hard|science))"]},
+    "aa_intelligence":       {"family": "general agent", "weight": 2.0, "patterns": ["artificial analysis intelligence index"]},
+    "mcp_tools":             {"family": "general agent", "weight": 1.0, "patterns": ["mcp[- ]?atlas", "toolathlon", "bfcl"]},
+    "tau_bench":             {"family": "general agent", "weight": 0.5, "patterns": ["^tau[23]?[- ]?(bench)?", "^τ"]},
+    "osworld":               {"family": "general agent", "weight": 0.5, "patterns": ["osworld"]},
+    "long_context":          {"family": "general agent", "weight": 1.0, "patterns": ["^aa-?lcr", "long[- ]context reasoning", "longbench"]},
+    "ifbench":               {"family": "general agent", "weight": 0.75, "patterns": ["^ifbench"]},
+    "livecodebench":         {"family": "general agent", "weight": 0.5, "patterns": ["^livecodebench(?! pro)"]}
+  },
+
+  "scoring": {
+    "normalisation": "minmax",
+    "_normalisation_options": "ratio_to_max: value / best value in the ranked pool; minmax: (value - min) / (max - min); zscore: normal CDF of the z-score in the pool",
+    "publisher_discount": 0.85,
+    "_publisher_discount_note": "Publisher-reported numbers are multiplied by this before normalisation (self-reported harnesses, budgets and task filters vary).",
+    "publisher_confidence": 0.75,
+    "_publisher_confidence_note": "A publisher-only benchmark counts this fraction of its weight as evidence.",
+    "shrinkage_weight": 2.0,
+    "shrinkage_prior": 0.2,
+    "_shrinkage_note": "Missing benchmarks are not zeros. The weighted mean is shrunk toward the prior by shrinkage_weight units of pseudo-evidence, so thin evidence pulls a model toward the prior.",
+    "family_weights": {"agentic coding": 0.6, "repository repair": 0.15, "general agent": 0.25},
+    "_family_weights_note": "Repository and terminal task completion first, general agent ability second (the reference method's stated priority). Each family is shrunk separately before mixing.",
+    "context_bonus_weight": 0.03,
+    "context_floor_tokens": 32768,
+    "context_full_tokens": 1048576,
+    "aa_variant_choice": "highest intelligence index among matched variants"
+  },
+
+  "tiers": {
+    "thresholds": [
+      {"tier": 1, "min_score_of_top": 0.75, "min_evidence": 3.0, "requires_tools": true},
+      {"tier": 2, "min_score_of_top": 0.30, "min_evidence": 2.0, "requires_tools": true},
+      {"tier": 3, "min_score_of_top": 0.20, "min_evidence": 0.5, "requires_tools": false},
+      {"tier": 4, "min_score_of_top": 0.0,  "min_evidence": 0.1, "requires_tools": false}
+    ],
+    "unplaced_below_evidence": 0.1
+  },
+
+  "ranked_kinds": ["chat"],
+
+  "matching": {
+    "ignorable_tokens": ["free", "it", "instruct", "chat", "reasoning", "thinking", "bf16", "fp8", "fp4", "gguf", "awq", "the", "model"],
+    "size_token_pattern": "^a?\\d+(\\.\\d+)?[bm]$",
+    "date_stamp_pattern": "-\\d{8}$"
+  },
+
+  "tags": {
+    "description_patterns": {
+      "limited": ["limited time", "limited-time", "for a limited"],
+      "undisclosed": ["stealth", "anonymous"],
+      "router": ["\\brouter\\b", "rotates through", "selects free models"],
+      "sharing": ["may be logged", "used to improve", "retained by the provider", "train on (your )?(prompts|data)"]
+    }
+  }
+}
