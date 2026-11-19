@@ -3,6 +3,7 @@
 import json
 
 from source_adapter import (
+    SourceAdapterRejected,
     build_source_observations,
     diff_source_observations,
     last_known_good_path,
@@ -110,3 +111,20 @@ def test_quarantine_receipt_keeps_only_digest_size_and_failure_reason():
     assert receipt["payload_bytes"] == len(payload)
     assert receipt["raw_payload_stored"] is False
     assert "potentially sensitive" not in str(receipt)
+
+
+def test_variable_price_sentinel_is_unknown_not_a_rejected_catalog():
+    payload = {"data": [
+        {"id": "openrouter/auto", "name": "Auto Router", "pricing": {"prompt": "-1", "completion": "-1"}},
+        {"id": "vendor/model-a", "name": "Model A", "pricing": {"prompt": "0.000001", "completion": "0.000002"}},
+    ]}
+    doc = build_source_observations(payload, serving_provider="openrouter", source_id="openrouter-models",
+                                    retrieved_at="2026-11-19T00:00:00Z", source_sha256="a" * 64)
+    validate_observations(doc)
+    auto, other = doc["records"]
+    assert auto["pricing"]["input"] == {"state": "unknown", "value": None, "basis": "variable"}
+    assert other["pricing"]["input"]["state"] == "known"
+    import pytest
+    with pytest.raises(SourceAdapterRejected):
+        build_source_observations({"data": [{"id": "x/y", "pricing": {"prompt": "-2"}}]}, serving_provider="p",
+                                  source_id="s", retrieved_at="t", source_sha256="a" * 64)

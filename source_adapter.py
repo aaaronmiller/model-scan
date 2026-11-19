@@ -30,6 +30,11 @@ def _price(value: Any) -> dict[str, Any]:
         parsed = float(value)
     except (TypeError, ValueError):
         raise SourceAdapterRejected(f"invalid price value: {value!r}")
+    if parsed == -1:
+        # OpenRouter marks routers whose price depends on the model they pick (for example
+        # openrouter/auto) with -1. That is an unknown price, not a bad payload: rejecting it
+        # used to throw away the whole catalog because of one entry.
+        return {"state": "unknown", "value": None, "basis": "variable"}
     if not math.isfinite(parsed) or parsed < 0:
         raise SourceAdapterRejected("price must be finite and nonnegative")
     return {"state": "known", "value": parsed}
