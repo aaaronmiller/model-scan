@@ -10,6 +10,7 @@ import gzip
 import hashlib
 import json
 import math
+import os
 import re
 from pathlib import Path
 
@@ -274,8 +275,12 @@ def ledger_refresh(payload):
                 'metric_name':metric,'metric_axis':axis,'raw_value':format(v,'.12g'),'raw_unit':'USD per task' if axis=='cost' else 'score / 100',
                 'raw_direction':'lower' if axis=='cost' else 'higher','use_in_aggregate':aggregate,
                 'is_reference_scale':aggregate})
-    with p.open('w',newline='') as f:
+    # Write beside the ledger, then rename: an interrupted refresh leaves the old ledger whole
+    # (old refresh_aa.py did this; ardf-archive idea AL-015).
+    tmp=p.with_name(p.name+'.tmp')
+    with tmp.open('w',newline='') as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(old+fresh)
+    os.replace(tmp,p)
 
 def _stable(value):
     """Floats rounded to 12 significant digits for serialization (same rule as calibrate.stable_json_value)."""
