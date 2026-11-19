@@ -1,9 +1,11 @@
 """Verify the rebuilt dashboard: offline panel logic, zero/unknown costs, filters, tier weighting, browser render.
 
-Run from ardf/ after `python3 calibrate.py`:   python3 tests/verify_dashboard.py [--screenshot out.png]
+Run from model-scan/frontier after `python3 calibrate.py`:   python3 tests/verify_dashboard.py [--screenshot out.png]
 
-Standard library only. Needs a Chromium/Chrome binary for the in-page self-test; without one the script says so
-and exits 3 (it never reports a pass it did not run). Cross-checks the page against current_frontier.py:
+Standard library, plus Playwright when it is importable. Needs a Chromium/Chrome binary for the in-page self-test;
+without one the script says so and exits 3 (it never reports a pass it did not run). With Playwright the page is
+loaded and the script waits for the self-test output (about 5 s). Without it, it falls back to `--dump-dom` with a
+virtual time budget, which stalls on newer Chromium builds (rec-04-review-r2; version-ledger idea FR-051). Cross-checks the page against current_frontier.py:
 the default frontier, tier-weighted scores and the weighted frontier must equal the Python reference exactly.
 """
 from __future__ import annotations
@@ -26,7 +28,28 @@ def browser():
     for name in ('chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome'):
         p = shutil.which(name)
         if p: return p
-    return None
+    # Playwright's cached browsers, newest build first
+    cached = sorted(Path.home().glob('.cache/ms-playwright/chromium-*/chrome-linux*/chrome'),
+                    key=lambda q: int(q.parts[-3].split('-')[1]) if q.parts[-3].split('-')[1].isdigit() else 0, reverse=True)
+    return str(cached[0]) if cached else None
+
+
+def selftest_text_playwright(exe, url):
+    """Load the page and wait for the self-test element; None when Playwright is not importable."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(headless=True, args=['--no-sandbox'], executable_path=exe)
+        try:
+            page = b.new_page()
+            page.goto(url, timeout=240000, wait_until='load')
+            page.wait_for_function("(() => {const e=document.getElementById('pc-selftest');"
+                                   " return e && e.textContent.trim().length>0})()", timeout=240000)
+            return page.eval_on_selector('#pc-selftest', 'e => e.textContent')
+        finally:
+            b.close()
 
 
 def run_browser(exe, args, out=None):
@@ -49,11 +72,14 @@ def main():
     exe = browser()
     if not exe:
         print('NOT VERIFIED: no Chromium/Chrome binary found, so the browser self-test did not run'); return 3
-    dom = run_browser(exe, ['--dump-dom', dash.as_uri() + '?selftest=1'])
-    m = re.search(r'<pre id="pc-selftest"[^>]*>(.*?)</pre>', dom, re.S)
-    if not m:
-        print('FAIL: no self-test output in the rendered page'); return 1
-    res = json.loads(html.unescape(m.group(1)))
+    text = selftest_text_playwright(exe, dash.as_uri() + '?selftest=1')
+    if text is None:
+        dom = run_browser(exe, ['--dump-dom', dash.as_uri() + '?selftest=1'])
+        m = re.search(r'<pre id="pc-selftest"[^>]*>(.*?)</pre>', dom, re.S)
+        if not m:
+            print('FAIL: no self-test output in the rendered page'); return 1
+        text = html.unescape(m.group(1))
+    res = json.loads(text)
     failed = 0
     for c in res['checks']:
         print(('PASS ' if c['pass'] else 'FAIL ') + c['name'] + (' [' + str(c['detail']) + ']' if c['detail'] != '' else ''))
